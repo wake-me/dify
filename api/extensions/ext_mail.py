@@ -5,19 +5,44 @@ from flask import Flask
 
 
 class Mail:
+    """
+    邮件服务类，用于初始化邮件客户端和发送邮件。
+    """
+
     def __init__(self):
-        self._client = None
-        self._default_send_from = None
+        """
+        初始化邮件服务类，邮件客户端和默认发件人地址初始为None。
+        """
+        self._client = None  # 邮件客户端
+        self._default_send_from = None  # 默认发件人地址
 
     def is_inited(self) -> bool:
+        """
+        检查邮件客户端是否已初始化。
+
+        返回:
+            bool: 邮件客户端是否已初始化。
+        """
         return self._client is not None
 
     def init_app(self, app: Flask):
-        if app.config.get('MAIL_TYPE'):
-            if app.config.get('MAIL_DEFAULT_SEND_FROM'):
-                self._default_send_from = app.config.get('MAIL_DEFAULT_SEND_FROM')
+        """
+        根据Flask应用配置初始化邮件客户端。
 
-            if app.config.get('MAIL_TYPE') == 'resend':
+        参数:
+            app (Flask): Flask应用实例。
+        """
+        # 检查邮件类型配置
+        mail_type = app.config.get('MAIL_TYPE')
+        if mail_type:
+            # 检查并设置默认发件人地址
+            default_send_from = app.config.get('MAIL_DEFAULT_SEND_FROM')
+            if default_send_from:
+                self._default_send_from = default_send_from
+
+            # 根据邮件类型初始化邮件客户端
+            if mail_type == 'resend':
+                # 重发邮件类型配置
                 api_key = app.config.get('RESEND_API_KEY')
                 if not api_key:
                     raise ValueError('RESEND_API_KEY is not set')
@@ -28,7 +53,8 @@ class Mail:
 
                 resend.api_key = api_key
                 self._client = resend.Emails
-            elif app.config.get('MAIL_TYPE') == 'smtp':
+            elif mail_type == 'smtp':
+                # SMTP邮件类型配置
                 from libs.smtp import SMTPClient
                 if not app.config.get('SMTP_SERVER') or not app.config.get('SMTP_PORT'):
                     raise ValueError('SMTP_SERVER and SMTP_PORT are required for smtp mail type')
@@ -41,12 +67,26 @@ class Mail:
                     use_tls=app.config.get('SMTP_USE_TLS')
                 )
             else:
+                # 不支持的邮件类型
                 raise ValueError('Unsupported mail type {}'.format(app.config.get('MAIL_TYPE')))
 
     def send(self, to: str, subject: str, html: str, from_: Optional[str] = None):
+        """
+        发送邮件。
+
+        参数:
+            to (str): 收件人邮箱。
+            subject (str): 邮件主题。
+            html (str): 邮件HTML内容。
+            from_ (Optional[str], optional): 发件人邮箱，如果未指定，则使用默认发件人地址。默认为None。
+
+        异常:
+            ValueError: 当邮件客户端未初始化、发件人地址未设置、收件人地址、邮件主题或HTML内容为空时抛出。
+        """
         if not self._client:
             raise ValueError('Mail client is not initialized')
 
+        # 设置发件人地址
         if not from_ and self._default_send_from:
             from_ = self._default_send_from
 
@@ -62,6 +102,7 @@ class Mail:
         if not html:
             raise ValueError('mail html is not set')
 
+        # 发送邮件
         self._client.send({
             "from": from_,
             "to": to,
@@ -71,7 +112,13 @@ class Mail:
 
 
 def init_app(app: Flask):
+    """
+    在Flask应用中初始化邮件服务。
+
+    参数:
+        app (Flask): Flask应用实例。
+    """
     mail.init_app(app)
 
 
-mail = Mail()
+mail = Mail()  # 邮件服务实例
