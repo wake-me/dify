@@ -15,22 +15,61 @@ from .account import Account, Tenant
 
 
 class DifySetup(db.Model):
-    __tablename__ = 'dify_setups'
+    """
+    DifySetup 类代表了 Dify 设置的信息模型。
+    
+    属性:
+    - version: 设置的版本号，为字符串类型，不可为空。
+    - setup_at: 设置完成的时间，为日期时间类型，不可为空，默认为当前时间。
+    
+    该模型映射到数据库表 'dify_setups'，其中主键为 'version'。
+    """
+    __tablename__ = 'dify_setups'  # 指定数据库表名为 'dify_setups'
     __table_args__ = (
-        db.PrimaryKeyConstraint('version', name='dify_setup_pkey'),
+        db.PrimaryKeyConstraint('version', name='dify_setup_pkey'),  # 设置 'version' 字段为 primary key
     )
 
-    version = db.Column(db.String(255), nullable=False)
-    setup_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-
+    version = db.Column(db.String(255), nullable=False)  # 版本号字段，长度最多为255个字符，不能为空
+    setup_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 设置完成时间字段，不可为空，默认值为当前时间（不带时区）
 
 class App(db.Model):
+    """
+    App 类表示一个应用程序模型，它在数据库中映射为一个表。
+
+    属性:
+    - id: 应用的唯一标识符，使用UUID生成。
+    - tenant_id: 租户的唯一标识符，不可为空。
+    - name: 应用的名称，不可为空。
+    - mode: 应用的模式，不可为空。
+    - icon: 应用的图标地址。
+    - icon_background: 图标的背景颜色。
+    - app_model_config_id: 应用模型配置的唯一标识符，可为空。
+    - status: 应用的状态，默认为'normal'。
+    - enable_site: 是否启用Web界面。
+    - enable_api: 是否启用API接口。
+    - api_rpm: API每分钟请求限制。
+    - api_rph: API每小时请求限制。
+    - is_demo: 是否为演示应用。
+    - is_public: 是否为公共应用。
+    - is_universal: 是否为通用应用。
+    - created_at: 创建时间。
+    - updated_at: 更新时间。
+
+    方法:
+    - site: 获取应用对应的Site对象。
+    - app_model_config: 获取应用的模型配置对象。
+    - api_base_url: 获取API的基础URL。
+    - tenant: 获取应用所属的租户对象。
+    - is_agent: 判断应用是否为代理模式。
+    - deleted_tools: 获取已删除的工具信息。
+    """
     __tablename__ = 'apps'
     __table_args__ = (
         db.PrimaryKeyConstraint('id', name='app_pkey'),
         db.Index('app_tenant_id_idx', 'tenant_id')
     )
 
+    # 定义表字段和它们的数据类型
     id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
     tenant_id = db.Column(UUID, nullable=False)
     name = db.Column(db.String(255), nullable=False)
@@ -51,27 +90,57 @@ class App(db.Model):
 
     @property
     def site(self):
+        """
+        获取关联的Site对象。
+
+        返回:
+        - Site对象或None（如果找不到对应的Site对象）。
+        """
         site = db.session.query(Site).filter(Site.app_id == self.id).first()
         return site
 
     @property
     def app_model_config(self):
+        """
+        获取关联的AppModelConfig对象。
+
+        返回:
+        - AppModelConfig对象或None（如果找不到对应的配置）。
+        """
         app_model_config = db.session.query(AppModelConfig).filter(
             AppModelConfig.id == self.app_model_config_id).first()
         return app_model_config
 
     @property
     def api_base_url(self):
+        """
+        获取API的基础URL。
+
+        返回:
+        - API的基础URL字符串。
+        """
         return (current_app.config['SERVICE_API_URL'] if current_app.config['SERVICE_API_URL']
                 else request.host_url.rstrip('/')) + '/v1'
 
     @property
     def tenant(self):
+        """
+        获取关联的租户对象。
+
+        返回:
+        - Tenant对象或None（如果找不到对应的租户）。
+        """
         tenant = db.session.query(Tenant).filter(Tenant.id == self.tenant_id).first()
         return tenant
     
     @property
     def is_agent(self) -> bool:
+        """
+        判断应用是否运行在代理模式。
+
+        返回:
+        - 布尔值，表示应用是否为代理模式。
+        """
         app_model_config = self.app_model_config
         if not app_model_config:
             return False
@@ -84,7 +153,13 @@ class App(db.Model):
     
     @property
     def deleted_tools(self) -> list:
-        # get agent mode tools
+        """
+        获取已从系统中删除的工具名称列表。
+
+        返回:
+        - 已删除工具的名称列表。
+        """
+        # 获取并处理应用的代理模式工具配置
         app_model_config = self.app_model_config
         if not app_model_config:
             return []
@@ -95,13 +170,14 @@ class App(db.Model):
         
         provider_ids = []
 
+        # 筛选出有效的API提供者ID
         for tool in tools:
             keys = list(tool.keys())
             if len(keys) >= 4:
                 provider_type = tool.get('provider_type', '')
                 provider_id = tool.get('provider_id', '')
                 if provider_type == 'api':
-                    # check if provider id is a uuid string, if not, skip
+                    # 如果提供者ID是有效的UUID，则加入到列表中
                     try:
                         uuid.UUID(provider_id)
                     except Exception:
@@ -111,6 +187,7 @@ class App(db.Model):
         if not provider_ids:
             return []
 
+        # 查询数据库，确认哪些工具的提供者已经被删除
         api_providers = db.session.execute(
             text('SELECT id FROM tool_api_providers WHERE id IN :provider_ids'),
             {'provider_ids': tuple(provider_ids)}
@@ -119,6 +196,7 @@ class App(db.Model):
         deleted_tools = []
         current_api_provider_ids = [str(api_provider.id) for api_provider in api_providers]
 
+        # 比较当前和已删除的提供者ID，收集已删除的工具名称
         for tool in tools:
             keys = list(tool.keys())
             if len(keys) >= 4:
@@ -130,6 +208,57 @@ class App(db.Model):
         return deleted_tools
 
 class AppModelConfig(db.Model):
+    """
+    应用模型配置类，用于表示应用程序与模型之间的配置关系。
+    
+    属性:
+    - id: 唯一标识符，使用UUID生成。
+    - app_id: 关联的应用程序的唯一标识符，不可为空。
+    - provider: 模型提供者。
+    - model_id: 模型的唯一标识符，不可为空。
+    - configs: 模型的配置信息，以JSON格式存储，不可为空。
+    - created_at: 记录创建时间，不可为空，默认为当前时间。
+    - updated_at: 记录更新时间，不可为空，默认为当前时间。
+    - opening_statement: 开场白。
+    - suggested_questions: 建议的问题列表。
+    - suggested_questions_after_answer: 回答后建议的问题。
+    - speech_to_text: 语音转文本的配置。
+    - text_to_speech: 文本转语音的配置。
+    - more_like_this: 类似的配置。
+    - model: 有关模型的额外信息。
+    - user_input_form: 用户输入表单的配置。
+    - dataset_query_variable: 数据集查询变量。
+    - pre_prompt: 预提示信息。
+    - agent_mode: 代理模式配置。
+    - sensitive_word_avoidance: 敏感词规避配置。
+    - retriever_resource: 检索资源配置。
+    - prompt_type: 提示类型，默认为'simple'。
+    - chat_prompt_config: 聊天提示配置。
+    - completion_prompt_config: 完成提示配置。
+    - dataset_configs: 数据集配置。
+    - external_data_tools: 外部数据工具配置。
+    - file_upload: 文件上传配置。
+    
+    方法:
+    - app: 根据app_id获取关联的应用程序对象。
+    - model_dict: 获取model属性解析后的字典形式。
+    - suggested_questions_list: 获取suggested_questions属性解析后的列表形式。
+    - suggested_questions_after_answer_dict: 获取suggested_questions_after_answer属性解析后的字典形式，若不存在则默认为{"enabled": False}。
+    - speech_to_text_dict: 获取speech_to_text属性解析后的字典形式，若不存在则默认为{"enabled": False}。
+    - text_to_speech_dict: 获取text_to_speech属性解析后的字典形式，若不存在则默认为{"enabled": False}。
+    - retriever_resource_dict: 获取retriever_resource属性解析后的字典形式，若不存在则默认为{"enabled": False}。
+    - annotation_reply_dict：获取注解回复配置的字典表示。
+    - more_like_this_dict：获取"更多类似"功能的配置字典。
+    - sensitive_word_avoidance_dict：获取敏感词规避配置的字典表示。
+    - external_data_tools_list：获取外部数据工具列表的字典表示。
+    - user_input_form_list：获取用户输入表单配置的列表表示。
+    - agent_mode_dict：获取代理模式配置的字典表示。
+    - chat_prompt_config_dict：获取聊天提示配置的字典表示。
+    - completion_prompt_config_dict：获取完成提示配置的字典表示。
+    - dataset_configs_dict：获取数据集配置的字典表示。
+    - file_upload_dict：获取文件上传配置的字典表示。
+    """
+
     __tablename__ = 'app_model_configs'
     __table_args__ = (
         db.PrimaryKeyConstraint('id', name='app_model_config_pkey'),
@@ -165,39 +294,88 @@ class AppModelConfig(db.Model):
 
     @property
     def app(self):
+        """
+        根据app_id获取关联的应用程序对象。
+        
+        返回:
+        - App对象: 与当前AppModelConfig关联的应用程序对象。
+        """
         app = db.session.query(App).filter(App.id == self.app_id).first()
         return app
 
     @property
     def model_dict(self) -> dict:
+        """
+        获取model属性解析后的字典形式。
+        
+        返回:
+        - dict: model属性解析后的字典形式，如果model为空则返回None。
+        """
         return json.loads(self.model) if self.model else None
 
     @property
     def suggested_questions_list(self) -> list:
+        """
+        获取suggested_questions属性解析后的列表形式。
+        
+        返回:
+        - list: suggested_questions属性解析后的列表形式，如果suggested_questions为空则返回空列表。
+        """
         return json.loads(self.suggested_questions) if self.suggested_questions else []
 
     @property
     def suggested_questions_after_answer_dict(self) -> dict:
+        """
+        获取suggested_questions_after_answer属性解析后的字典形式，若不存在则默认为{"enabled": False}。
+        
+        返回:
+        - dict: suggested_questions_after_answer属性解析后的字典形式。
+        """
         return json.loads(self.suggested_questions_after_answer) if self.suggested_questions_after_answer \
             else {"enabled": False}
 
     @property
     def speech_to_text_dict(self) -> dict:
+        """
+        获取speech_to_text属性解析后的字典形式，若不存在则默认为{"enabled": False}。
+        
+        返回:
+        - dict: speech_to_text属性解析后的字典形式。
+        """
         return json.loads(self.speech_to_text) if self.speech_to_text \
             else {"enabled": False}
 
     @property
     def text_to_speech_dict(self) -> dict:
+        """
+        获取text_to_speech属性解析后的字典形式，若不存在则默认为{"enabled": False}。
+        
+        返回:
+        - dict: text_to_speech属性解析后的字典形式。
+        """
         return json.loads(self.text_to_speech) if self.text_to_speech \
             else {"enabled": False}
 
     @property
     def retriever_resource_dict(self) -> dict:
+        """
+        获取retriever_resource属性解析后的字典形式，若不存在则默认为{"enabled": False}。
+        
+        返回:
+        - dict: retriever_resource属性解析后的字典形式。
+        """
         return json.loads(self.retriever_resource) if self.retriever_resource \
             else {"enabled": False}
 
     @property
     def annotation_reply_dict(self) -> dict:
+        """
+        获取注解回复配置的字典表示。
+
+        返回:
+            dict: 包含注解设置的id、启用状态、分数阈值和嵌入模型信息的字典。
+        """
+        # 从数据库查询注解设置，并根据设置构建返回的字典
         annotation_setting = db.session.query(AppAnnotationSetting).filter(
             AppAnnotationSetting.app_id == self.app_id).first()
         if annotation_setting:
@@ -217,36 +395,92 @@ class AppModelConfig(db.Model):
 
     @property
     def more_like_this_dict(self) -> dict:
+        """
+        获取"更多类似"功能的配置字典。
+
+        返回:
+            dict: 包含该功能的启用状态的字典。
+        """
+        # 将字符串形式的配置转换为字典形式，若无配置，则返回禁用状态
         return json.loads(self.more_like_this) if self.more_like_this else {"enabled": False}
 
     @property
     def sensitive_word_avoidance_dict(self) -> dict:
+        """
+        获取敏感词规避配置的字典表示。
+
+        返回:
+            dict: 包含敏感词规避的启用状态、类型和配置信息的字典。
+        """
+        # 处理敏感词规避配置，转换为字典格式，若无配置，则返回默认禁用状态
         return json.loads(self.sensitive_word_avoidance) if self.sensitive_word_avoidance \
             else {"enabled": False, "type": "", "configs": []}
 
     @property
     def external_data_tools_list(self) -> list[dict]:
+        """
+        获取外部数据工具列表的字典表示。
+
+        返回:
+            list[dict]: 包含外部数据工具信息的列表。
+        """
+        # 将外部数据工具的字符串配置转换为列表形式，若无配置，则返回空列表
         return json.loads(self.external_data_tools) if self.external_data_tools \
             else []
 
     @property
     def user_input_form_list(self) -> dict:
+        """
+        获取用户输入表单配置的列表表示。
+
+        返回:
+            dict: 包含用户输入表单信息的列表。
+        """
+        # 将用户输入表单的字符串配置转换为列表形式，若无配置，则返回空列表
         return json.loads(self.user_input_form) if self.user_input_form else []
 
     @property
     def agent_mode_dict(self) -> dict:
+        """
+        获取代理模式配置的字典表示。
+
+        返回:
+            dict: 包含代理模式的启用状态、策略、工具和提示信息的字典。
+        """
+        # 将代理模式配置转换为字典形式，若无配置，则返回默认禁用状态
         return json.loads(self.agent_mode) if self.agent_mode else {"enabled": False, "strategy": None, "tools": [], "prompt": None}
 
     @property
     def chat_prompt_config_dict(self) -> dict:
+        """
+        获取聊天提示配置的字典表示。
+
+        返回:
+            dict: 聊天提示配置的字典。
+        """
+        # 转换聊天提示配置为字典形式，若无配置，则返回空字典
         return json.loads(self.chat_prompt_config) if self.chat_prompt_config else {}
 
     @property
     def completion_prompt_config_dict(self) -> dict:
+        """
+        获取完成提示配置的字典表示。
+
+        返回:
+            dict: 完成提示配置的字典。
+        """
+        # 转换完成提示配置为字典形式，若无配置，则返回空字典
         return json.loads(self.completion_prompt_config) if self.completion_prompt_config else {}
 
     @property
     def dataset_configs_dict(self) -> dict:
+        """
+        获取数据集配置的字典表示。
+
+        返回:
+            dict: 包含数据集配置信息的字典，若无配置，默认返回单模型检索配置。
+        """
+        # 处理数据集配置，转换为字典格式，若无配置，则返回默认的单模型检索配置
         if self.dataset_configs:
             dataset_configs = json.loads(self.dataset_configs)
             if 'retrieval_model' not in dataset_configs:
@@ -257,41 +491,65 @@ class AppModelConfig(db.Model):
 
     @property
     def file_upload_dict(self) -> dict:
+        """
+        获取文件上传配置的字典表示。
+
+        返回:
+            dict: 包含文件上传配置的字典，若无配置，则返回默认配置。
+        """
+        # 转换文件上传配置为字典形式，若无配置，则返回默认配置
         return json.loads(self.file_upload) if self.file_upload else {
             "image": {"enabled": False, "number_limits": 3, "detail": "high",
                       "transfer_methods": ["remote_url", "local_file"]}}
 
     def to_dict(self) -> dict:
+        """
+        将对象转换为字典格式。
+        
+        该方法整理并返回了一个包含模型配置、问答建议、语音转换设置等多样信息的字典结构，方便对聊天机器人进行配置和管理。
+        
+        返回值:
+            dict: 包含模型提供者、模型ID、配置信息、开场白、建议问题等多样信息的字典。
+        """
         return {
-            "provider": "",
-            "model_id": "",
-            "configs": {},
-            "opening_statement": self.opening_statement,
-            "suggested_questions": self.suggested_questions_list,
-            "suggested_questions_after_answer": self.suggested_questions_after_answer_dict,
-            "speech_to_text": self.speech_to_text_dict,
-            "text_to_speech": self.text_to_speech_dict,
-            "retriever_resource": self.retriever_resource_dict,
-            "annotation_reply": self.annotation_reply_dict,
-            "more_like_this": self.more_like_this_dict,
-            "sensitive_word_avoidance": self.sensitive_word_avoidance_dict,
-            "external_data_tools": self.external_data_tools_list,
-            "model": self.model_dict,
-            "user_input_form": self.user_input_form_list,
-            "dataset_query_variable": self.dataset_query_variable,
-            "pre_prompt": self.pre_prompt,
-            "agent_mode": self.agent_mode_dict,
-            "prompt_type": self.prompt_type,
-            "chat_prompt_config": self.chat_prompt_config_dict,
-            "completion_prompt_config": self.completion_prompt_config_dict,
-            "dataset_configs": self.dataset_configs_dict,
-            "file_upload": self.file_upload_dict
+            "provider": "",  # 模型提供者
+            "model_id": "",  # 模型ID
+            "configs": {},  # 配置信息
+            "opening_statement": self.opening_statement,  # 开场白
+            "suggested_questions": self.suggested_questions_list,  # 建议问题列表
+            "suggested_questions_after_answer": self.suggested_questions_after_answer_dict,  # 回答后的建议问题字典
+            "speech_to_text": self.speech_to_text_dict,  # 语音转文本配置
+            "text_to_speech": self.text_to_speech_dict,  # 文本转语音配置
+            "retriever_resource": self.retriever_resource_dict,  # 数据检索资源
+            "annotation_reply": self.annotation_reply_dict,  # 注解回复
+            "more_like_this": self.more_like_this_dict,  # 类似的查询配置
+            "sensitive_word_avoidance": self.sensitive_word_avoidance_dict,  # 敏感词规避配置
+            "external_data_tools": self.external_data_tools_list,  # 外部数据工具列表
+            "model": self.model_dict,  # 模型配置
+            "user_input_form": self.user_input_form_list,  # 用户输入表单列表
+            "dataset_query_variable": self.dataset_query_variable,  # 数据集查询变量
+            "pre_prompt": self.pre_prompt,  # 提示信息前置配置
+            "agent_mode": self.agent_mode_dict,  # 代理模式配置
+            "prompt_type": self.prompt_type,  # 提示类型
+            "chat_prompt_config": self.chat_prompt_config_dict,  # 聊天提示配置
+            "completion_prompt_config": self.completion_prompt_config_dict,  # 完成提示配置
+            "dataset_configs": self.dataset_configs_dict,  # 数据集配置
+            "file_upload": self.file_upload_dict  # 文件上传配置
         }
 
     def from_model_config_dict(self, model_config: dict):
+        """
+        从模型配置字典中初始化对象的属性。
+        
+        :param model_config: 一个包含模型配置的字典，字典的键和值对应于模型配置的各个属性。
+        :return: 返回配置了模型配置的当前对象实例。
+        """
+        # 初始化基本属性
         self.provider = ""
         self.model_id = ""
         self.configs = {}
+        
+        # 从模型配置字典中提取特定配置项，并进行JSON序列化
         self.opening_statement = model_config['opening_statement']
         self.suggested_questions = json.dumps(model_config['suggested_questions'])
         self.suggested_questions_after_answer = json.dumps(model_config['suggested_questions_after_answer'])
@@ -306,6 +564,8 @@ class AppModelConfig(db.Model):
             if model_config.get('external_data_tools') else None
         self.model = json.dumps(model_config['model'])
         self.user_input_form = json.dumps(model_config['user_input_form'])
+        
+        # 提取特定配置项，未指定时默认值为None或空字符串
         self.dataset_query_variable = model_config.get('dataset_query_variable')
         self.pre_prompt = model_config['pre_prompt']
         self.agent_mode = json.dumps(model_config['agent_mode'])
@@ -320,9 +580,20 @@ class AppModelConfig(db.Model):
             if model_config.get('dataset_configs') else None
         self.file_upload = json.dumps(model_config.get('file_upload')) \
             if model_config.get('file_upload') else None
+        
         return self
 
     def copy(self):
+        """
+        创建当前AppModelConfig对象的一个深拷贝。
+        
+        参数:
+        - 无
+        
+        返回值:
+        - new_app_model_config: AppModelConfig类型，一个新的AppModelConfig对象，是当前对象的深拷贝。
+        """
+        # 初始化一个新的AppModelConfig实例，复制当前实例的所有字段但不包括敏感信息
         new_app_model_config = AppModelConfig(
             id=self.id,
             app_id=self.app_id,
@@ -354,11 +625,29 @@ class AppModelConfig(db.Model):
 
 
 class RecommendedApp(db.Model):
-    __tablename__ = 'recommended_apps'
+    """
+    推荐应用模型类，用于表示推荐应用的信息
+    
+    属性:
+    - id: 应用的唯一标识符，UUID类型，自动生成
+    - app_id: 关联的应用的ID，UUID类型，不可为空
+    - description: 应用的描述信息，JSON类型，不可为空
+    - copyright: 应用的版权声明信息，字符串类型，不可为空
+    - privacy_policy: 应用的隐私政策链接，字符串类型，不可为空
+    - category: 应用的分类，字符串类型，不可为空
+    - position: 应用在推荐列表中的位置，整数类型，默认为0
+    - is_listed: 应用是否在推荐列表上显示，布尔类型，默认为True
+    - install_count: 应用的安装计数，整数类型，默认为0
+    - language: 应用的语言设置，字符串类型，默认为'en-US'
+    - created_at: 记录创建时间，日期时间类型，默认为当前时间
+    - updated_at: 记录更新时间，日期时间类型，默认为当前时间
+    """
+    
+    __tablename__ = 'recommended_apps'  # 指定数据库表名为recommended_apps
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='recommended_app_pkey'),
-        db.Index('recommended_app_app_id_idx', 'app_id'),
-        db.Index('recommended_app_is_listed_idx', 'is_listed', 'language')
+        db.PrimaryKeyConstraint('id', name='recommended_app_pkey'),  # 指定主键约束
+        db.Index('recommended_app_app_id_idx', 'app_id'),  # 为app_id创建索引
+        db.Index('recommended_app_is_listed_idx', 'is_listed', 'language')  # 为is_listed和language创建复合索引
     )
 
     id = db.Column(UUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))
@@ -376,52 +665,137 @@ class RecommendedApp(db.Model):
 
     @property
     def app(self):
+        """
+        获取关联的应用对象
+        
+        返回值:
+        - App对象: 与当前推荐应用关联的应用对象，如果找不到则返回None
+        """
         app = db.session.query(App).filter(App.id == self.app_id).first()
         return app
 
-
 class InstalledApp(db.Model):
-    __tablename__ = 'installed_apps'
+    """
+    已安装应用的模型类，用于表示一个租户安装的具体应用的信息。
+    
+    属性:
+    - id: 应用的唯一标识符，使用UUID生成。
+    - tenant_id: 租户的唯一标识符，不可为空。
+    - app_id: 应用的唯一标识符，不可为空。
+    - app_owner_tenant_id: 应用所有者的租户标识符，不可为空。
+    - position: 应用在界面中的位置，默认为0。
+    - is_pinned: 应用是否被固定在界面上，默认为false。
+    - last_used_at: 应用最后一次被使用的时间，可为空。
+    - created_at: 记录创建的时间，不可为空。
+    
+    方法:
+    - app: 一个属性方法，返回与该安装记录关联的应用对象。
+    - tenant: 一个属性方法，返回与该安装记录关联的租户对象。
+    - is_agent: 一个属性方法，判断该应用是否为代理应用。
+    """
+    __tablename__ = 'installed_apps'  # 指定数据库表名为installed_apps
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='installed_app_pkey'),
-        db.Index('installed_app_tenant_id_idx', 'tenant_id'),
-        db.Index('installed_app_app_id_idx', 'app_id'),
-        db.UniqueConstraint('tenant_id', 'app_id', name='unique_tenant_app')
+        db.PrimaryKeyConstraint('id', name='installed_app_pkey'),  # 指定id为表的主要键
+        db.Index('installed_app_tenant_id_idx', 'tenant_id'),  # 为tenant_id创建索引
+        db.Index('installed_app_app_id_idx', 'app_id'),  # 为app_id创建索引
+        db.UniqueConstraint('tenant_id', 'app_id', name='unique_tenant_app')  # 确保每个租户对每个应用只能有一条安装记录
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
-    app_id = db.Column(UUID, nullable=False)
-    app_owner_tenant_id = db.Column(UUID, nullable=False)
-    position = db.Column(db.Integer, nullable=False, default=0)
-    is_pinned = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
-    last_used_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 生成唯一的UUID作为ID
+    tenant_id = db.Column(UUID, nullable=False)  # 租户ID
+    app_id = db.Column(UUID, nullable=False)  # 应用ID
+    app_owner_tenant_id = db.Column(UUID, nullable=False)  # 应用所有者的租户ID
+    position = db.Column(db.Integer, nullable=False, default=0)  # 应用在界面中的位置
+    is_pinned = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))  # 应用是否被固定
+    last_used_at = db.Column(db.DateTime, nullable=True)  # 最后使用时间
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 记录创建时间
 
     @property
     def app(self):
+        """
+        查询并返回与当前安装记录关联的应用对象。
+        
+        返回:
+        - App对象: 与当前安装记录关联的应用对象，如果找不到则返回None。
+        """
         app = db.session.query(App).filter(App.id == self.app_id).first()
         return app
 
     @property
     def tenant(self):
+        """
+        查询并返回与当前安装记录关联的租户对象。
+        
+        返回:
+        - Tenant对象: 与当前安装记录关联的租户对象，如果找不到则返回None。
+        """
         tenant = db.session.query(Tenant).filter(Tenant.id == self.tenant_id).first()
         return tenant
 
     @property
     def is_agent(self) -> bool:
+        """
+        判断当前应用是否为代理应用。
+        
+        返回:
+        - bool值: 如果应用是代理应用，则返回True，否则返回False。
+        """
         app = self.app
         if not app:
             return False
         return app.is_agent
 
 class Conversation(db.Model):
+    """
+    对话模型，用于表示一个对话实体。
+
+    属性:
+    - id: 对话的唯一标识符。
+    - app_id: 关联的应用程序ID。
+    - app_model_config_id: 关联的应用模型配置ID。
+    - model_provider: 模型提供者。
+    - override_model_configs: 覆盖的模型配置。
+    - model_id: 模型ID。
+    - mode: 模式。
+    - name: 对话名称。
+    - summary: 对话摘要。
+    - inputs: 输入参数。
+    - introduction: 介绍。
+    - system_instruction: 系统指令。
+    - system_instruction_tokens: 系统指令标记。
+    - status: 状态。
+    - from_source: 来源。
+    - from_end_user_id: 来自终端用户的ID。
+    - from_account_id: 来自账户的ID。
+    - read_at: 阅读时间。
+    - read_account_id: 阅读账户ID。
+    - created_at: 创建时间。
+    - updated_at: 更新时间。
+    - messages: 消息关系。
+    - message_annotations: 消息注解关系。
+    - is_deleted: 是否已删除。
+    
+    方法:
+    - model_config: 获取当前对话所使用的模型配置信息。
+    - summary_or_query: 获取对话摘要或首个消息的查询内容。
+    - annotated: 判断对话是否包含注解信息。
+    - annotation: 获取对话的第一个注解信息。
+    - message_count: 获取对话中包含的消息总数。
+    - user_feedback_stats: 获取用户反馈统计数据。
+    - admin_feedback_stats: 获取管理员反馈统计数据。
+    - first_message: 获取对话中的第一条消息。
+    - app: 获取与对话关联的应用程序实例。
+    - from_end_user_session_id: 获取发起对话的终端用户的会话ID。
+    - in_debug_mode: 判断对话是否处于调试模式。
+    """
+    # 定义表名和主键等数据库表配置
     __tablename__ = 'conversations'
     __table_args__ = (
         db.PrimaryKeyConstraint('id', name='conversation_pkey'),
         db.Index('conversation_app_from_user_idx', 'app_id', 'from_source', 'from_end_user_id')
     )
 
+    # 对话的基本属性
     id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
     app_id = db.Column(UUID, nullable=False)
     app_model_config_id = db.Column(UUID, nullable=False)
@@ -444,6 +818,7 @@ class Conversation(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
     updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
+    # 定义与其他模型的关系
     messages = db.relationship("Message", backref="conversation", lazy='select', passive_deletes="all")
     message_annotations = db.relationship("MessageAnnotation", backref="conversation", lazy='select',
                                           passive_deletes="all")
@@ -452,10 +827,16 @@ class Conversation(db.Model):
 
     @property
     def model_config(self):
+        """
+        获取模型配置。
+
+        返回:
+        - 模型配置的字典表示。
+        """
         model_config = {}
         if self.override_model_configs:
+            # 如果存在覆盖的模型配置，则使用它
             override_model_configs = json.loads(self.override_model_configs)
-
             if 'model' in override_model_configs:
                 app_model_config = AppModelConfig()
                 app_model_config = app_model_config.from_model_config_dict(override_model_configs)
@@ -463,9 +844,9 @@ class Conversation(db.Model):
             else:
                 model_config['configs'] = override_model_configs
         else:
+            # 否则，从数据库查询默认模型配置
             app_model_config = db.session.query(AppModelConfig).filter(
                 AppModelConfig.id == self.app_model_config_id).first()
-
             model_config = app_model_config.to_dict()
 
         model_config['model_id'] = self.model_id
@@ -475,6 +856,12 @@ class Conversation(db.Model):
 
     @property
     def summary_or_query(self):
+        """
+        获取对话摘要或第一个消息的查询内容。
+
+        返回:
+        - 对话摘要或第一个消息的查询字符串。
+        """
         if self.summary:
             return self.summary
         else:
@@ -486,18 +873,42 @@ class Conversation(db.Model):
 
     @property
     def annotated(self):
+        """
+        检查对话是否有注解。
+
+        返回:
+        - 如果对话有注解则为True，否则为False。
+        """
         return db.session.query(MessageAnnotation).filter(MessageAnnotation.conversation_id == self.id).count() > 0
 
     @property
     def annotation(self):
+        """
+        获取对话的第一个注解。
+
+        返回:
+        - 第一个注解对象，如果没有则为None。
+        """
         return db.session.query(MessageAnnotation).filter(MessageAnnotation.conversation_id == self.id).first()
 
     @property
     def message_count(self):
+        """
+        获取对话中的消息数量。
+
+        返回:
+        - 消息数量。
+        """
         return db.session.query(Message).filter(Message.conversation_id == self.id).count()
 
     @property
     def user_feedback_stats(self):
+        """
+        获取用户反馈统计信息。
+
+        返回:
+        - 包含"like"和"dislike"计数的字典。
+        """
         like = db.session.query(MessageFeedback) \
             .filter(MessageFeedback.conversation_id == self.id,
                     MessageFeedback.from_source == 'user',
@@ -512,6 +923,12 @@ class Conversation(db.Model):
 
     @property
     def admin_feedback_stats(self):
+        """
+        获取管理员反馈统计信息。
+
+        返回:
+        - 包含"like"和"dislike"计数的字典。
+        """
         like = db.session.query(MessageFeedback) \
             .filter(MessageFeedback.conversation_id == self.id,
                     MessageFeedback.from_source == 'admin',
@@ -526,14 +943,32 @@ class Conversation(db.Model):
 
     @property
     def first_message(self):
+        """
+        获取对话中的第一个消息。
+
+        返回:
+        - 第一个消息对象，如果没有则为None。
+        """
         return db.session.query(Message).filter(Message.conversation_id == self.id).first()
 
     @property
     def app(self):
+        """
+        获取对话关联的应用程序。
+
+        返回:
+        - 关联的应用程序对象，如果没有则为None。
+        """
         return db.session.query(App).filter(App.id == self.app_id).first()
 
     @property
     def from_end_user_session_id(self):
+        """
+        获取来自终端用户的会话ID。
+
+        返回:
+        - 终端用户会话ID，如果不存在则为None。
+        """
         if self.from_end_user_id:
             end_user = db.session.query(EndUser).filter(EndUser.id == self.from_end_user_id).first()
             if end_user:
@@ -543,10 +978,59 @@ class Conversation(db.Model):
 
     @property
     def in_debug_mode(self):
+        """
+        检查对话是否处于调试模式。
+
+        返回:
+        - 如果对话配置了覆盖模型配置，则为True，表示处于调试模式；否则为False。
+        """
         return self.override_model_configs is not None
 
 
 class Message(db.Model):
+    """
+    消息模型，用于表示与对话相关的信息和元数据。
+    
+    属性:
+    - id: 消息的唯一标识符。
+    - app_id: 关联的应用程序ID。
+    - model_provider: 模型提供者。
+    - model_id: 模型的ID。
+    - override_model_configs: 覆盖的模型配置。
+    - conversation_id: 对话的唯一标识符。
+    - inputs: 输入消息的内容。
+    - query: 查询内容。
+    - message: 消息的内容。
+    - message_tokens: 消息的标记数量。
+    - message_unit_price: 消息的单位价格。
+    - message_price_unit: 消息的价格单位。
+    - answer: 答案内容。
+    - answer_tokens: 答案的标记数量。
+    - answer_unit_price: 答案的单位价格。
+    - answer_price_unit: 答案的价格单位。
+    - provider_response_latency: 提供者响应延迟。
+    - total_price: 总价格。
+    - currency: 货币单位。
+    - from_source: 消息来源。
+    - from_end_user_id: 来自终端用户的ID。
+    - from_account_id: 来自账户的ID。
+    - created_at: 创建时间。
+    - updated_at: 更新时间。
+    - agent_based: 是否基于代理。
+
+    方法:
+    - user_feedback: 获取用户的反馈信息。
+    - admin_feedback: 获取管理员的反馈信息。
+    - feedbacks: 获取所有反馈信息。
+    - annotation: 获取注解信息。
+    - annotation_hit_history: 获取注解命中历史。
+    - app_model_config: 获取应用模型配置。
+    - in_debug_mode: 判断是否处于调试模式。
+    - agent_thoughts: 获取代理思考信息。
+    - retriever_resources: 获取检索资源信息。
+    - message_files: 获取消息文件信息。
+    - files: 获取所有文件信息，包括处理后的URL等。
+    """
     __tablename__ = 'messages'
     __table_args__ = (
         db.PrimaryKeyConstraint('id', name='message_pkey'),
@@ -556,6 +1040,7 @@ class Message(db.Model):
         db.Index('message_account_idx', 'app_id', 'from_source', 'from_account_id'),
     )
 
+    # 消息表的字段定义
     id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
     app_id = db.Column(UUID, nullable=False)
     model_provider = db.Column(db.String(255), nullable=False)
@@ -584,28 +1069,58 @@ class Message(db.Model):
 
     @property
     def user_feedback(self):
+        """
+        获取用户的反馈信息。
+        
+        返回:
+        - user_feedback: 用户反馈的实例。
+        """
         feedback = db.session.query(MessageFeedback).filter(MessageFeedback.message_id == self.id,
                                                             MessageFeedback.from_source == 'user').first()
         return feedback
 
     @property
     def admin_feedback(self):
+        """
+        获取管理员的反馈信息。
+        
+        返回:
+        - admin_feedback: 管理员反馈的实例。
+        """
         feedback = db.session.query(MessageFeedback).filter(MessageFeedback.message_id == self.id,
                                                             MessageFeedback.from_source == 'admin').first()
         return feedback
 
     @property
     def feedbacks(self):
+        """
+        获取所有反馈信息。
+        
+        返回:
+        - feedbacks: 反馈信息列表。
+        """
         feedbacks = db.session.query(MessageFeedback).filter(MessageFeedback.message_id == self.id).all()
         return feedbacks
 
     @property
     def annotation(self):
+        """
+        获取注解信息。
+        
+        返回:
+        - annotation: 注解的实例。
+        """
         annotation = db.session.query(MessageAnnotation).filter(MessageAnnotation.message_id == self.id).first()
         return annotation
 
     @property
     def annotation_hit_history(self):
+        """
+        获取注解命中历史。
+        
+        返回:
+        - annotation: 命中历史对应的注解实例，如果没有则返回None。
+        """
         annotation_history = (db.session.query(AppAnnotationHitHistory)
                               .filter(AppAnnotationHitHistory.message_id == self.id).first())
         if annotation_history:
@@ -616,6 +1131,12 @@ class Message(db.Model):
 
     @property
     def app_model_config(self):
+        """
+        获取应用模型配置。
+        
+        返回:
+        - app_model_config: 应用模型配置的实例，如果没有则返回None。
+        """
         conversation = db.session.query(Conversation).filter(Conversation.id == self.conversation_id).first()
         if conversation:
             return db.session.query(AppModelConfig).filter(
@@ -625,24 +1146,54 @@ class Message(db.Model):
 
     @property
     def in_debug_mode(self):
+        """
+        判断消息是否处于调试模式。
+        
+        返回:
+        - bool: 如果有覆盖的模型配置则为True，否则为False。
+        """
         return self.override_model_configs is not None
 
     @property
     def agent_thoughts(self):
+        """
+        获取代理思考信息。
+        
+        返回:
+        - agent_thoughts: 代理思考信息列表，按位置升序排列。
+        """
         return db.session.query(MessageAgentThought).filter(MessageAgentThought.message_id == self.id) \
             .order_by(MessageAgentThought.position.asc()).all()
 
     @property
     def retriever_resources(self):
+        """
+        获取检索资源信息。
+        
+        返回:
+        - retriever_resources: 检索资源信息列表，按位置升序排列。
+        """
         return db.session.query(DatasetRetrieverResource).filter(DatasetRetrieverResource.message_id == self.id) \
             .order_by(DatasetRetrieverResource.position.asc()).all()
 
     @property
     def message_files(self):
+        """
+        获取消息文件信息。
+        
+        返回:
+        - message_files: 消息文件列表。
+        """
         return db.session.query(MessageFile).filter(MessageFile.message_id == self.id).all()
 
     @property
     def files(self):
+        """
+        获取所有文件信息，包括处理后的URL等。
+        
+        返回:
+        - files: 包含文件ID、类型、URL和归属者的字典列表。
+        """
         message_files = self.message_files
 
         files = []
@@ -660,14 +1211,14 @@ class Message(db.Model):
                         force_url=True
                     )
                 if message_file.transfer_method == 'tool_file':
-                    # get extension
+                    # 获取文件扩展名
                     if '.' in message_file.url:
                         extension = f'.{message_file.url.split(".")[-1]}'
                         if len(extension) > 10:
                             extension = '.bin'
                     else:
                         extension = '.bin'
-                    # add sign url
+                    # 添加签名URL
                     url = ToolFileParser.get_tool_file_manager().sign_file(file_id=message_file.id, extension=extension)
 
             files.append({
@@ -679,86 +1230,185 @@ class Message(db.Model):
 
         return files
 
-
 class MessageFeedback(db.Model):
+    """
+    消息反馈模型，用于表示用户对消息的反馈信息。
+    
+    属性:
+    - id: 反馈信息的唯一标识符，UUID类型。
+    - app_id: 关联的应用程序的ID，UUID类型，不可为空。
+    - conversation_id: 关联的对话的ID，UUID类型，不可为空。
+    - message_id: 关联的消息的ID，UUID类型，不可为空。
+    - rating: 反馈的评分，字符串类型，不可为空。
+    - content: 反馈的内容，文本类型，可为空。
+    - from_source: 反馈来源，字符串类型，不可为空。
+    - from_end_user_id: 提供反馈的终端用户ID，UUID类型，可为空。
+    - from_account_id: 提供反馈的账户ID，UUID类型，可为空。
+    - created_at: 反馈创建时间，日期时间类型，不可为空。
+    - updated_at: 反馈更新时间，日期时间类型，不可为空。
+    
+    方法:
+    - from_account: 获取提供反馈的账户信息。
+    """
+    
     __tablename__ = 'message_feedbacks'
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='message_feedback_pkey'),
-        db.Index('message_feedback_app_idx', 'app_id'),
-        db.Index('message_feedback_message_idx', 'message_id', 'from_source'),
-        db.Index('message_feedback_conversation_idx', 'conversation_id', 'from_source', 'rating')
+        db.PrimaryKeyConstraint('id', name='message_feedback_pkey'),  # 主键约束
+        db.Index('message_feedback_app_idx', 'app_id'),  # 应用ID索引
+        db.Index('message_feedback_message_idx', 'message_id', 'from_source'),  # 消息ID和来源索引
+        db.Index('message_feedback_conversation_idx', 'conversation_id', 'from_source', 'rating')  # 对话ID、来源和评分索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=False)
-    conversation_id = db.Column(UUID, nullable=False)
-    message_id = db.Column(UUID, nullable=False)
-    rating = db.Column(db.String(255), nullable=False)
-    content = db.Column(db.Text)
-    from_source = db.Column(db.String(255), nullable=False)
-    from_end_user_id = db.Column(UUID)
-    from_account_id = db.Column(UUID)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，使用函数生成默认值
+    app_id = db.Column(UUID, nullable=False)  # 应用ID列
+    conversation_id = db.Column(UUID, nullable=False)  # 对话ID列
+    message_id = db.Column(UUID, nullable=False)  # 消息ID列
+    rating = db.Column(db.String(255), nullable=False)  # 评分列
+    content = db.Column(db.Text)  # 内容列
+    from_source = db.Column(db.String(255), nullable=False)  # 来源列
+    from_end_user_id = db.Column(UUID)  # 终端用户ID列
+    from_account_id = db.Column(UUID)  # 账户ID列
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间列
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间列
 
     @property
     def from_account(self):
+        """
+        获取提供反馈的账户信息。
+        
+        返回:
+        - Account对象: 提供反馈的账户信息。如果找不到对应账户，则返回None。
+        """
         account = db.session.query(Account).filter(Account.id == self.from_account_id).first()
         return account
 
 
 class MessageFile(db.Model):
-    __tablename__ = 'message_files'
+    """
+    消息文件模型类，用于表示与消息相关的文件信息。
+    
+    属性:
+    - id: 文件的唯一标识符，使用UUID生成。
+    - message_id: 关联的消息的唯一标识符，不可为空。
+    - type: 文件的类型，如文本、图片等，不可为空。
+    - transfer_method: 文件传输方法，如直接上传、链接等，不可为空。
+    - url: 文件的访问URL，可以为空。
+    - belongs_to: 文件归属的类别或用户ID，可以为空。
+    - upload_file_id: 上传过程中生成的文件ID，可以为空。
+    - created_by_role: 创建文件的用户角色，如管理员、用户等，不可为空。
+    - created_by: 创建文件的用户ID，不可为空。
+    - created_at: 文件创建的时间，不可为空且默认为当前时间。
+    
+    使用数据库模型定义消息文件的表结构，包括主键、索引等设置。
+    """
+    
+    __tablename__ = 'message_files'  # 指定数据库表名为message_files
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='message_file_pkey'),
-        db.Index('message_file_message_idx', 'message_id'),
-        db.Index('message_file_created_by_idx', 'created_by')
+        db.PrimaryKeyConstraint('id', name='message_file_pkey'),  # 设置id为 primary key
+        db.Index('message_file_message_idx', 'message_id'),  # 为message_id创建索引，优化查询
+        db.Index('message_file_created_by_idx', 'created_by')  # 为created_by创建索引，优化查询
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    message_id = db.Column(UUID, nullable=False)
-    type = db.Column(db.String(255), nullable=False)
-    transfer_method = db.Column(db.String(255), nullable=False)
-    url = db.Column(db.Text, nullable=True)
-    belongs_to = db.Column(db.String(255), nullable=True)
-    upload_file_id = db.Column(UUID, nullable=True)
-    created_by_role = db.Column(db.String(255), nullable=False)
-    created_by = db.Column(UUID, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 文件的唯一标识符，使用UUID生成
+    message_id = db.Column(UUID, nullable=False)  # 关联的消息ID
+    type = db.Column(db.String(255), nullable=False)  # 文件类型
+    transfer_method = db.Column(db.String(255), nullable=False)  # 文件传输方法
+    url = db.Column(db.Text, nullable=True)  # 文件的URL
+    belongs_to = db.Column(db.String(255), nullable=True)  # 文件归属
+    upload_file_id = db.Column(UUID, nullable=True)  # 上传过程中的文件ID
+    created_by_role = db.Column(db.String(255), nullable=False)  # 创建文件的用户角色
+    created_by = db.Column(UUID, nullable=False)  # 创建文件的用户ID
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 文件创建时间，默认为当前时间
 
 
 class MessageAnnotation(db.Model):
-    __tablename__ = 'message_annotations'
+    """
+    消息标注模型，用于表示消息的标注信息。
+    
+    属性:
+    - id: 注解的唯一标识符，使用UUID生成。
+    - app_id: 关联的应用程序ID，不可为空。
+    - conversation_id: 关联的对话ID，可以为空。
+    - message_id: 关联的消息ID，可以为空。
+    - question: 注解的问题，可以为空。
+    - content: 注解的内容，不可为空。
+    - hit_count: 注解的点击次数，不可为空，默认值为0。
+    - account_id: 创建注解的账户ID，不可为空。
+    - created_at: 注解的创建时间，不可为空，默认为当前时间。
+    - updated_at: 注解的更新时间，不可为空，默认为当前时间。
+    
+    方法:
+    - account: 获取创建注解的账户信息。
+    - annotation_create_account: 获取创建注解的账户信息（与account方法重复）。
+    """
+    
+    __tablename__ = 'message_annotations'  # 指定数据库表名为message_annotations
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='message_annotation_pkey'),
-        db.Index('message_annotation_app_idx', 'app_id'),
-        db.Index('message_annotation_conversation_idx', 'conversation_id'),
-        db.Index('message_annotation_message_idx', 'message_id')
+        db.PrimaryKeyConstraint('id', name='message_annotation_pkey'),  # 指定id为表的主键
+        db.Index('message_annotation_app_idx', 'app_id'),  # 为app_id创建索引
+        db.Index('message_annotation_conversation_idx', 'conversation_id'),  # 为conversation_id创建索引
+        db.Index('message_annotation_message_idx', 'message_id')  # 为message_id创建索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=False)
-    conversation_id = db.Column(UUID, db.ForeignKey('conversations.id'), nullable=True)
-    message_id = db.Column(UUID, nullable=True)
-    question = db.Column(db.Text, nullable=True)
-    content = db.Column(db.Text, nullable=False)
-    hit_count = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
-    account_id = db.Column(UUID, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，使用函数生成默认值
+    app_id = db.Column(UUID, nullable=False)  # 不可为空的UUID列
+    conversation_id = db.Column(UUID, db.ForeignKey('conversations.id'), nullable=True)  # 可为空的外键列，指向对话表
+    message_id = db.Column(UUID, nullable=True)  # 可为空的UUID列
+    question = db.Column(db.Text, nullable=True)  # 可为空的文本列
+    content = db.Column(db.Text, nullable=False)  # 不可为空的文本列
+    hit_count = db.Column(db.Integer, nullable=False, server_default=db.text('0'))  # 不可为空的整数列，默认值为0
+    account_id = db.Column(UUID, nullable=False)  # 不可为空的UUID列，指向账户表
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 不可为空的日期时间列，默认为当前时间
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 不可为空的日期时间列，默认为当前时间
 
     @property
     def account(self):
+        """
+        获取创建注解的账户信息。
+        
+        返回:
+        - Account对象: 创建该注解的账户信息。
+        """
         account = db.session.query(Account).filter(Account.id == self.account_id).first()
         return account
 
     @property
     def annotation_create_account(self):
+        """
+        获取创建注解的账户信息。
+        
+        说明:
+        - 此方法与account方法功能相同，可能为冗余代码。
+        
+        返回:
+        - Account对象: 创建该注解的账户信息。
+        """
         account = db.session.query(Account).filter(Account.id == self.account_id).first()
         return account
 
 
 class AppAnnotationHitHistory(db.Model):
+    """
+    App注解命中历史模型类，用于表示应用程序注解的命中历史记录。
+    
+    属性:
+    - id: 唯一标识符，使用UUID生成。
+    - app_id: 关联的应用程序ID，不可为空。
+    - annotation_id: 关联的注解ID，不可为空。
+    - source: 来源信息，不可为空。
+    - question: 提问或任务，不可为空。
+    - account_id: 创建注解的账户ID，不可为空。
+    - created_at: 记录创建时间，不可为空，默认为当前时间。
+    - score: 与该记录相关的得分，不可为空，默认为0。
+    - message_id: 关联的消息ID，不可为空。
+    - annotation_question: 注解的问题或主题，不可为空。
+    - annotation_content: 注解的内容，不可为空。
+    
+    方法:
+    - account: 获取创建注解的账户信息。
+    - annotation_create_account: 获取创建该记录的账户信息。
+    """
+    
     __tablename__ = 'app_annotation_hit_histories'
     __table_args__ = (
         db.PrimaryKeyConstraint('id', name='app_annotation_hit_histories_pkey'),
@@ -782,6 +1432,12 @@ class AppAnnotationHitHistory(db.Model):
 
     @property
     def account(self):
+        """
+        获取创建注解的账户信息。
+        
+        返回:
+        - Account对象：与该注解关联的账户信息。
+        """
         account = (db.session.query(Account)
                    .join(MessageAnnotation, MessageAnnotation.account_id == Account.id)
                    .filter(MessageAnnotation.id == self.annotation_id).first())
@@ -789,17 +1445,43 @@ class AppAnnotationHitHistory(db.Model):
 
     @property
     def annotation_create_account(self):
+        """
+        获取创建该记录的账户信息。
+        
+        返回:
+        - Account对象：创建该记录的账户信息。
+        """
         account = db.session.query(Account).filter(Account.id == self.account_id).first()
         return account
 
 
 class AppAnnotationSetting(db.Model):
-    __tablename__ = 'app_annotation_settings'
+    """
+    应用注解设置模型，用于表示应用的注解设置信息。
+    
+    属性:
+    - id: 唯一标识符，使用UUID生成。
+    - app_id: 关联的应用ID，不可为空。
+    - score_threshold: 分数阈值，不可为空，默认值为0。
+    - collection_binding_id: 数据集绑定ID，不可为空。
+    - created_user_id: 创建用户的ID，不可为空。
+    - created_at: 创建时间，不可为空，默认为当前时间。
+    - updated_user_id: 更新用户的ID，不可为空。
+    - updated_at: 更新时间，不可为空，默认为当前时间。
+    
+    方法:
+    - created_account: 获取创建该设置的账户信息。
+    - updated_account: 获取最后更新该设置的账户信息。
+    - collection_binding_detail: 获取与该设置关联的数据集绑定详细信息。
+    """
+    
+    __tablename__ = 'app_annotation_settings'  # 指定数据库表名为app_annotation_settings
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='app_annotation_settings_pkey'),
-        db.Index('app_annotation_settings_app_idx', 'app_id')
+        db.PrimaryKeyConstraint('id', name='app_annotation_settings_pkey'),  # 指定主键约束
+        db.Index('app_annotation_settings_app_idx', 'app_id')  # 创建app_id的索引
     )
 
+    # 定义表字段和它们的数据类型以及默认值
     id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
     app_id = db.Column(UUID, nullable=False)
     score_threshold = db.Column(Float, nullable=False, server_default=db.text('0'))
@@ -811,6 +1493,12 @@ class AppAnnotationSetting(db.Model):
 
     @property
     def created_account(self):
+        """
+        获取创建该设置的账户信息。
+        
+        返回:
+        - 创建账户的信息对象。
+        """
         account = (db.session.query(Account)
                    .join(AppAnnotationSetting, AppAnnotationSetting.created_user_id == Account.id)
                    .filter(AppAnnotationSetting.id == self.annotation_id).first())
@@ -818,6 +1506,12 @@ class AppAnnotationSetting(db.Model):
 
     @property
     def updated_account(self):
+        """
+        获取最后更新该设置的账户信息。
+        
+        返回:
+        - 最后更新账户的信息对象。
+        """
         account = (db.session.query(Account)
                    .join(AppAnnotationSetting, AppAnnotationSetting.updated_user_id == Account.id)
                    .filter(AppAnnotationSetting.id == self.annotation_id).first())
@@ -825,6 +1519,12 @@ class AppAnnotationSetting(db.Model):
 
     @property
     def collection_binding_detail(self):
+        """
+        获取与该设置关联的数据集绑定详细信息。
+        
+        返回:
+        - 关联的数据集绑定详细信息对象。
+        """
         from .dataset import DatasetCollectionBinding
         collection_binding_detail = (db.session.query(DatasetCollectionBinding)
                                      .filter(DatasetCollectionBinding.id == self.collection_binding_id).first())
@@ -832,81 +1532,128 @@ class AppAnnotationSetting(db.Model):
 
 
 class OperationLog(db.Model):
-    __tablename__ = 'operation_logs'
+    """
+    操作日志模型类，用于记录操作日志信息。
+
+    属性:
+    - id: 操作日志的唯一标识符，使用UUID生成。
+    - tenant_id: 租户ID，标识操作所属的租户，不可为空。
+    - account_id: 账户ID，标识操作执行者的账户，不可为空。
+    - action: 操作动作的描述，使用字符串表示，不可为空。
+    - content: 操作内容的详细信息，以JSON格式存储。
+    - created_at: 记录创建的时间，不可为空，默认为当前时间。
+    - created_ip: 记录创建时的IP地址，不可为空。
+    - updated_at: 记录最后更新的时间，不可为空，默认为当前时间。
+    """
+    __tablename__ = 'operation_logs'  # 指定数据库表名为operation_logs
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='operation_log_pkey'),
-        db.Index('operation_log_account_action_idx', 'tenant_id', 'account_id', 'action')
+        db.PrimaryKeyConstraint('id', name='operation_log_pkey'),  # 设置id为PRIMARY KEY
+        db.Index('operation_log_account_action_idx', 'tenant_id', 'account_id', 'action')  # 创建索引以加速查询
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
-    account_id = db.Column(UUID, nullable=False)
-    action = db.Column(db.String(255), nullable=False)
-    content = db.Column(db.JSON)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-    created_ip = db.Column(db.String(255), nullable=False)
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-
+    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，默认使用函数生成
+    tenant_id = db.Column(UUID, nullable=False)  # 租户ID列，不可为空
+    account_id = db.Column(UUID, nullable=False)  # 账户ID列，不可为空
+    action = db.Column(db.String(255), nullable=False)  # 动作描述列，字符串类型，不可为空
+    content = db.Column(db.JSON)  # 内容详情列，JSON类型
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间列，不可为空，默认为当前时间
+    created_ip = db.Column(db.String(255), nullable=False)  # 创建时的IP地址列，不可为空
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间列，不可为空，默认为当前时间
 
 class EndUser(UserMixin, db.Model):
-    __tablename__ = 'end_users'
+    """
+    EndUser 类表示一个最终用户模型，它继承自 Flask-Login 的 UserMixin 以及 SQLAlchemy 的 Model，
+    用于定义与数据库交互的用户模型。
+
+    属性:
+    - id: 用户唯一标识符，使用UUID生成。
+    - tenant_id: 租户ID，不可为空，用于区分不同租户的用户。
+    - app_id: 应用ID，可为空，用于区分不同应用的用户。
+    - type: 用户类型，不可为空，用于区分不同类型的用户。
+    - external_user_id: 外部系统中的用户ID，可为空。
+    - name: 用户名，可为空。
+    - is_anonymous: 标记是否为匿名用户，不可为空，默认为 True。
+    - session_id: 用户会话ID，不可为空，用于会话管理。
+    - created_at: 用户创建时间，不可为空，默认为当前时间。
+    - updated_at: 用户信息更新时间，不可为空，默认为当前时间。
+    
+    方法:
+    - 无特殊方法，使用 Flask-Login 和 SQLAlchemy 提供的方法进行用户管理操作。
+    """
+    __tablename__ = 'end_users'  # 指定数据库表名为 end_users
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='end_user_pkey'),
-        db.Index('end_user_session_id_idx', 'session_id', 'type'),
-        db.Index('end_user_tenant_session_id_idx', 'tenant_id', 'session_id', 'type'),
+        db.PrimaryKeyConstraint('id', name='end_user_pkey'),  # 指定 id 为表的主键
+        db.Index('end_user_session_id_idx', 'session_id', 'type'),  # 创建 session_id 和 type 的索引
+        db.Index('end_user_tenant_session_id_idx', 'tenant_id', 'session_id', 'type'),  # 创建 tenant_id, session_id 和 type 的索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
-    app_id = db.Column(UUID, nullable=True)
-    type = db.Column(db.String(255), nullable=False)
-    external_user_id = db.Column(db.String(255), nullable=True)
-    name = db.Column(db.String(255))
-    is_anonymous = db.Column(db.Boolean, nullable=False, server_default=db.text('true'))
-    session_id = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID类型，生成唯一的用户ID
+    tenant_id = db.Column(UUID, nullable=False)  # 租户ID，不可为空
+    app_id = db.Column(UUID, nullable=True)  # 应用ID，可为空
+    type = db.Column(db.String(255), nullable=False)  # 用户类型，不可为空
+    external_user_id = db.Column(db.String(255), nullable=True)  # 外部用户ID，可为空
+    name = db.Column(db.String(255))  # 用户名，可为空
+    is_anonymous = db.Column(db.Boolean, nullable=False, server_default=db.text('true'))  # 是否为匿名用户，不可为空，默认为 True
+    session_id = db.Column(db.String(255), nullable=False)  # 会话ID，不可为空
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间，不可为空，默认为当前时间
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间，不可为空，默认为当前时间Time, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
 
 class Site(db.Model):
-    __tablename__ = 'sites'
+    """
+    Site 类表示一个网站模型，用于数据库中的站点信息的映射。
+    """
+    __tablename__ = 'sites'  # 指定数据库表名为 sites
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='site_pkey'),
-        db.Index('site_app_id_idx', 'app_id'),
-        db.Index('site_code_idx', 'code', 'status')
+        db.PrimaryKeyConstraint('id', name='site_pkey'),  # 指定 id 为主键
+        db.Index('site_app_id_idx', 'app_id'),  # 创建 app_id 的索引
+        db.Index('site_code_idx', 'code', 'status')  # 创建 code 和 status 的复合索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=False)
-    title = db.Column(db.String(255), nullable=False)
-    icon = db.Column(db.String(255))
-    icon_background = db.Column(db.String(255))
-    description = db.Column(db.Text)
-    default_language = db.Column(db.String(255), nullable=False)
-    copyright = db.Column(db.String(255))
-    privacy_policy = db.Column(db.String(255))
-    customize_domain = db.Column(db.String(255))
-    customize_token_strategy = db.Column(db.String(255), nullable=False)
-    prompt_public = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
-    status = db.Column(db.String(255), nullable=False, server_default=db.text("'normal'::character varying"))
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-    code = db.Column(db.String(255))
+    # 定义数据库表的字段
+    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 站点的唯一标识符，使用 UUID 生成
+    app_id = db.Column(UUID, nullable=False)  # 应用的唯一标识符，不可为空
+    title = db.Column(db.String(255), nullable=False)  # 站点的标题，不可为空
+    icon = db.Column(db.String(255))  # 站点的图标链接
+    icon_background = db.Column(db.String(255))  # 图标的背景颜色
+    description = db.Column(db.Text)  # 站点的描述信息
+    default_language = db.Column(db.String(255), nullable=False)  # 默认的语言
+    copyright = db.Column(db.String(255))  # 版权信息
+    privacy_policy = db.Column(db.String(255))  # 隐私政策链接
+    customize_domain = db.Column(db.String(255))  # 自定义域名
+    customize_token_strategy = db.Column(db.String(255), nullable=False)  # 自定义令牌策略
+    prompt_public = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))  # 是否公开提示
+    status = db.Column(db.String(255), nullable=False, server_default=db.text("'normal'::character varying"))  # 站点状态
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间
+    code = db.Column(db.String(255))  # 站点的唯一代码
 
     @staticmethod
     def generate_code(n):
+        """
+        生成一个唯一的站点代码。
+
+        :param n: 生成的代码长度。
+        :return: 生成的唯一代码字符串。
+        """
         while True:
-            result = generate_string(n)
+            result = generate_string(n)  # 生成代码字符串
+            # 检查生成的代码是否已存在，如果存在，则继续生成
             while db.session.query(Site).filter(Site.code == result).count() > 0:
                 result = generate_string(n)
 
-            return result
+            return result  # 返回生成的唯一代码
 
     @property
     def app_base_url(self):
+        """
+        获取应用的基础 URL。
+
+        :return: 应用的基础 URL 字符串。
+        """
         return (
             current_app.config['APP_WEB_URL'] if current_app.config['APP_WEB_URL'] else request.host_url.rstrip('/'))
-
+        # 如果配置中有 APP_WEB_URL，则使用之；否则，使用请求的主机 URL。
 
 class ApiToken(db.Model):
     __tablename__ = 'api_tokens'
@@ -936,62 +1683,145 @@ class ApiToken(db.Model):
 
 
 class UploadFile(db.Model):
-    __tablename__ = 'upload_files'
+    """
+    上传文件模型，用于表示数据库中的上传文件信息。
+
+    属性:
+    - id: 文件唯一标识符，使用UUID生成。
+    - tenant_id: 租户ID，标识文件所属的租户，不可为空。
+    - storage_type: 存储类型，例如本地存储、云存储等，不可为空。
+    - key: 文件在存储系统中的键，不可为空。
+    - name: 文件名，不可为空。
+    - size: 文件大小，以字节为单位，不可为空。
+    - extension: 文件扩展名，不可为空。
+    - mime_type: 文件的MIME类型，可为空。
+    - created_by_role: 创建文件的用户角色，例如'account'，不可为空，默认值为'account'。
+    - created_by: 创建文件的用户ID，不可为空。
+    - created_at: 文件创建时间，不可为空，默认为当前时间。
+    - used: 标记文件是否已被使用，不可为空，默认为false。
+    - used_by: 使用文件的用户ID，可为空。
+    - used_at: 文件被使用的时间，可为空。
+    - hash: 文件的哈希值，用于验证文件完整性，可为空。
+    """
+    __tablename__ = 'upload_files'  # 指定数据库表名为upload_files
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='upload_file_pkey'),
-        db.Index('upload_file_tenant_idx', 'tenant_id')
+        db.PrimaryKeyConstraint('id', name='upload_file_pkey'),  # 设置id为PRIMARY KEY
+        db.Index('upload_file_tenant_idx', 'tenant_id')  # 为tenant_id创建索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
-    storage_type = db.Column(db.String(255), nullable=False)
-    key = db.Column(db.String(255), nullable=False)
-    name = db.Column(db.String(255), nullable=False)
-    size = db.Column(db.Integer, nullable=False)
-    extension = db.Column(db.String(255), nullable=False)
-    mime_type = db.Column(db.String(255), nullable=True)
-    created_by_role = db.Column(db.String(255), nullable=False, server_default=db.text("'account'::character varying"))
-    created_by = db.Column(UUID, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-    used = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
-    used_by = db.Column(UUID, nullable=True)
-    used_at = db.Column(db.DateTime, nullable=True)
-    hash = db.Column(db.String(255), nullable=True)
-
+    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，默认使用uuid_generate_v4()生成
+    tenant_id = db.Column(UUID, nullable=False)  # 租户ID列，不可为空
+    storage_type = db.Column(db.String(255), nullable=False)  # 存储类型列，不可为空
+    key = db.Column(db.String(255), nullable=False)  # 存储键列，不可为空
+    name = db.Column(db.String(255), nullable=False)  # 文件名列，不可为空
+    size = db.Column(db.Integer, nullable=False)  # 文件大小列，不可为空
+    extension = db.Column(db.String(255), nullable=False)  # 文件扩展名列，不可为空
+    mime_type = db.Column(db.String(255), nullable=True)  # MIME类型列，可为空
+    created_by_role = db.Column(db.String(255), nullable=False, server_default=db.text("'account'::character varying"))  # 创建者角色列，不可为空，默认为'account'
+    created_by = db.Column(UUID, nullable=False)  # 创建者ID列，不可为空
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间列，不可为空，默认为当前时间
+    used = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))  # 是否已使用列，不可为空，默认为false
+    used_by = db.Column(UUID, nullable=True)  # 使用者ID列，可为空
+    used_at = db.Column(db.DateTime, nullable=True)  # 使用时间列，可为空
+    hash = db.Column(db.String(255), nullable=True)  # 文件哈希值列，可为空
 
 class ApiRequest(db.Model):
-    __tablename__ = 'api_requests'
+    """
+    ApiRequest 类表示一个API请求的模型，用于数据库操作。
+    
+    属性:
+    - id: 请求的唯一标识符，使用UUID生成。
+    - tenant_id: 租户的唯一标识符，不可为空。
+    - api_token_id: API令牌的唯一标识符，不可为空。
+    - path: 请求的路径，不可为空。
+    - request: 请求的内容，可以为空。
+    - response: 响应的内容，可以为空。
+    - ip: 发起请求的IP地址，不可为空。
+    - created_at: 请求创建的时间，不可为空且默认为当前时间。
+    
+    表结构信息:
+    - 表名: api_requests
+    - 主键: id，约束名称为 api_request_pkey
+    - 索引: 一个组合索引，包含 tenant_id 和 api_token_id，索引名称为 api_request_token_idx
+    """
+    
+    __tablename__ = 'api_requests'  # 指定表名为 api_requests
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='api_request_pkey'),
-        db.Index('api_request_token_idx', 'tenant_id', 'api_token_id')
+        db.PrimaryKeyConstraint('id', name='api_request_pkey'),  # 定义主键约束
+        db.Index('api_request_token_idx', 'tenant_id', 'api_token_id')  # 定义组合索引
     )
 
-    id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
-    api_token_id = db.Column(UUID, nullable=False)
-    path = db.Column(db.String(255), nullable=False)
-    request = db.Column(db.Text, nullable=True)
-    response = db.Column(db.Text, nullable=True)
-    ip = db.Column(db.String(255), nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-
+    id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))  # 生成唯一的UUID作为ID
+    tenant_id = db.Column(UUID, nullable=False)  # 租户ID
+    api_token_id = db.Column(UUID, nullable=False)  # API令牌ID
+    path = db.Column(db.String(255), nullable=False)  # 请求路径
+    request = db.Column(db.Text, nullable=True)  # 请求内容
+    response = db.Column(db.Text, nullable=True)  # 响应内容
+    ip = db.Column(db.String(255), nullable=False)  # 请求的IP地址
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 请求创建时间，默认为当前时间
 
 class MessageChain(db.Model):
-    __tablename__ = 'message_chains'
+    """
+    消息链表模型类，用于表示一系列消息的数据结构。
+    
+    属性:
+    - id: 消息链的唯一标识符，使用UUID作为类型，不可为空，通过服务器默认函数生成。
+    - message_id: 消息的唯一标识符，使用UUID作为类型，不可为空。
+    - type: 消息链的类型，使用字符串表示，不可为空。
+    - input: 消息的输入内容，以文本形式存储，可为空。
+    - output: 消息的输出内容，以文本形式存储，可为空。
+    - created_at: 消息链创建的时间，使用日期时间类型存储，不可为空，通过服务器默认当前时间函数设置。
+    
+    使用数据库模型的特性，定义了消息链表在数据库中的表结构和约束条件。
+    """
+    __tablename__ = 'message_chains'  # 指定数据库表名为message_chains
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='message_chain_pkey'),
-        db.Index('message_chain_message_id_idx', 'message_id')
+        db.PrimaryKeyConstraint('id', name='message_chain_pkey'),  # 定义主键约束
+        db.Index('message_chain_message_id_idx', 'message_id')  # 创建message_id的索引
     )
 
-    id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))
-    message_id = db.Column(UUID, nullable=False)
-    type = db.Column(db.String(255), nullable=False)
-    input = db.Column(db.Text, nullable=True)
-    output = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
-
+    id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))  # 消息链ID
+    message_id = db.Column(UUID, nullable=False)  # 消息ID
+    type = db.Column(db.String(255), nullable=False)  # 消息类型
+    input = db.Column(db.Text, nullable=True)  # 消息输入内容
+    output = db.Column(db.Text, nullable=True)  # 消息输出内容
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())  # 创建时间
 
 class MessageAgentThought(db.Model):
+    """
+    消息代理思考模型，用于表示机器人在处理消息时的思考过程和相关信息。
+
+    属性:
+    - id: 唯一标识符，使用UUID生成。
+    - message_id: 关联的消息ID，使用UUID。
+    - message_chain_id: 消息链的ID，使用UUID，可为空。
+    - position: 思考的位置，整数，不为空。
+    - thought: 思考的内容，文本，可为空。
+    - tool: 使用的工具，文本，可为空。
+    - tool_labels_str: 工具标签的字符串表示，文本，不为空，默认为空字典。
+    - tool_input: 工具输入，文本，可为空。
+    - observation: 观察结果，文本，可为空。
+    - tool_process_data: 工具处理数据，文本，可为空。
+    - message: 消息内容，文本，可为空。
+    - message_token: 消息令牌，整数，可为空。
+    - message_unit_price: 消息单价，数值，不为空，默认值为0.001。
+    - message_files: 消息文件，文本，可为空。
+    - answer: 回答内容，文本，可为空。
+    - answer_token: 回答令牌，整数，可为空。
+    - answer_unit_price: 回答单价，数值，不为空，默认值为0.001。
+    - tokens: 令牌数量，整数，可为空。
+    - total_price: 总价格，数值，可为空。
+    - currency: 货币单位，字符串，可为空。
+    - latency: 延迟时间，浮点数，可为空。
+    - created_by_role: 创建者角色，字符串，不为空。
+    - created_by: 创建者ID，UUID，不为空。
+    - created_at: 创建时间，日期时间，不为空，默认为当前时间。
+
+    方法:
+    - files: 获取消息文件列表的属性装饰器。
+    - tool_labels: 获取工具标签字典的属性装饰器。
+    """
+
     __tablename__ = 'message_agent_thoughts'
     __table_args__ = (
         db.PrimaryKeyConstraint('id', name='message_agent_thought_pkey'),
@@ -999,6 +1829,7 @@ class MessageAgentThought(db.Model):
         db.Index('message_agent_thought_message_chain_id_idx', 'message_chain_id'),
     )
 
+    # 数据库字段定义
     id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))
     message_id = db.Column(UUID, nullable=False)
     message_chain_id = db.Column(UUID, nullable=True)
@@ -1008,7 +1839,6 @@ class MessageAgentThought(db.Model):
     tool_labels_str = db.Column(db.Text, nullable=False, server_default=db.text("'{}'::text"))
     tool_input = db.Column(db.Text, nullable=True)
     observation = db.Column(db.Text, nullable=True)
-    # plugin_id = db.Column(UUID, nullable=True)  ## for future design
     tool_process_data = db.Column(db.Text, nullable=True)
     message = db.Column(db.Text, nullable=True)
     message_token = db.Column(db.Integer, nullable=True)
@@ -1029,6 +1859,12 @@ class MessageAgentThought(db.Model):
 
     @property
     def files(self) -> list:
+        """
+        获取消息文件列表。
+
+        返回:
+        - 文件列表，如果消息文件为空则返回空列表。
+        """
         if self.message_files:
             return json.loads(self.message_files)
         else:
@@ -1036,6 +1872,12 @@ class MessageAgentThought(db.Model):
         
     @property
     def tool_labels(self) -> dict:
+        """
+        获取工具标签字典。
+
+        返回:
+        - 工具标签字典，如果工具标签字符串为空则返回空字典，解析失败也返回空字典。
+        """
         try:
             if self.tool_labels_str:
                 return json.loads(self.tool_labels_str)
@@ -1045,27 +1887,51 @@ class MessageAgentThought(db.Model):
             return {}
 
 class DatasetRetrieverResource(db.Model):
-    __tablename__ = 'dataset_retriever_resources'
+    """
+    数据集检索资源模型，用于表示数据集中每个文档或片段的检索相关信息。
+    
+    属性:
+    - id: 唯一标识符，使用UUID生成。
+    - message_id: 消息ID，关联到特定的消息。
+    - position: 文档或片段在数据集中的位置。
+    - dataset_id: 数据集的唯一标识符。
+    - dataset_name: 数据集的名称。
+    - document_id: 文档的唯一标识符。
+    - document_name: 文档的名称。
+    - data_source_type: 数据源类型，表明数据来自何处。
+    - segment_id: 片段的唯一标识符。
+    - score: 检索评分，表示文档与查询的相关性。
+    - content: 文档或片段的内容。
+    - hit_count: 击中次数，表示文档在检索中的被击中次数。
+    - word_count: 字词数，文档中的单词数量。
+    - segment_position: 片段在文档中的位置。
+    - index_node_hash: 索引节点哈希值，用于快速检索。
+    - retriever_from: 检索来源，表明检索是如何执行的。
+    - created_by: 创建者的唯一标识符。
+    - created_at: 创建时间，记录行的创建时间戳。
+    """
+    
+    __tablename__ = 'dataset_retriever_resources'  # 指定数据库表名
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='dataset_retriever_resource_pkey'),
-        db.Index('dataset_retriever_resource_message_id_idx', 'message_id'),
+        db.PrimaryKeyConstraint('id', name='dataset_retriever_resource_pkey'),  # 设置主键约束
+        db.Index('dataset_retriever_resource_message_id_idx', 'message_id'),  # 为message_id创建索引，优化查询
     )
 
-    id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))
-    message_id = db.Column(UUID, nullable=False)
-    position = db.Column(db.Integer, nullable=False)
-    dataset_id = db.Column(UUID, nullable=False)
-    dataset_name = db.Column(db.Text, nullable=False)
-    document_id = db.Column(UUID, nullable=False)
-    document_name = db.Column(db.Text, nullable=False)
-    data_source_type = db.Column(db.Text, nullable=False)
-    segment_id = db.Column(UUID, nullable=False)
-    score = db.Column(db.Float, nullable=True)
-    content = db.Column(db.Text, nullable=False)
-    hit_count = db.Column(db.Integer, nullable=True)
-    word_count = db.Column(db.Integer, nullable=True)
-    segment_position = db.Column(db.Integer, nullable=True)
-    index_node_hash = db.Column(db.Text, nullable=True)
-    retriever_from = db.Column(db.Text, nullable=False)
-    created_by = db.Column(UUID, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
+    id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))  # 唯一标识符
+    message_id = db.Column(UUID, nullable=False)  # 消息ID
+    position = db.Column(db.Integer, nullable=False)  # 在数据集中的位置
+    dataset_id = db.Column(UUID, nullable=False)  # 数据集ID
+    dataset_name = db.Column(db.Text, nullable=False)  # 数据集名称
+    document_id = db.Column(UUID, nullable=False)  # 文档ID
+    document_name = db.Column(db.Text, nullable=False)  # 文档名称
+    data_source_type = db.Column(db.Text, nullable=False)  # 数据源类型
+    segment_id = db.Column(UUID, nullable=False)  # 片段ID
+    score = db.Column(db.Float, nullable=True)  # 检索评分
+    content = db.Column(db.Text, nullable=False)  # 内容
+    hit_count = db.Column(db.Integer, nullable=True)  # 击中次数
+    word_count = db.Column(db.Integer, nullable=True)  # 字词数
+    segment_position = db.Column(db.Integer, nullable=True)  # 片段位置
+    index_node_hash = db.Column(db.Text, nullable=True)  # 索引节点哈希值
+    retriever_from = db.Column(db.Text, nullable=False)  # 检索来源
+    created_by = db.Column(UUID, nullable=False)  # 创建者ID
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())  # 创建时间
