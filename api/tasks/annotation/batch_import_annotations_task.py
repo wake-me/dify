@@ -18,18 +18,20 @@ from services.dataset_service import DatasetCollectionBindingService
 def batch_import_annotations_task(job_id: str, content_list: list[dict], app_id: str, tenant_id: str,
                                   user_id: str):
     """
-    Add annotation to index.
-    :param job_id: job_id
-    :param content_list: content list
-    :param tenant_id: tenant id
-    :param app_id: app id
-    :param user_id: user_id
-
+    批量导入注解任务。
+    :param job_id: 任务ID
+    :param content_list: 内容列表，列表中的每个元素都是一个字典，包含'question'和'answer'键值对
+    :param tenant_id: 租户ID
+    :param app_id: 应用ID
+    :param user_id: 用户ID
+    :return: 无返回值
     """
+    # 记录任务开始信息
     logging.info(click.style('Start batch import annotation: {}'.format(job_id), fg='green'))
     start_at = time.perf_counter()
     indexing_cache_key = 'app_annotation_batch_import_{}'.format(str(job_id))
-    # get app info
+    
+    # 查询应用信息
     app = db.session.query(App).filter(
         App.id == app_id,
         App.tenant_id == tenant_id,
@@ -40,6 +42,7 @@ def batch_import_annotations_task(job_id: str, content_list: list[dict], app_id:
         try:
             documents = []
             for content in content_list:
+                # 为每个内容创建注解并添加到数据库
                 annotation = MessageAnnotation(
                     app_id=app.id,
                     content=content['answer'],
@@ -49,6 +52,7 @@ def batch_import_annotations_task(job_id: str, content_list: list[dict], app_id:
                 db.session.add(annotation)
                 db.session.flush()
 
+                # 创建文档对象，并将其与注解关联
                 document = Document(
                     page_content=content['question'],
                     metadata={
@@ -58,12 +62,14 @@ def batch_import_annotations_task(job_id: str, content_list: list[dict], app_id:
                     }
                 )
                 documents.append(document)
-            # if annotation reply is enabled , batch add annotations' index
+            
+            # 如果启用了注解回复，批量添加注解索引
             app_annotation_setting = db.session.query(AppAnnotationSetting).filter(
                 AppAnnotationSetting.app_id == app_id
             ).first()
 
             if app_annotation_setting:
+                # 根据配置绑定的数据集信息，创建数据集和向量索引
                 dataset_collection_binding = DatasetCollectionBindingService.get_dataset_collection_binding_by_id_and_type(
                     app_annotation_setting.collection_binding_id,
                     'annotation'
@@ -82,14 +88,18 @@ def batch_import_annotations_task(job_id: str, content_list: list[dict], app_id:
                 vector = Vector(dataset, attributes=['doc_id', 'annotation_id', 'app_id'])
                 vector.create(documents, duplicate_check=True)
 
+            # 提交数据库事务
             db.session.commit()
+            # 设置索引完成状态的缓存
             redis_client.setex(indexing_cache_key, 600, 'completed')
             end_at = time.perf_counter()
+            # 记录任务完成信息
             logging.info(
                 click.style(
                     'Build index successful for batch import annotation: {} latency: {}'.format(job_id, end_at - start_at),
                     fg='green'))
         except Exception as e:
+            # 发生异常时回滚事务，并记录错误信息
             db.session.rollback()
             redis_client.setex(indexing_cache_key, 600, 'error')
             indexing_error_msg_key = 'app_annotation_batch_import_error_msg_{}'.format(str(job_id))
