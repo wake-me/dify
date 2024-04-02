@@ -282,8 +282,6 @@ class Config:
         self.TOOL_ICON_CACHE_MAX_AGE = get_env('TOOL_ICON_CACHE_MAX_AGE')
         self.KEYWORD_DATA_SOURCE_TYPE = get_env('KEYWORD_DATA_SOURCE_TYPE')
 
-        self.KEYWORD_DATA_SOURCE_TYPE = get_env('KEYWORD_DATA_SOURCE_TYPE')
-
 class CloudEditionConfig(Config):
     """
     云版本配置类，继承自Config类。用于设置和管理云版本相关的配置信息。
