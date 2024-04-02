@@ -65,6 +65,7 @@ DEFAULTS = {
     'KEYWORD_STORE': 'jieba',  # 关键词存储方式
     'BATCH_UPLOAD_LIMIT': 20,  # 批量上传限制
     'TOOL_ICON_CACHE_MAX_AGE': 3600,  # 工具图标缓存最大年龄（秒）
+    'KEYWORD_DATA_SOURCE_TYPE': 'database',
 }
 
 
@@ -279,6 +280,9 @@ class Config:
         self.BATCH_UPLOAD_LIMIT = get_env('BATCH_UPLOAD_LIMIT')
         self.API_COMPRESSION_ENABLED = get_bool_env('API_COMPRESSION_ENABLED')
         self.TOOL_ICON_CACHE_MAX_AGE = get_env('TOOL_ICON_CACHE_MAX_AGE')
+        self.KEYWORD_DATA_SOURCE_TYPE = get_env('KEYWORD_DATA_SOURCE_TYPE')
+
+        self.KEYWORD_DATA_SOURCE_TYPE = get_env('KEYWORD_DATA_SOURCE_TYPE')
 
 class CloudEditionConfig(Config):
     """
