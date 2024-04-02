@@ -11,18 +11,54 @@ from flask_restful import fields
 
 
 def run(script):
+    """
+    执行提供的脚本并返回执行状态和输出。
+    
+    参数:
+    - script: 要执行的脚本命令字符串。
+    
+    返回:
+    - 一个元组，包含命令执行的状态码和输出结果。
+    """
     return subprocess.getstatusoutput('source /root/.bashrc && ' + script)
 
 
 class TimestampField(fields.Raw):
+    """
+    一个字段类，用于格式化时间戳值。
+    
+    方法:
+    - format: 将时间戳对象格式化为整数。
+    """
     def format(self, value):
+        """
+        格式化时间戳。
+        
+        参数:
+        - value: 时间戳对象。
+        
+        返回:
+        - 时间戳的整数表示。
+        """
         return int(value.timestamp())
 
 
 def email(email):
-    # Define a regex pattern for email addresses
+    """
+    验证提供的电子邮件地址是否符合标准格式。
+    
+    参数:
+    - email: 待验证的电子邮件地址字符串。
+    
+    返回:
+    - 验证通过的电子邮件地址。
+    
+    异常:
+    - ValueError: 如果电子邮件地址格式不正确，则抛出。
+    """
+    # 定义电子邮件地址的正则表达式模式
     pattern = r"^[\w\.-]+@([\w-]+\.)+[\w-]{2,}$"
-    # Check if the email matches the pattern
+    # 检查电子邮件地址是否匹配模式
     if re.match(pattern, email) is not None:
         return email
 
@@ -32,6 +68,18 @@ def email(email):
 
 
 def uuid_value(value):
+    """
+    验证提供的值是否是一个有效的UUID。
+    
+    参数:
+    - value: 待验证的字符串值。
+    
+    返回:
+    - 验证通过的UUID字符串。
+    
+    异常:
+    - ValueError: 如果提供的值不是一个有效的UUID，则抛出。
+    """
     if value == '':
         return str(value)
 
@@ -45,6 +93,18 @@ def uuid_value(value):
 
 
 def timestamp_value(timestamp):
+    """
+    验证提供的的时间戳是否为有效的整数。
+    
+    参数:
+    - timestamp: 待验证的时间戳字符串。
+    
+    返回:
+    - 验证通过的时间戳整数。
+    
+    异常:
+    - ValueError: 如果时间戳无效或为负数，则抛出。
+    """
     try:
         int_timestamp = int(timestamp)
         if int_timestamp < 0:
@@ -57,13 +117,36 @@ def timestamp_value(timestamp):
 
 
 class str_len:
-    """ Restrict input to an integer in a range (inclusive) """
-
+    """
+    一个限制输入字符串长度的类。
+    
+    方法:
+    - __call__: 对提供的值进行长度检查。
+    """
     def __init__(self, max_length, argument='argument'):
+        """
+        初始化限制长度的类实例。
+        
+        参数:
+        - max_length: 允许的最大字符串长度。
+        - argument: 对象的名称，默认为'argument'。
+        """
         self.max_length = max_length
         self.argument = argument
 
     def __call__(self, value):
+        """
+        检查提供的值是否符合长度限制。
+        
+        参数:
+        - value: 待检查的字符串值。
+        
+        返回:
+        - 符合长度限制的字符串值。
+        
+        异常:
+        - ValueError: 如果字符串长度超过最大允许长度，则抛出。
+        """
         length = len(value)
         if length > self.max_length:
             error = ('Invalid {arg}: {val}. {arg} cannot exceed length {length}'
@@ -74,13 +157,21 @@ class str_len:
 
 
 class float_range:
-    """ Restrict input to an float in a range (inclusive) """
+    """
+    限制输入为指定范围内的浮点数（包含边界）。
+    
+    参数:
+    - low: 浮点数范围的下界。
+    - high: 浮点数范围的上界。
+    - argument: 输入参数的名称，默认为'argument'。
+    """
     def __init__(self, low, high, argument='argument'):
         self.low = low
         self.high = high
         self.argument = argument
 
     def __call__(self, value):
+        # 将输入转换为浮点数，并检查是否在指定范围内
         value = _get_float(value)
         if value < self.low or value > self.high:
             error = ('Invalid {arg}: {val}. {arg} must be within the range {lo} - {hi}'
@@ -91,11 +182,19 @@ class float_range:
 
 
 class datetime_string:
+    """
+    确保输入字符串符合指定的日期时间格式。
+    
+    参数:
+    - format: 日期时间字符串的格式。
+    - argument: 输入参数的名称，默认为'argument'。
+    """
     def __init__(self, format, argument='argument'):
         self.format = format
         self.argument = argument
 
     def __call__(self, value):
+        # 尝试将输入字符串按指定格式解析
         try:
             datetime.strptime(value, self.format)
         except ValueError:
@@ -107,12 +206,36 @@ class datetime_string:
 
 
 def _get_float(value):
+    """
+    将输入转换为浮点数。
+    
+    参数:
+    - value: 待转换的值。
+    
+    返回:
+    - 转换后的浮点数。
+    
+    异常:
+    - ValueError: 如果无法将输入转换为浮点数。
+    """
     try:
         return float(value)
     except (TypeError, ValueError):
         raise ValueError('{} is not a valid float'.format(value))
 
 def timezone(timezone_string):
+    """
+    验证时区字符串的有效性。
+    
+    参数:
+    - timezone_string: 待验证的时区字符串。
+    
+    返回:
+    - 验证通过的时区字符串。
+    
+    异常:
+    - ValueError: 如果时区字符串无效。
+    """
     if timezone_string and timezone_string in available_timezones():
         return timezone_string
 
@@ -122,8 +245,18 @@ def timezone(timezone_string):
 
 
 def generate_string(n):
+    """
+    生成指定长度的随机字符串。
+    
+    参数:
+    - n: 字符串的长度。
+    
+    返回:
+    - 生成的随机字符串。
+    """
     letters_digits = string.ascii_letters + string.digits
     result = ""
+    # 生成指定长度的随机字符串
     for i in range(n):
         result += random.choice(letters_digits)
 
@@ -131,14 +264,35 @@ def generate_string(n):
 
 
 def get_remote_ip(request):
+    """
+    获取远程客户端的IP地址。
+    
+    参数:
+    - request: HTTP请求对象。
+    
+    返回:
+    - 远程客户端的IP地址。
+    """
+    # 优先使用Cloudflare提供的IP地址
     if request.headers.get('CF-Connecting-IP'):
         return request.headers.get('Cf-Connecting-Ip')
+    # 如果Cloudflare的IP不存在，尝试获取X-Forwarded-For头中的IP
     elif request.headers.getlist("X-Forwarded-For"):
         return request.headers.getlist("X-Forwarded-For")[0]
+    # 如果以上都不存在，使用请求的远程地址
     else:
         return request.remote_addr
 
 
 def generate_text_hash(text: str) -> str:
-    hash_text = str(text) + 'None'
+    """
+    生成文本的哈希值。
+    
+    参数:
+    - text: 待哈希的文本。
+    
+    返回:
+    - 哈希后的字符串。
+    """
+    hash_text = str(text) + 'None'  # 添加固定字符串以确保哈希值的唯一性
     return sha256(hash_text.encode()).hexdigest()

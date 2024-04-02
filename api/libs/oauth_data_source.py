@@ -8,53 +8,114 @@ from models.source import DataSourceBinding
 
 
 class OAuthDataSource:
+    """
+    OAuth数据源类，用于提供OAuth认证的基本信息和支持。
+    
+    参数:
+    client_id : str
+        客户端ID，用于识别应用程序。
+    client_secret : str
+        客户端密钥，用于验证应用程序的身份。
+    redirect_uri : str
+        重定向URI，用于OAuth授权流程完成后的回调。
+    """
+
     def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
+        """
+        初始化OAuth数据源。
+        
+        参数:
+        client_id : str
+            客户端ID，用于识别应用程序。
+        client_secret : str
+            客户端密钥，用于验证应用程序的身份。
+        redirect_uri : str
+            重定向URI，用于OAuth授权流程完成后的回调。
+        """
         self.client_id = client_id
         self.client_secret = client_secret
         self.redirect_uri = redirect_uri
 
     def get_authorization_url(self):
+        """
+        获取授权URL，用于开始OAuth授权流程。
+        
+        返回:
+        str
+            授权页面的URL。
+        """
         raise NotImplementedError()
 
     def get_access_token(self, code: str):
+        """
+        使用授权码获取访问令牌。
+        
+        参数:
+        code : str
+            授权码，用于换取访问令牌。
+        
+        返回:
+        str
+            获取到的访问令牌。
+        """
         raise NotImplementedError()
 
 
 class NotionOAuth(OAuthDataSource):
-    _AUTH_URL = 'https://api.notion.com/v1/oauth/authorize'
-    _TOKEN_URL = 'https://api.notion.com/v1/oauth/token'
-    _NOTION_PAGE_SEARCH = "https://api.notion.com/v1/search"
-    _NOTION_BLOCK_SEARCH = "https://api.notion.com/v1/blocks"
-    _NOTION_BOT_USER = "https://api.notion.com/v1/users/me"
+    # NotionOAuth类，继承自OAuthDataSource，用于处理Notion的OAuth认证流程。
+    
+    _AUTH_URL = 'https://api.notion.com/v1/oauth/authorize'  # 授权URL
+    _TOKEN_URL = 'https://api.notion.com/v1/oauth/token'  # 令牌URL
+    _NOTION_PAGE_SEARCH = "https://api.notion.com/v1/search"  # 搜索Notion页面的URL
+    _NOTION_BLOCK_SEARCH = "https://api.notion.com/v1/blocks"  # 搜索Notion区块的URL
+    _NOTION_BOT_USER = "https://api.notion.com/v1/users/me"  # 获取当前Notion机器人用户信息的URL
 
     def get_authorization_url(self):
-        params = {
+        """
+        获取授权页面的URL。
+        
+        返回:
+            str: 授权页面的URL，用于引导用户进行授权。
+        """
+        params = {  # 构建请求参数
             'client_id': self.client_id,
             'response_type': 'code',
             'redirect_uri': self.redirect_uri,
             'owner': 'user'
         }
-        return f"{self._AUTH_URL}?{urllib.parse.urlencode(params)}"
+        return f"{self._AUTH_URL}?{urllib.parse.urlencode(params)}"  # 组装URL
 
     def get_access_token(self, code: str):
-        data = {
+        """
+        使用授权码获取访问令牌。
+        
+        参数:
+            code (str): 授权码，用于向Notion服务器申请访问令牌。
+        
+        返回:
+            无返回值，但在类实例中更新了访问令牌和其他相关信息。
+        
+        抛出:
+            ValueError: 如果获取访问令牌失败，抛出包含错误信息的ValueError。
+        """
+        data = {  # 构建请求数据
             'code': code,
             'grant_type': 'authorization_code',
             'redirect_uri': self.redirect_uri
         }
-        headers = {'Accept': 'application/json'}
-        auth = (self.client_id, self.client_secret)
-        response = requests.post(self._TOKEN_URL, data=data, auth=auth, headers=headers)
+        headers = {'Accept': 'application/json'}  # 请求头部
+        auth = (self.client_id, self.client_secret)  # 认证信息
+        response = requests.post(self._TOKEN_URL, data=data, auth=auth, headers=headers)  # 发起请求
 
-        response_json = response.json()
+        response_json = response.json()  # 解析响应
         access_token = response_json.get('access_token')
         if not access_token:
-            raise ValueError(f"Error in Notion OAuth: {response_json}")
+            raise ValueError(f"Error in Notion OAuth: {response_json}")  # 处理无访问令牌的情况
+        # 解析并保存工作空间信息和授权页面信息
         workspace_name = response_json.get('workspace_name')
         workspace_icon = response_json.get('workspace_icon')
         workspace_id = response_json.get('workspace_id')
-        # get all authorized pages
-        pages = self.get_authorized_pages(access_token)
+        pages = self.get_authorized_pages(access_token)  # 获取授权页面
         source_info = {
             'workspace_name': workspace_name,
             'workspace_icon': workspace_icon,
@@ -62,7 +123,7 @@ class NotionOAuth(OAuthDataSource):
             'pages': pages,
             'total': len(pages)
         }
-        # save data source binding
+        # 处理数据源绑定
         data_source_binding = DataSourceBinding.query.filter(
             db.and_(
                 DataSourceBinding.tenant_id == current_user.current_tenant_id,
@@ -71,10 +132,12 @@ class NotionOAuth(OAuthDataSource):
             )
         ).first()
         if data_source_binding:
+            # 更新已存在的数据源绑定
             data_source_binding.source_info = source_info
             data_source_binding.disabled = False
             db.session.commit()
         else:
+            # 新增数据源绑定
             new_data_source_binding = DataSourceBinding(
                 tenant_id=current_user.current_tenant_id,
                 access_token=access_token,
@@ -85,11 +148,21 @@ class NotionOAuth(OAuthDataSource):
             db.session.commit()
 
     def save_internal_access_token(self, access_token: str):
+        """
+        保存内部访问令牌到数据源绑定中。
+        
+        参数:
+        access_token (str): 需要保存的访问令牌。
+        
+        该方法不会返回任何内容。
+        """
+        # 根据访问令牌获取工作空间名称
         workspace_name = self.notion_workspace_name(access_token)
         workspace_icon = None
         workspace_id = current_user.current_tenant_id
-        # get all authorized pages
+        # 获取所有授权页面
         pages = self.get_authorized_pages(access_token)
+        # 准备数据源信息
         source_info = {
             'workspace_name': workspace_name,
             'workspace_icon': workspace_icon,
@@ -97,7 +170,7 @@ class NotionOAuth(OAuthDataSource):
             'pages': pages,
             'total': len(pages)
         }
-        # save data source binding
+        # 保存数据源绑定
         data_source_binding = DataSourceBinding.query.filter(
             db.and_(
                 DataSourceBinding.tenant_id == current_user.current_tenant_id,
@@ -106,10 +179,12 @@ class NotionOAuth(OAuthDataSource):
             )
         ).first()
         if data_source_binding:
+            # 如果数据源绑定已存在，则更新其信息并启用
             data_source_binding.source_info = source_info
             data_source_binding.disabled = False
             db.session.commit()
         else:
+            # 如果不存在，则创建新的数据源绑定并保存
             new_data_source_binding = DataSourceBinding(
                 tenant_id=current_user.current_tenant_id,
                 access_token=access_token,
@@ -120,7 +195,16 @@ class NotionOAuth(OAuthDataSource):
             db.session.commit()
 
     def sync_data_source(self, binding_id: str):
-        # save data source binding
+        """
+        同步数据源信息。该方法通过绑定ID查找数据源绑定信息，并根据授权页面更新数据源的详细信息。
+
+        参数:
+        - binding_id (str): 数据源绑定的唯一标识符。
+
+        返回值:
+        - 无返回值。如果找不到对应的数据源绑定，则抛出 ValueError。
+        """
+        # 根据条件查询数据源绑定信息
         data_source_binding = DataSourceBinding.query.filter(
             db.and_(
                 DataSourceBinding.tenant_id == current_user.current_tenant_id,
@@ -130,9 +214,10 @@ class NotionOAuth(OAuthDataSource):
             )
         ).first()
         if data_source_binding:
-            # get all authorized pages
+            # 使用访问令牌获取所有授权页面
             pages = self.get_authorized_pages(data_source_binding.access_token)
             source_info = data_source_binding.source_info
+            # 更新数据源信息，包括工作区名称、图标、ID以及授权页面列表
             new_source_info = {
                 'workspace_name': source_info['workspace_name'],
                 'workspace_icon': source_info['workspace_icon'],
@@ -142,16 +227,30 @@ class NotionOAuth(OAuthDataSource):
             }
             data_source_binding.source_info = new_source_info
             data_source_binding.disabled = False
+            # 提交数据库会话，保存更新
             db.session.commit()
         else:
+            # 如果找不到绑定，抛出异常
             raise ValueError('Data source binding not found')
 
     def get_authorized_pages(self, access_token: str):
+        """
+        使用访问令牌获取授权页面和数据库的详细信息。
+        
+        参数:
+        - access_token: 用户授权后的访问令牌，用于访问Notion API。
+        
+        返回值:
+        - pages: 包含页面和数据库详情的列表，每个元素都是一个字典，含有页面或数据库的ID、名称、图标、父页面ID和类型。
+        """
         pages = []
+        # 搜索页面和数据库
         page_results = self.notion_page_search(access_token)
         database_results = self.notion_database_search(access_token)
         # get page detail
+        # 遍历搜索结果，获取每个页面的详细信息
         for page_result in page_results:
+            # 提取页面名称和图标
             page_id = page_result['id']
             if 'Name' in page_result['properties']:
                 if len(page_result['properties']['Name']['title']) > 0:
@@ -194,6 +293,7 @@ class NotionOAuth(OAuthDataSource):
                 parent_id = 'root'
             else:
                 parent_id = parent[parent_type]
+            # 构建页面信息字典
             page = {
                 'page_id': page_id,
                 'page_name': page_name,
@@ -202,8 +302,10 @@ class NotionOAuth(OAuthDataSource):
                 'type': 'page'
             }
             pages.append(page)
-            # get database detail
+            
+        # 遍历数据库搜索结果，获取每个数据库的详细信息
         for database_result in database_results:
+            # 提取数据库名称和图标
             page_id = database_result['id']
             if len(database_result['title']) > 0:
                 page_name = database_result['title'][0]['plain_text']
@@ -233,6 +335,7 @@ class NotionOAuth(OAuthDataSource):
                 parent_id = 'root'
             else:
                 parent_id = parent[parent_type]
+            # 构建数据库信息字典
             page = {
                 'page_id': page_id,
                 'page_name': page_name,

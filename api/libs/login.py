@@ -17,40 +17,36 @@ current_user = LocalProxy(lambda: _get_user())
 
 def login_required(func):
     """
-    If you decorate a view with this, it will ensure that the current user is
-    logged in and authenticated before calling the actual view. (If they are
-    not, it calls the :attr:`LoginManager.unauthorized` callback.) For
-    example::
+    一个装饰器，用于确保当前用户已登录并经过身份验证才可访问视图。
+    如果用户未登录，将调用 :attr:`LoginManager.unauthorized` 回调。
+    
+    使用示例：
+    
+    @app.route('/post')
+    @login_required
+    def post():
+        pass
 
-        @app.route('/post')
-        @login_required
-        def post():
-            pass
+    如果仅在特定情况下需要用户登录，可以这样判断：
 
-    If there are only certain times you need to require that your user is
-    logged in, you can do so with::
+    if not current_user.is_authenticated:
+        return current_app.login_manager.unauthorized()
 
-        if not current_user.is_authenticated:
-            return current_app.login_manager.unauthorized()
+    该装饰器还支持通过设置环境变量 `LOGIN_DISABLED` 为 `True` 来全局禁用身份验证，
+    以便在单元测试时使用。
 
-    ...which is essentially the code that this function adds to your views.
+    注意：
+    
+    根据 W3 对 CORS 预检请求的指南，HTTP "OPTIONS" 请求免于登录检查。
 
-    It can be convenient to globally turn off authentication when unit testing.
-    To enable this, if the application configuration variable `LOGIN_DISABLED`
-    is set to `True`, this decorator will be ignored.
-
-    .. Note ::
-
-        Per `W3 guidelines for CORS preflight requests
-        <http://www.w3.org/TR/cors/#cross-origin-request-with-preflight-0>`_,
-        HTTP ``OPTIONS`` requests are exempt from login checks.
-
-    :param func: The view function to decorate.
+    :param func: 需要装饰的视图函数。
     :type func: function
+    :return: 被装饰的视图函数。
     """
 
     @wraps(func)
     def decorated_view(*args, **kwargs):
+        # 检查管理员API密钥
         auth_header = request.headers.get('Authorization')
         admin_api_key_enable = os.getenv('ADMIN_API_KEY_ENABLE', default='False')
         if admin_api_key_enable.lower() == 'true':
@@ -63,9 +59,11 @@ def login_required(func):
                     raise Unauthorized('Invalid Authorization header format. Expected \'Bearer <api-key>\' format.')
                 admin_api_key = os.getenv('ADMIN_API_KEY')
 
+                # 验证API密钥
                 if admin_api_key:
                     if os.getenv('ADMIN_API_KEY') == auth_token:
                         workspace_id = request.headers.get('X-WORKSPACE-ID')
+                        # 检查工作空间权限
                         if workspace_id:
                             tenant_account_join = db.session.query(Tenant, TenantAccountJoin) \
                                 .filter(Tenant.id == workspace_id) \
@@ -75,18 +73,20 @@ def login_required(func):
                             if tenant_account_join:
                                 tenant, ta = tenant_account_join
                                 account = Account.query.filter_by(id=ta.account_id).first()
-                                # Login admin
+                                # 登录管理员
                                 if account:
                                     account.current_tenant = tenant
                                     current_app.login_manager._update_request_context_with_user(account)
                                     user_logged_in.send(current_app._get_current_object(), user=_get_user())
+        
+        # 免登录检查的HTTP方法或当登录被禁用时
         if request.method in EXEMPT_METHODS or current_app.config.get("LOGIN_DISABLED"):
             pass
         elif not current_user.is_authenticated:
             return current_app.login_manager.unauthorized()
 
-        # flask 1.x compatibility
-        # current_app.ensure_sync is only available in Flask >= 2.0
+        # 兼容Flask 1.x
+        # current_app.ensure_sync 只在Flask >= 2.0中可用
         if callable(getattr(current_app, "ensure_sync", None)):
             return current_app.ensure_sync(func)(*args, **kwargs)
         return func(*args, **kwargs)
@@ -95,10 +95,19 @@ def login_required(func):
 
 
 def _get_user():
-    if has_request_context():
-        if "_login_user" not in g:
-            current_app.login_manager._load_user()
+    """
+    获取当前请求的登录用户。
+    
+    该函数首先检查当前请求上下文中是否存在登录用户。如果存在，但用户信息尚未加载，则调用登录管理器加载用户信息。
+    
+    返回值:
+        - 如果有登录用户，则返回该用户对象。
+        - 如果没有登录用户或不在请求上下文中，则返回None。
+    """
+    if has_request_context():  # 检查当前是否有请求上下文
+        if "_login_user" not in g:  # 在全局变量g中检查登录用户是否存在
+            current_app.login_manager._load_user()  # 如果未加载用户，则加载
 
-        return g._login_user
+        return g._login_user  # 返回登录用户对象
 
-    return None
+    return None  # 如果没有请求上下文，返回None
