@@ -1,5 +1,6 @@
 # 导入必要的模块和库
 import os
+from werkzeug.exceptions import Unauthorized
 
 # 如果不是在调试模式下，对一些库进行特殊配置，以提高性能
 if not os.environ.get("DEBUG") or os.environ.get("DEBUG").lower() != 'true':

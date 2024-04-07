@@ -433,26 +433,45 @@ class AppModelConfigService:
 
     @classmethod
     def is_moderation_valid(cls, tenant_id: str, config: dict):
+        """
+        校验审核配置是否有效。
+
+        参数:
+        - cls: 类的引用，用于可能的类方法调用。
+        - tenant_id: 字符串，表示租户ID。
+        - config: 字典，包含敏感词规避的配置信息。
+
+        返回值:
+        - 无返回值，但会在配置无效时抛出异常或直接返回。
+        """
+
+        # 如果配置中没有敏感词规避部分，初始化为禁用状态
         if 'sensitive_word_avoidance' not in config or not config["sensitive_word_avoidance"]:
             config["sensitive_word_avoidance"] = {
                 "enabled": False
             }
 
+        # 确保敏感词规避的配置是字典类型
         if not isinstance(config["sensitive_word_avoidance"], dict):
             raise ValueError("sensitive_word_avoidance must be of dict type")
 
+        # 如果未明确启用敏感词规避，视为禁用
         if "enabled" not in config["sensitive_word_avoidance"] or not config["sensitive_word_avoidance"]["enabled"]:
             config["sensitive_word_avoidance"]["enabled"] = False
 
+        # 如果敏感词规避未启用，则直接返回
         if not config["sensitive_word_avoidance"]["enabled"]:
             return
 
+        # 如果未提供类型或类型未明确启用，抛出异常
         if "type" not in config["sensitive_word_avoidance"] or not config["sensitive_word_avoidance"]["type"]:
             raise ValueError("sensitive_word_avoidance.type is required")
 
+        # 准备类型和配置，以供进一步验证
         type = config["sensitive_word_avoidance"]["type"]
         config = config["sensitive_word_avoidance"]["config"]
 
+        # 调用工厂方法验证配置的有效性
         ModerationFactory.validate_config(
             name=type,
             tenant_id=tenant_id,
@@ -461,25 +480,41 @@ class AppModelConfigService:
 
     @classmethod
     def is_file_upload_valid(cls, config: dict):
+        """
+        检查文件上传配置是否有效。
+        
+        参数:
+        - cls: 类的引用，用于可能的类方法调用，但在此函数中未使用。
+        - config: 一个字典，包含关于文件上传的配置信息。
+        
+        返回值:
+        - 无返回值，但会抛出 ValueError 如果配置不满足要求。
+        """
+        # 检查 file_upload 配置是否存在，若不存在则初始化为空字典
         if 'file_upload' not in config or not config["file_upload"]:
             config["file_upload"] = {}
 
+        # 确保 file_upload 配置是字典类型
         if not isinstance(config["file_upload"], dict):
             raise ValueError("file_upload must be of dict type")
 
-        # check image config
+        # 检查图片上传配置
         if 'image' not in config["file_upload"] or not config["file_upload"]["image"]:
             config["file_upload"]["image"] = {"enabled": False}
 
+        # 如果启用了图片上传，检查配置的合法性
         if config['file_upload']['image']['enabled']:
+            # 检查图片数量限制是否在 [1, 6] 的范围内
             number_limits = config['file_upload']['image']['number_limits']
             if number_limits < 1 or number_limits > 6:
                 raise ValueError("number_limits must be in [1, 6]")
-
+            
+            # 检查图片详情设置是否为 'high' 或 'low'
             detail = config['file_upload']['image']['detail']
             if detail not in ['high', 'low']:
                 raise ValueError("detail must be in ['high', 'low']")
 
+            # 检查图片传输方法是否为列表，并且列表中的每个项是否是 'remote_url' 或 'local_file'
             transfer_methods = config['file_upload']['image']['transfer_methods']
             if not isinstance(transfer_methods, list):
                 raise ValueError("transfer_methods must be of list type")
@@ -489,22 +524,40 @@ class AppModelConfigService:
 
     @classmethod
     def is_external_data_tools_valid(cls, tenant_id: str, config: dict):
+        """
+        验证外部数据工具的配置是否有效。
+
+        参数:
+        - cls: 类的引用，用于可能的类方法调用。
+        - tenant_id: 字符串，表示租户ID。
+        - config: 字典，包含外部数据工具的配置信息。
+
+        返回值:
+        - 无返回值，但会抛出异常来指示配置验证失败。
+        """
+        # 检查config中是否定义了external_data_tools，如果没有则初始化为空列表
         if 'external_data_tools' not in config or not config["external_data_tools"]:
             config["external_data_tools"] = []
 
+        # 确保external_data_tools是一个列表类型
         if not isinstance(config["external_data_tools"], list):
             raise ValueError("external_data_tools must be of list type")
 
+        # 遍历external_data_tools列表，验证每个工具的配置
         for tool in config["external_data_tools"]:
+            # 如果工具未明确启用，则默认为禁用
             if "enabled" not in tool or not tool["enabled"]:
                 tool["enabled"] = False
 
+            # 跳过禁用的工具
             if not tool["enabled"]:
                 continue
 
+            # 验证工具必须提供类型信息
             if "type" not in tool or not tool["type"]:
                 raise ValueError("external_data_tools[].type is required")
 
+            # 获取工具类型和配置，并进行进一步的配置验证
             type = tool["type"]
             config = tool["config"]
 
@@ -516,43 +569,71 @@ class AppModelConfigService:
 
     @classmethod
     def is_dataset_query_variable_valid(cls, config: dict, mode: str) -> None:
-        # Only check when mode is completion
+        """
+        检查数据集查询变量的有效性。
+        
+        参数:
+        - cls: 类的引用，此处未使用。
+        - config: 包含代理模式和数据集配置的字典。
+        - mode: 操作模式，如"completion"表示完成模式。
+        
+        返回值:
+        - None: 该函数不返回任何值，但可能会抛出 ValueError。
+
+        当模式为"completion"时，检查配置中是否指定了数据集以及数据集查询变量。
+        如果数据集存在但未指定数据集查询变量，则抛出 ValueError。
+        """
+
+        # 仅当模式为"completion"时进行检查
         if mode != 'completion':
             return
 
         agent_mode = config.get("agent_mode", {})
         tools = agent_mode.get("tools", [])
-        dataset_exists = "dataset" in str(tools)
+        dataset_exists = "dataset" in str(tools)  # 检查数据集是否存在
 
-        dataset_query_variable = config.get("dataset_query_variable")
+        dataset_query_variable = config.get("dataset_query_variable")  # 获取数据集查询变量配置
 
+        # 如果数据集存在但未设置数据集查询变量，则抛出异常
         if dataset_exists and not dataset_query_variable:
             raise ValueError("Dataset query variable is required when dataset is exist")
 
     @classmethod
     def is_advanced_prompt_valid(cls, config: dict, app_mode: str) -> None:
-        # prompt_type
+        """
+        校验高级提示配置的有效性。
+
+        参数:
+        - cls: 类的引用，用于可能的类方法调用，但在此函数中未使用。
+        - config: 一个字典，包含提示配置、聊天提示配置、完成提示配置和数据集配置等。
+        - app_mode: 应用模式字符串，用于根据应用的当前模式调整配置要求。
+
+        返回值:
+        - 无。此函数通过抛出异常来报告无效配置。
+        """
+
+        # 校验提示类型配置
         if 'prompt_type' not in config or not config["prompt_type"]:
             config["prompt_type"] = "simple"
 
         if config['prompt_type'] not in ['simple', 'advanced']:
             raise ValueError("prompt_type must be in ['simple', 'advanced']")
 
-        # chat_prompt_config
+        # 校验聊天提示配置
         if 'chat_prompt_config' not in config or not config["chat_prompt_config"]:
             config["chat_prompt_config"] = {}
 
         if not isinstance(config["chat_prompt_config"], dict):
             raise ValueError("chat_prompt_config must be of object type")
 
-        # completion_prompt_config
+        # 校验完成提示配置
         if 'completion_prompt_config' not in config or not config["completion_prompt_config"]:
             config["completion_prompt_config"] = {}
 
         if not isinstance(config["completion_prompt_config"], dict):
             raise ValueError("completion_prompt_config must be of object type")
 
-        # dataset_configs
+        # 校验数据集配置
         if 'dataset_configs' not in config or not config["dataset_configs"]:
             config["dataset_configs"] = {'retrieval_model': 'single'}
 
@@ -565,6 +646,7 @@ class AppModelConfigService:
         if not isinstance(config["dataset_configs"], dict):
             raise ValueError("dataset_configs must be of object type")
 
+        # 多重检索模型配置检查
         if config["dataset_configs"]['retrieval_model'] == 'multiple':
             if not config["dataset_configs"]['reranking_model']:
                 raise ValueError("reranking_model has not been set")
@@ -574,6 +656,7 @@ class AppModelConfigService:
         if not isinstance(config["dataset_configs"], dict):
             raise ValueError("dataset_configs must be of object type")
 
+        # 高级提示类型下的额外校验
         if config['prompt_type'] == 'advanced':
             if not config['chat_prompt_config'] and not config['completion_prompt_config']:
                 raise ValueError("chat_prompt_config or completion_prompt_config is required when prompt_type is advanced")
@@ -581,6 +664,7 @@ class AppModelConfigService:
             if config['model']["mode"] not in ['chat', 'completion']:
                 raise ValueError("model.mode must be in ['chat', 'completion'] when prompt_type is advanced")
 
+            # 在聊天模式下，检查完成提示配置中的用户和助手前缀
             if app_mode == AppMode.CHAT.value and config['model']["mode"] == "completion":
                 user_prefix = config['completion_prompt_config']['conversation_histories_role']['user_prefix']
                 assistant_prefix = config['completion_prompt_config']['conversation_histories_role']['assistant_prefix']
@@ -591,6 +675,7 @@ class AppModelConfigService:
                 if not assistant_prefix:
                     config['completion_prompt_config']['conversation_histories_role']['assistant_prefix'] = 'Assistant'
 
+            # 聊天模式下，提示消息数量限制检查
             if config['model']["mode"] == "chat":
                 prompt_list = config['chat_prompt_config']['prompt']
 

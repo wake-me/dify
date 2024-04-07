@@ -32,15 +32,18 @@ class ToolManageService:
     @staticmethod
     def list_tool_providers(user_id: str, tenant_id: str):
         """
-            list tool providers
+        列出工具提供者
 
-            :return: the list of tool providers
+        :param user_id: 用户ID，类型为字符串
+        :param tenant_id: 租户ID，类型为字符串
+        :return: 工具提供者列表，返回类型为列表
         """
+        # 获取用户和租户的工具提供者列表
         result = [provider.to_dict() for provider in ToolManager.user_list_providers(
             user_id, tenant_id
         )]
-
-        # add icon url prefix
+        
+        # 为每个工具提供者添加图标URL前缀
         for provider in result:
             ToolManageService.repack_provider(provider)
 
@@ -49,22 +52,32 @@ class ToolManageService:
     @staticmethod
     def repack_provider(provider: dict):
         """
-            repack provider
+        重新打包provider信息。
 
-            :param provider: the provider dict
+        对传入的provider字典进行处理，根据provider的类型，更新其icon字段的值。
+        如果是内置类型（BUILTIN），则icon路径会根据名称拼接；
+        如果是模型类型（MODEL），则同样根据名称拼接icon路径；
+        如果是API类型，尝试将icon字段解析为JSON，失败则默认为一个表情图标。
+
+        :param provider: 提供者信息字典，包含类型、名称和图标等信息。
         """
+        # 获取基础API URL，用于拼接icon的完整URL
         url_prefix = (current_app.config.get("CONSOLE_API_URL")
-                      + "/console/api/workspaces/current/tool-provider/")
+                    + "/console/api/workspaces/current/tool-provider/")
         
+        # 如果provider中包含icon字段
         if 'icon' in provider:
+            # 根据provider类型，设置不同的icon路径
             if provider['type'] == UserToolProvider.ProviderType.BUILTIN.value:
                 provider['icon'] = url_prefix + 'builtin/' + provider['name'] + '/icon'
             elif provider['type'] == UserToolProvider.ProviderType.MODEL.value:
                 provider['icon'] = url_prefix + 'model/' + provider['name'] + '/icon'
             elif provider['type'] == UserToolProvider.ProviderType.API.value:
+                # 尝试将icon字段解析为JSON，用于支持动态图标配置
                 try:
                     provider['icon'] = json.loads(provider['icon'])
                 except:
+                    # 解析失败时，设置默认的icon配置
                     provider['icon'] =  {
                         "background": "#252525",
                         "content": "\ud83d\ude01"
@@ -75,13 +88,25 @@ class ToolManageService:
         user_id: str, tenant_id: str, provider: str
     ):
         """
-            list builtin tool provider tools
+        列出内置工具提供商的工具列表。
+
+        参数:
+        - user_id: 用户ID，字符串类型，用于标识请求的用户。
+        - tenant_id: 租户ID，字符串类型，用于标识用户所属的租户。
+        - provider: 工具提供商的标识符，字符串类型，用于指定要查询的工具提供商。
+
+        返回值:
+        - 返回一个序列化后的用户工具列表，每个用户工具包含作者、名称、标签、描述和参数信息。
         """
+
+        # 获取指定提供商的工具控制器
         provider_controller: ToolProviderController = ToolManager.get_builtin_provider(provider)
         tools = provider_controller.get_tools()
 
+        # 初始化工具配置管理器
         tool_provider_configurations = ToolConfigurationManager(tenant_id=tenant_id, provider_controller=provider_controller)
-        # check if user has added the provider
+        
+        # 检查用户是否已添加该提供商
         builtin_provider: BuiltinToolProvider = db.session.query(BuiltinToolProvider).filter(
             BuiltinToolProvider.tenant_id == tenant_id,
             BuiltinToolProvider.provider == provider,
@@ -89,23 +114,22 @@ class ToolManageService:
 
         credentials = {}
         if builtin_provider is not None:
-            # get credentials
+            # 解密工具的凭证信息
             credentials = builtin_provider.credentials
             credentials = tool_provider_configurations.decrypt_tool_credentials(credentials)
 
         result = []
         for tool in tools:
-            # fork tool runtime
+            # 为每个工具创建独立的运行时环境
             tool = tool.fork_tool_runtime(meta={
                 'credentials': credentials,
                 'tenant_id': tenant_id,
             })
 
-            # get tool parameters
+            # 获取工具参数和运行时参数
             parameters = tool.parameters or []
-            # get tool runtime parameters
             runtime_parameters = tool.get_runtime_parameters()
-            # override parameters
+            # 合并参数
             current_parameters = parameters.copy()
             for runtime_parameter in runtime_parameters:
                 found = False
@@ -118,6 +142,7 @@ class ToolManageService:
                 if not found and runtime_parameter.form == ToolParameter.ToolParameterForm.FORM:
                     current_parameters.append(runtime_parameter)
 
+            # 创建用户工具对象并添加到结果列表中
             user_tool = UserTool(
                 author=tool.identity.author,
                 name=tool.identity.name,
@@ -127,6 +152,7 @@ class ToolManageService:
             )
             result.append(user_tool)
 
+        # 序列化并返回结果
         return json.loads(
             serialize_base_model_array(result)
         )
@@ -136,11 +162,17 @@ class ToolManageService:
         provider_name
     ):
         """
-            list builtin provider credentials schema
+            列出内置提供者凭证架构列表
 
-            :return: the list of tool providers
+            :param provider_name: 提供者名称
+            :type provider_name: str
+            :return: 工具提供者的凭证架构列表
+            :rtype: list
         """
+        # 获取指定名称的内置提供者
         provider = ToolManager.get_builtin_provider(provider_name)
+        
+        # 序列化并返回提供者的凭证架构列表
         return json.loads(serialize_base_model_array([
             v for _, v in (provider.credentials_schema or {}).items()
         ]))
@@ -148,15 +180,25 @@ class ToolManageService:
     @staticmethod
     def parser_api_schema(schema: str) -> list[ApiBasedToolBundle]:
         """
-            parse api schema to tool bundle
+        解析 API 架构到工具捆绑包
+
+        参数:
+        schema: str - 待解析的API架构字符串。
+
+        返回值:
+        list[ApiBasedToolBundle] - 解析后得到的工具捆绑包列表。
         """
         try:
-            warnings = {}
+            warnings = {}  # 用于收集解析过程中的警告信息
+
+            # 尝试自动解析API架构到工具捆绑包和架构类型
             try:
                 tool_bundles, schema_type = ApiBasedToolSchemaParser.auto_parse_to_tool_bundle(schema, warning=warnings)
             except Exception as e:
+                # 如果解析失败，抛出无效架构的错误
                 raise ValueError(f'invalid schema: {str(e)}')
             
+            # 定义认证信息的架构，包括认证类型选择、API Key头部和API Key值
             credentials_schema = [
                 ToolProviderCredentials(
                     name='auth_type',
@@ -204,6 +246,7 @@ class ToolManageService:
                 ),
             ]
 
+            # 序列化并返回解析结果
             return json.loads(serialize_base_model_dict(
                 {
                     'schema_type': schema_type,
@@ -213,16 +256,20 @@ class ToolManageService:
                 }
             ))
         except Exception as e:
+            # 任何其他异常都视为无效架构，并抛出错误
             raise ValueError(f'invalid schema: {str(e)}')
 
     @staticmethod
     def convert_schema_to_tool_bundles(schema: str, extra_info: dict = None) -> list[ApiBasedToolBundle]:
         """
-            convert schema to tool bundles
+        将架构转换为工具包列表
 
-            :return: the list of tool bundles, description
+        :param schema: 待转换的架构字符串
+        :param extra_info: 额外信息字典，可选参数，默认为None
+        :return: 工具包列表，包含根据架构解析得到的ApiBasedToolBundle对象
         """
         try:
+            # 自动解析架构字符串为工具包列表
             tool_bundles = ApiBasedToolSchemaParser.auto_parse_to_tool_bundle(schema, extra_info=extra_info)
             return tool_bundles
         except Exception as e:
@@ -234,12 +281,27 @@ class ToolManageService:
         schema_type: str, schema: str, privacy_policy: str
     ):
         """
-            create api tool provider
+        创建一个API工具提供者。
+
+        参数:
+        - user_id: 用户ID，字符串类型，标识创建此工具提供者的用户。
+        - tenant_id: 租户ID，字符串类型，标识此工具提供者所属的租户。
+        - provider_name: 提供者名称，字符串类型，唯一标识一个工具提供者。
+        - icon: 图标信息，字典类型，包含图标的元数据。
+        - credentials: 凭据信息，字典类型，用于认证和授权。
+        - schema_type: 架构类型，字符串类型，定义了工具提供者的数据架构。
+        - schema: 架构定义，字符串类型，详细描述了工具提供者的数据模型。
+        - privacy_policy: 隐私政策，字符串类型，描述了提供者如何处理用户数据。
+
+        返回值:
+        - 字典类型，包含单一键值对{'result': 'success'}，表示操作成功。
         """
+
+        # 校验架构类型是否有效
         if schema_type not in [member.value for member in ApiProviderSchemaType]:
             raise ValueError(f'invalid schema type {schema}')
         
-        # check if the provider exists
+        # 检查提供者是否已存在
         provider: ApiToolProvider = db.session.query(ApiToolProvider).filter(
             ApiToolProvider.tenant_id == tenant_id,
             ApiToolProvider.name == provider_name,
@@ -248,15 +310,15 @@ class ToolManageService:
         if provider is not None:
             raise ValueError(f'provider {provider_name} already exists')
 
-        # parse openapi to tool bundle
+        # 解析OpenAPI到工具包
         extra_info = {}
-        # extra info like description will be set here
+        # 额外信息如描述将在这里设置
         tool_bundles, schema_type = ToolManageService.convert_schema_to_tool_bundles(schema, extra_info)
         
         if len(tool_bundles) > 100:
             raise ValueError('the number of apis should be less than 100')
 
-        # create db provider
+        # 创建数据库提供者记录
         db_provider = ApiToolProvider(
             tenant_id=tenant_id,
             user_id=user_id,
@@ -273,19 +335,20 @@ class ToolManageService:
         if 'auth_type' not in credentials:
             raise ValueError('auth_type is required')
 
-        # get auth type, none or api key
+        # 获取认证类型，无或API密钥
         auth_type = ApiProviderAuthType.value_of(credentials['auth_type'])
 
-        # create provider entity
+        # 创建提供者实体
         provider_controller = ApiBasedToolProviderController.from_db(db_provider, auth_type)
-        # load tools into provider entity
+        # 将工具加载到提供者实体中
         provider_controller.load_bundled_tools(tool_bundles)
 
-        # encrypt credentials
+        # 加密凭据信息
         tool_configuration = ToolConfigurationManager(tenant_id=tenant_id, provider_controller=provider_controller)
         encrypted_credentials = tool_configuration.encrypt_tool_credentials(credentials)
         db_provider.credentials_str = json.dumps(encrypted_credentials)
 
+        # 将提供者记录添加到数据库并提交事务
         db.session.add(db_provider)
         db.session.commit()
 
@@ -296,25 +359,43 @@ class ToolManageService:
         user_id: str, tenant_id: str, url: str
     ):
         """
-            get api tool provider remote schema
+        获取 API 工具提供者的远程模式
+
+        参数:
+        - user_id: 用户ID，字符串类型，用于标识请求的用户
+        - tenant_id: 租户ID，字符串类型，用于标识用户所属的租户
+        - url: 远程模式的URL地址，字符串类型
+
+        返回值:
+        - 一个字典，包含远程模式的文本内容:
+        {
+            'schema': 模式文本
+        }
         """
+
+        # 设置HTTP请求头，伪装为浏览器访问以避免被识别为自动化请求
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
             "Accept": "*/*",
         }
 
         try:
+            # 向指定URL发起GET请求
             response = get(url, headers=headers, timeout=10)
+            # 如果响应状态码不是200，抛出异常
             if response.status_code != 200:
                 raise ValueError(f'Got status code {response.status_code}')
             schema = response.text
 
-            # try to parse schema, avoid SSRF attack
+            # 尝试解析模式文本，避免SSRF攻击
             ToolManageService.parser_api_schema(schema)
         except Exception as e:
+            # 记录解析模式错误的日志
             logger.error(f"parse api schema error: {str(e)}")
+            # 如果解析失败，抛出无效模式的异常
             raise ValueError('invalid schema, please check the url you provided')
         
+        # 返回解析后的模式
         return {
             'schema': schema
         }
@@ -324,16 +405,31 @@ class ToolManageService:
         user_id: str, tenant_id: str, provider: str
     ):
         """
-            list api tool provider tools
+        列出指定服务提供商的工具列表。
+
+        参数:
+        - user_id: 用户ID，字符串类型，用于标识请求的用户。
+        - tenant_id: 租户ID，字符串类型，用于确定操作的租户范围。
+        - provider: 服务提供商名称，字符串类型，指定要查询的工具提供商。
+
+        返回值:
+        - 返回一个JSON对象，包含指定服务提供商的所有工具信息。
+
+        抛出:
+        - ValueError: 如果指定的服务提供商不存在，则抛出此异常。
         """
+        
+        # 从数据库中查询指定租户ID和名称的服务提供商
         provider: ApiToolProvider = db.session.query(ApiToolProvider).filter(
             ApiToolProvider.tenant_id == tenant_id,
             ApiToolProvider.name == provider,
         ).first()
 
         if provider is None:
+            # 如果查询不到指定的服务提供商，抛出异常
             raise ValueError(f'you have not added provider {provider}')
         
+        # 序列化并返回服务提供商的工具信息
         return json.loads(
             serialize_base_model_array([
                 UserTool(
@@ -357,37 +453,46 @@ class ToolManageService:
         user_id: str, tenant_id: str, provider_name: str, credentials: dict
     ):
         """
-            update builtin tool provider
+        更新内置工具提供商的凭证信息。
+
+        参数:
+        - user_id: 用户ID，字符串类型，标识更新操作的用户。
+        - tenant_id: 租户ID，字符串类型，标识提供商所属的租户。
+        - provider_name: 提供商名称，字符串类型，标识要更新的工具提供商。
+        - credentials: 凭证字典，包含更新后的提供商凭证信息。
+
+        返回值:
+        - 字典，包含结果信息，例如 {'result': 'success'} 表示更新成功。
         """
-        # get if the provider exists
+        # 检查提供商是否已存在
         provider: BuiltinToolProvider = db.session.query(BuiltinToolProvider).filter(
             BuiltinToolProvider.tenant_id == tenant_id,
             BuiltinToolProvider.provider == provider_name,
         ).first()
 
         try: 
-            # get provider
+            # 获取提供商控制器，并验证凭证是否必要
             provider_controller = ToolManager.get_builtin_provider(provider_name)
             if not provider_controller.need_credentials:
                 raise ValueError(f'provider {provider_name} does not need credentials')
             tool_configuration = ToolConfigurationManager(tenant_id=tenant_id, provider_controller=provider_controller)
-            # get original credentials if exists
+            # 如果存在原始凭证，则解密并比对新旧凭证
             if provider is not None:
                 original_credentials = tool_configuration.decrypt_tool_credentials(provider.credentials)
                 masked_credentials = tool_configuration.mask_tool_credentials(original_credentials)
-                # check if the credential has changed, save the original credential
+                # 检查凭证是否有变化，如有则保存原始凭证
                 for name, value in credentials.items():
                     if name in masked_credentials and value == masked_credentials[name]:
                         credentials[name] = original_credentials[name]
-            # validate credentials
+            # 验证更新后的凭证信息
             provider_controller.validate_credentials(credentials)
-            # encrypt credentials
+            # 加密更新后的凭证信息
             credentials = tool_configuration.encrypt_tool_credentials(credentials)
         except (ToolProviderNotFoundError, ToolNotFoundError, ToolProviderCredentialValidationError) as e:
             raise ValueError(str(e))
 
         if provider is None:
-            # create provider
+            # 如果提供商不存在，则创建新提供商并保存凭证
             provider = BuiltinToolProvider(
                 tenant_id=tenant_id,
                 user_id=user_id,
@@ -399,11 +504,12 @@ class ToolManageService:
             db.session.commit()
 
         else:
+            # 如果提供商已存在，则更新凭证信息并提交
             provider.encrypted_credentials = json.dumps(credentials)
             db.session.add(provider)
             db.session.commit()
 
-            # delete cache
+            # 删除凭证缓存
             tool_configuration.delete_tool_credentials_cache()
 
         return { 'result': 'success' }
@@ -414,12 +520,27 @@ class ToolManageService:
         schema_type: str, schema: str, privacy_policy: str
     ):
         """
-            update api tool provider
+        更新 API 工具提供者的信息。
+
+        参数:
+        - user_id: 用户ID，字符串类型。
+        - tenant_id: 租户ID，字符串类型。
+        - provider_name: 新的工具提供者名称，字符串类型。
+        - original_provider: 原始工具提供者名称，字符串类型。
+        - icon: 提供者图标信息，字典类型。
+        - credentials: 认证信息，字典类型。
+        - schema_type: 架构类型，字符串类型。
+        - schema: 架构定义，字符串类型。
+        - privacy_policy: 隐私政策，字符串类型。
+
+        返回值:
+        - 字典类型，包含结果信息。
         """
+        # 校验架构类型是否有效
         if schema_type not in [member.value for member in ApiProviderSchemaType]:
             raise ValueError(f'invalid schema type {schema}')
         
-        # check if the provider exists
+        # 检查提供者是否存在
         provider: ApiToolProvider = db.session.query(ApiToolProvider).filter(
             ApiToolProvider.tenant_id == tenant_id,
             ApiToolProvider.name == original_provider,
@@ -428,12 +549,12 @@ class ToolManageService:
         if provider is None:
             raise ValueError(f'api provider {provider_name} does not exists')
 
-        # parse openapi to tool bundle
+        # 将OpenAPI解析为工具包
         extra_info = {}
-        # extra info like description will be set here
+        # 在此处设置额外信息，如描述
         tool_bundles, schema_type = ToolManageService.convert_schema_to_tool_bundles(schema, extra_info)
         
-        # update db provider
+        # 更新数据库中的提供者信息
         provider.name = provider_name
         provider.icon = json.dumps(icon)
         provider.schema = schema
@@ -445,20 +566,20 @@ class ToolManageService:
         if 'auth_type' not in credentials:
             raise ValueError('auth_type is required')
 
-        # get auth type, none or api key
+        # 获取认证类型，无或API密钥
         auth_type = ApiProviderAuthType.value_of(credentials['auth_type'])
 
-        # create provider entity
+        # 创建提供者实体
         provider_controller = ApiBasedToolProviderController.from_db(provider, auth_type)
-        # load tools into provider entity
+        # 将工具加载到提供者实体中
         provider_controller.load_bundled_tools(tool_bundles)
 
-        # get original credentials if exists
+        # 获取原始认证信息，如果存在
         tool_configuration = ToolConfigurationManager(tenant_id=tenant_id, provider_controller=provider_controller)
 
         original_credentials = tool_configuration.decrypt_tool_credentials(provider.credentials)
         masked_credentials = tool_configuration.mask_tool_credentials(original_credentials)
-        # check if the credential has changed, save the original credential
+        # 检查认证信息是否更改，保存原始认证信息
         for name, value in credentials.items():
             if name in masked_credentials and value == masked_credentials[name]:
                 credentials[name] = original_credentials[name]
@@ -469,7 +590,7 @@ class ToolManageService:
         db.session.add(provider)
         db.session.commit()
 
-        # delete cache
+        # 删除缓存
         tool_configuration.delete_tool_credentials_cache()
 
         return { 'result': 'success' }
@@ -479,20 +600,31 @@ class ToolManageService:
         user_id: str, tenant_id: str, provider_name: str
     ):
         """
-            delete tool provider
+        删除内置工具提供商
+
+        参数:
+        user_id (str): 用户ID，用于标识请求的用户。
+        tenant_id (str): 租户ID，用于限定操作的范围。
+        provider_name (str): 提供商名称，指定要删除的工具提供商。
+
+        返回值:
+        dict: 包含操作结果信息的字典，例如 {'result': 'success'}。
         """
+        # 从数据库中查询指定的工具提供商
         provider: BuiltinToolProvider = db.session.query(BuiltinToolProvider).filter(
             BuiltinToolProvider.tenant_id == tenant_id,
             BuiltinToolProvider.provider == provider_name,
         ).first()
 
+        # 如果指定的工具提供商不存在，则抛出异常
         if provider is None:
             raise ValueError(f'you have not added provider {provider_name}')
         
+        # 从数据库中删除工具提供商，并提交事务
         db.session.delete(provider)
         db.session.commit()
 
-        # delete cache
+        # 删除工具提供商的缓存数据
         provider_controller = ToolManager.get_builtin_provider(provider_name)
         tool_configuration = ToolConfigurationManager(tenant_id=tenant_id, provider_controller=provider_controller)
         tool_configuration.delete_tool_credentials_cache()
@@ -504,9 +636,17 @@ class ToolManageService:
         provider: str
     ):
         """
-            get tool provider icon and it's mimetype
+        获取内置工具提供商的图标及其MIME类型。
+
+        参数:
+        provider (str): 工具提供商的名称。
+
+        返回:
+        tuple: 包含图标数据的字节串和MIME类型的元组。
         """
+        # 从ToolManager获取指定提供商的图标路径和MIME类型
         icon_path, mime_type = ToolManager.get_builtin_provider_icon(provider)
+        # 读取图标文件内容为字节串
         with open(icon_path, 'rb') as f:
             icon_bytes = f.read()
 
@@ -517,12 +657,22 @@ class ToolManageService:
         provider: str
     ):
         """
-            get tool provider icon and it's mimetype
+        获取模型工具提供者的图标及其MIME类型
+        
+        参数:
+        provider: str - 模型工具提供者的标识符
+
+        返回值:
+        icon_bytes: bytes - 图标的字节串
+        mime_type: str - 图标的MIME类型
         """
         
+        # 获取模型提供者服务实例
         service = ModelProviderService()
+        # 根据提供者标识符获取小图标及其MIME类型
         icon_bytes, mime_type = service.get_model_provider_icon(provider=provider, icon_type='icon_small', lang='en_US')
 
+        # 如果未获取到图标，抛出异常
         if icon_bytes is None:
             raise ValueError(f'provider {provider} does not exists')
 
@@ -533,11 +683,22 @@ class ToolManageService:
         user_id: str, tenant_id: str, provider: str
     ):
         """
-            list model tool provider tools
+        列出指定模型工具提供者的工具列表。
+
+        参数:
+        - user_id: 用户ID，字符串类型，用于授权和访问控制。
+        - tenant_id: 租户ID，字符串类型，用于确定工具所属的租户范围。
+        - provider: 工具提供者名称，字符串类型，指定要查询的模型工具提供者。
+
+        返回值:
+        - 返回一个JSON解析后的对象，包含所请求的工具列表，每个工具包含作者、名称、标签、描述和参数信息。
         """
+        # 获取指定租户和提供者的工具提供者控制器
         provider_controller = ToolManager.get_model_provider(tenant_id=tenant_id, provider_name=provider)
+        # 从提供者控制器获取用户有权访问的工具列表
         tools = provider_controller.get_tools(user_id=user_id, tenant_id=tenant_id)
 
+        # 将获取的工具信息转换为UserTool对象列表，准备返回
         result = [
             UserTool(
                 author=tool.identity.author,
@@ -548,6 +709,7 @@ class ToolManageService:
             ) for tool in tools
         ]
 
+        # 序列化UserTool对象数组，并将其转换为JSON格式返回
         return json.loads(
             serialize_base_model_array(result)
         )
@@ -557,19 +719,31 @@ class ToolManageService:
         user_id: str, tenant_id: str, provider_name: str
     ):
         """
-            delete tool provider
+        删除工具提供者
+
+        参数:
+        user_id (str): 用户ID，用于标识请求的用户。
+        tenant_id (str): 租户ID，用于确定操作的范围。
+        provider_name (str): 提供者名称，指定要删除的工具提供者。
+
+        返回值:
+        dict: 包含操作结果信息的字典，{'result': 'success'} 表示成功。
         """
+        # 从数据库中查询指定的工具提供者
         provider: ApiToolProvider = db.session.query(ApiToolProvider).filter(
             ApiToolProvider.tenant_id == tenant_id,
             ApiToolProvider.name == provider_name,
         ).first()
 
+        # 如果提供者不存在，则抛出错误
         if provider is None:
             raise ValueError(f'you have not added provider {provider_name}')
         
+        # 从数据库中删除提供者并提交更改
         db.session.delete(provider)
         db.session.commit()
 
+        # 返回操作成功的结果
         return { 'result': 'success' }
     
     @staticmethod
@@ -577,10 +751,18 @@ class ToolManageService:
         user_id: str, tenant_id: str, provider: str
     ):
         """
-            get api tool provider
+        获取指定用户的API工具提供者。
+
+        参数:
+        - user_id: 用户的唯一标识符，类型为字符串。
+        - tenant_id: 租户的唯一标识符，类型为字符串。用于确定用户所属的租户。
+        - provider: 工具提供者的唯一标识符，类型为字符串。用于指定要获取的API工具提供者。
+
+        返回值:
+        - 返回调用ToolManager.user_get_api_provider方法的结果，该方法用于获取指定提供者的API工具信息。
         """
         return ToolManager.user_get_api_provider(provider=provider, tenant_id=tenant_id)
-    
+        
     @staticmethod
     def test_api_tool_preview(
         tenant_id: str, 
@@ -592,28 +774,44 @@ class ToolManageService:
         schema: str
     ):
         """
-            test api tool before adding api tool provider
+            在添加API工具提供者之前测试API工具。
+
+        参数:
+        - tenant_id: 字符串，租户ID。
+        - provider_name: 字符串，提供者名称。
+        - tool_name: 字符串，工具名称。
+        - credentials: 字典，认证信息。
+        - parameters: 字典，参数。
+        - schema_type: 字符串，模式类型。
+        - schema: 字符串，模式定义。
+
+        返回值:
+        - 字典，包含测试结果或错误信息。
         """
+
+        # 校验模式类型是否有效
         if schema_type not in [member.value for member in ApiProviderSchemaType]:
             raise ValueError(f'invalid schema type {schema_type}')
         
         try:
+            # 自动解析模式到工具包
             tool_bundles, _ = ApiBasedToolSchemaParser.auto_parse_to_tool_bundle(schema)
         except Exception as e:
             raise ValueError('invalid schema')
         
-        # get tool bundle
+        # 获取对应操作ID的工具包
         tool_bundle = next(filter(lambda tb: tb.operation_id == tool_name, tool_bundles), None)
         if tool_bundle is None:
             raise ValueError(f'invalid tool name {tool_name}')
         
+        # 从数据库查询API工具提供者
         db_provider: ApiToolProvider = db.session.query(ApiToolProvider).filter(
             ApiToolProvider.tenant_id == tenant_id,
             ApiToolProvider.name == provider_name,
         ).first()
 
         if not db_provider:
-            # create a fake db provider
+            # 如果提供者不存在，则创建一个虚拟的数据库提供者
             db_provider = ApiToolProvider(
                 tenant_id='', user_id='', name='', icon='',
                 schema=schema,
@@ -624,39 +822,44 @@ class ToolManageService:
             )
 
         if 'auth_type' not in credentials:
+            # 验证认证类型是否提供
             raise ValueError('auth_type is required')
 
-        # get auth type, none or api key
+        # 获取认证类型，无或API密钥
         auth_type = ApiProviderAuthType.value_of(credentials['auth_type'])
 
-        # create provider entity
+        # 创建提供者实体
         provider_controller = ApiBasedToolProviderController.from_db(db_provider, auth_type)
-        # load tools into provider entity
+        # 将工具包加载到提供者实体中
         provider_controller.load_bundled_tools(tool_bundles)
 
-        # decrypt credentials
+        # 如果存在数据库ID，则解密认证信息
         if db_provider.id:
             tool_configuration = ToolConfigurationManager(
                 tenant_id=tenant_id, 
                 provider_controller=provider_controller
             )
             decrypted_credentials = tool_configuration.decrypt_tool_credentials(credentials)
-            # check if the credential has changed, save the original credential
+            # 检查凭证是否已更改，保存原始凭证
             masked_credentials = tool_configuration.mask_tool_credentials(decrypted_credentials)
             for name, value in credentials.items():
                 if name in masked_credentials and value == masked_credentials[name]:
                     credentials[name] = decrypted_credentials[name]
 
         try:
+            # 验证认证信息格式
             provider_controller.validate_credentials_format(credentials)
-            # get tool
+            # 获取工具
             tool = provider_controller.get_tool(tool_name)
             tool = tool.fork_tool_runtime(meta={
                 'credentials': credentials,
                 'tenant_id': tenant_id,
             })
+            # 验证认证信息和参数
             result = tool.validate_credentials(credentials, parameters)
         except Exception as e:
+            # 如果过程中发生异常，返回错误信息
             return { 'error': str(e) }
         
+        # 返回测试结果或空响应
         return { 'result': result or 'empty response' }
