@@ -236,6 +236,7 @@ class Dataset(db.Model):
         normalized_dataset_id = dataset_id.replace("-", "_")
         return f'Vector_index_{normalized_dataset_id}_Node'
 
+
 class DatasetProcessRule(db.Model):
     """
     数据集处理规则模型类，继承自db.Model，用于在数据库中存储数据集处理规则。
@@ -814,7 +815,8 @@ class DatasetKeywordTable(db.Model):
     id = db.Column(UUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))
     dataset_id = db.Column(UUID, nullable=False, unique=True)
     keyword_table = db.Column(db.Text, nullable=False)
-    data_source_type = db.Column(db.String(255), nullable=False, server_default=db.text("'database'::character varying"))
+    data_source_type = db.Column(db.String(255), nullable=False,
+                                 server_default=db.text("'database'::character varying"))
 
     @property
     def keyword_table_dict(self):
@@ -847,6 +849,7 @@ class DatasetKeywordTable(db.Model):
                         if isinstance(node_idxs, list):
                             dct[keyword] = set(node_idxs)
                 return dct
+
         # get dataset
         dataset = Dataset.query.filter_by(
             id=self.dataset_id
@@ -885,16 +888,18 @@ class Embedding(db.Model):
 
     __tablename__ = 'embeddings'  # 定义数据库表名
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='embedding_pkey'),  # 主键约束
-        db.UniqueConstraint('model_name', 'hash', name='embedding_hash_idx')  # 唯一性约束
+        db.PrimaryKeyConstraint('id', name='embedding_pkey'),
+        db.UniqueConstraint('model_name', 'hash', 'provider_name', name='embedding_hash_idx')
     )
 
     id = db.Column(UUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))  # UUID主键字段
     model_name = db.Column(db.String(40), nullable=False,
-                           server_default=db.text("'text-embedding-ada-002'::character varying"))  # 模型名称字段
-    hash = db.Column(db.String(64), nullable=False)  # 哈希值字段
-    embedding = db.Column(db.LargeBinary, nullable=False)  # 嵌入数据字段
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间字段
+                           server_default=db.text("'text-embedding-ada-002'::character varying"))
+    hash = db.Column(db.String(64), nullable=False)
+    embedding = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    provider_name = db.Column(db.String(40), nullable=False,
+                              server_default=db.text("''::character varying"))
 
     def set_embedding(self, embedding_data: list[float]):
         """

@@ -124,7 +124,7 @@ class Config:
 
     def __init__(self):
         # 初始化通用配置
-        self.CURRENT_VERSION = "0.5.11"  # 应用当前版本
+        self.CURRENT_VERSION = "0.5.11-fix1"  # 应用当前版本
         self.COMMIT_SHA = get_env('COMMIT_SHA')  # 版本控制的提交哈希值
         self.EDITION = "SELF_HOSTED"  # 应用版本，此处为自托管版
         self.DEPLOY_ENV = get_env('DEPLOY_ENV')  # 部署环境
