@@ -1,11 +1,3 @@
-'''
-Author: fanwenqi hi.fanwenqi@gmail.com
-Date: 2024-04-01 16:39:26
-LastEditors: fanwenqi hi.fanwenqi@gmail.com
-LastEditTime: 2024-04-07 17:05:34
-FilePath: /dify/api/services/web_conversation_service.py
-Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-'''
 from typing import Optional, Union
 
 from extensions.ext_database import db
