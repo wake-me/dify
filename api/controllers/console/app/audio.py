@@ -6,7 +6,6 @@ from werkzeug.exceptions import InternalServerError
 
 import services
 from controllers.console import api
-from controllers.console.app import _get_app
 from controllers.console.app.error import (
     AppUnavailableError,
     AudioTooLargeError,
@@ -18,11 +17,13 @@ from controllers.console.app.error import (
     ProviderQuotaExceededError,
     UnsupportedAudioTypeError,
 )
+from controllers.console.app.wraps import get_app_model
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required
 from core.errors.error import ModelCurrentlyNotSupportError, ProviderTokenNotInitError, QuotaExceededError
 from core.model_runtime.errors.invoke import InvokeError
 from libs.login import login_required
+from models.model import AppMode
 from services.audio_service import AudioService
 from services.errors.audio import (
     AudioTooLargeServiceError,
@@ -43,40 +44,14 @@ class ChatMessageAudioApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    def post(self, app_id):
-        """
-        上传并转写音频文件。
-
-        对于给定的应用ID，接收一个音频文件并尝试将其转写为文本。使用ASR(Automatic Speech Recognition)服务进行音频转写。
-
-        Parameters:
-            app_id (int): 应用的唯一标识符。
-
-        Returns:
-            转写服务的响应数据。
-
-        Raises:
-            AppUnavailableError: 应用配置错误时抛出。
-            NoAudioUploadedError: 未上传音频时抛出。
-            AudioTooLargeError: 音频文件过大时抛出。
-            UnsupportedAudioTypeError: 音频类型不受支持时抛出。
-            ProviderNotSupportSpeechToTextError: 服务提供商不支持语音转文本功能时抛出。
-            ProviderNotInitializeError: 服务提供商令牌未初始化时抛出。
-            ProviderQuotaExceededError: 服务提供商配额超出时抛出。
-            ProviderModelCurrentlyNotSupportError: 当前服务提供商模型不支持时抛出。
-            CompletionRequestError: 调用转写服务失败时抛出。
-            ValueError: 价值错误时抛出。
-            InternalServerError: 内部服务器错误时抛出。
-        """
-        app_id = str(app_id)  # 将app_id转换为字符串格式
-        app_model = _get_app(app_id, 'chat')  # 获取应用模型
-
-        file = request.files['file']  # 从请求中获取音频文件
+    @get_app_model(mode=[AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT])
+    def post(self, app_model):
+        file = request.files['file']
 
         try:
             # 尝试使用音频转写服务进行转写
             response = AudioService.transcript_asr(
-                tenant_id=app_model.tenant_id,
+                app_model=app_model,
                 file=file,
                 end_user=None,
             )
@@ -117,43 +92,14 @@ class ChatMessageTextApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    def post(self, app_id):
-        """
-        将文本消息转换为音频。
-
-        Requirements:
-            - 需要完成设置。
-            - 用户必须登录。
-            - 用户账户必须初始化。
-
-        Parameters:
-            app_id (int): 应用的ID，将被转换为字符串格式。
-
-        Returns:
-            dict: 包含转换后的音频数据的字典。
-
-        Raises:
-            AppUnavailableError: 应用模型配置错误时抛出。
-            NoAudioUploadedError: 无音频上传错误时抛出。
-            AudioTooLargeError: 音频过大错误时抛出。
-            UnsupportedAudioTypeError: 不支持的音频类型错误时抛出。
-            ProviderNotSupportSpeechToTextError: 提供商不支持语音转文本服务错误时抛出。
-            ProviderNotInitializeError: 提供商令牌未初始化错误时抛出。
-            ProviderQuotaExceededError: 提供商配额超出错误时抛出。
-            ProviderModelCurrentlyNotSupportError: 当前提供商模型不支持错误时抛出。
-            CompletionRequestError: 完成请求错误时抛出。
-            ValueError: 值错误时抛出。
-            InternalServerError: 内部服务器错误时抛出。
-        """
-        app_id = str(app_id)  # 将app_id转换为字符串格式
-        app_model = _get_app(app_id, None)  # 获取应用模型
-
+    @get_app_model
+    def post(self, app_model):
         try:
             # 调用音频服务，将文本转换为音频
             response = AudioService.transcript_tts(
-                tenant_id=app_model.tenant_id,
+                app_model=app_model,
                 text=request.form['text'],
-                voice=request.form['voice'] if request.form['voice'] else app_model.app_model_config.text_to_speech_dict.get('voice'),
+                voice=request.form.get('voice'),
                 streaming=False
             )
 
@@ -197,23 +143,11 @@ class ChatMessageTextApi(Resource):
 
 
 class TextModesApi(Resource):
-    """
-    处理有关文本模式的API请求。
-
-    方法:
-    - get: 根据应用ID和请求参数，获取对应语言的文本到语音转换支持信息。
-    
-    参数:
-    - app_id: str, 应用的唯一标识符。
-
-    返回值:
-    - 返回音频服务提供的文本到语音转换支持的语言信息。
-    """
-
-    def get(self, app_id: str):
-        # 根据app_id获取应用模型
-        app_model = _get_app(str(app_id))
-
+    @setup_required
+    @login_required
+    @account_initialization_required
+    @get_app_model
+    def get(self, app_model):
         try:
             # 解析请求参数
             parser = reqparse.RequestParser()

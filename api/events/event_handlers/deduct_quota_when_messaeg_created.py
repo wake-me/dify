@@ -1,4 +1,4 @@
-from core.entities.application_entities import ApplicationGenerateEntity
+from core.app.entities.app_invoke_entities import AgentChatAppGenerateEntity, ChatAppGenerateEntity
 from core.entities.provider_entities import QuotaUnit
 from events.message_event import message_was_created
 from extensions.ext_database import db
@@ -14,11 +14,12 @@ def handle(sender, **kwargs):
     :param **kwargs: 关键字参数，包含应用生成实体等额外信息。
     """
     message = sender
-    # 从kwargs中获取应用生成实体
-    application_generate_entity: ApplicationGenerateEntity = kwargs.get('application_generate_entity')
+    application_generate_entity = kwargs.get('application_generate_entity')
 
-    # 获取模型配置和提供商配置
-    model_config = application_generate_entity.app_orchestration_config_entity.model_config
+    if not isinstance(application_generate_entity, ChatAppGenerateEntity | AgentChatAppGenerateEntity):
+        return
+
+    model_config = application_generate_entity.model_config
     provider_model_bundle = model_config.provider_model_bundle
     provider_configuration = provider_model_bundle.configuration
 
@@ -59,7 +60,7 @@ def handle(sender, **kwargs):
     if used_quota is not None:
         # 在数据库中更新配额使用情况
         db.session.query(Provider).filter(
-            Provider.tenant_id == application_generate_entity.tenant_id,
+            Provider.tenant_id == application_generate_entity.app_config.tenant_id,
             Provider.provider_name == model_config.provider,
             Provider.provider_type == ProviderType.SYSTEM.value,
             Provider.quota_type == system_configuration.current_quota_type.value,

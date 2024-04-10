@@ -1,9 +1,5 @@
-import json
 import logging
-from collections.abc import Generator
-from typing import Union
 
-from flask import Response, stream_with_context
 from flask_restful import fields, marshal_with, reqparse
 from flask_restful.inputs import int_range
 from werkzeug.exceptions import InternalServerError, NotFound
@@ -21,13 +17,15 @@ from controllers.web.error import (
     ProviderQuotaExceededError,
 )
 from controllers.web.wraps import WebApiResource
-from core.entities.application_entities import InvokeFrom
+from core.app.entities.app_invoke_entities import InvokeFrom
 from core.errors.error import ModelCurrentlyNotSupportError, ProviderTokenNotInitError, QuotaExceededError
 from core.model_runtime.errors.invoke import InvokeError
 from fields.conversation_fields import message_file_fields
 from fields.message_fields import agent_thought_fields
+from libs import helper
 from libs.helper import TimestampField, uuid_value
-from services.completion_service import CompletionService
+from models.model import AppMode
+from services.app_generate_service import AppGenerateService
 from services.errors.app import MoreLikeThisDisabledError
 from services.errors.conversation import ConversationNotExistsError
 from services.errors.message import MessageNotExistsError, SuggestedQuestionsAfterAnswerDisabledError
@@ -72,16 +70,18 @@ class MessageListApi(WebApiResource):
 
     # 定义消息的字段
     message_fields = {
-        'id': fields.String,  # 消息的唯一标识符
-        'conversation_id': fields.String,  # 对话的唯一标识符
-        'inputs': fields.Raw,  # 输入的消息内容，保持原始格式
-        'query': fields.String,  # 用户的查询内容
-        'answer': fields.String,  # 对应的答案内容
-        'message_files': fields.List(fields.Nested(message_file_fields), attribute='files'),  # 消息附带的文件列表
-        'feedback': fields.Nested(feedback_fields, attribute='user_feedback', allow_null=True),  # 用户反馈的信息，可以为空
-        'retriever_resources': fields.List(fields.Nested(retriever_resource_fields)),  # 检索器使用的资源列表
-        'created_at': TimestampField,  # 消息创建的时间戳
-        'agent_thoughts': fields.List(fields.Nested(agent_thought_fields))  # 代理（AI）思考过程或内部信息
+        'id': fields.String,
+        'conversation_id': fields.String,
+        'inputs': fields.Raw,
+        'query': fields.String,
+        'answer': fields.String(attribute='re_sign_file_url_answer'),
+        'message_files': fields.List(fields.Nested(message_file_fields), attribute='files'),
+        'feedback': fields.Nested(feedback_fields, attribute='user_feedback', allow_null=True),
+        'retriever_resources': fields.List(fields.Nested(retriever_resource_fields)),
+        'created_at': TimestampField,
+        'agent_thoughts': fields.List(fields.Nested(agent_thought_fields)),
+        'status': fields.String,
+        'error': fields.String,
     }
 
     """
@@ -102,22 +102,8 @@ class MessageListApi(WebApiResource):
 
     @marshal_with(message_infinite_scroll_pagination_fields)
     def get(self, app_model, end_user):
-        """
-        获取消息列表，支持无限滚动分页。
-
-        参数:
-        - app_model: 应用模型，用于判断应用模式。
-        - end_user: 终端用户信息。
-
-        返回:
-        - 分页消息列表。
-
-        异常:
-        - NotChatAppError: 聊天模式应用不存在错误。
-        - NotFound: 对话或起始消息不存在错误。
-        """
-        # 检查应用模式是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         # 解析请求参数
@@ -212,8 +198,7 @@ class MessageMoreLikeThisApi(WebApiResource):
         streaming = args['response_mode'] == 'streaming'
 
         try:
-            # 生成更多相似内容的响应
-            response = CompletionService.generate_more_like_this(
+            response = AppGenerateService.generate_more_like_this(
                 app_model=app_model,
                 user=end_user,
                 message_id=message_id,
@@ -221,8 +206,7 @@ class MessageMoreLikeThisApi(WebApiResource):
                 streaming=streaming
             )
 
-            # 返回压缩后的响应
-            return compact_response(response)
+            return helper.compact_generate_response(response)
         except MessageNotExistsError:
             raise NotFound("Message Not Exists.")
         except MoreLikeThisDisabledError:
@@ -241,29 +225,6 @@ class MessageMoreLikeThisApi(WebApiResource):
             # 记录并抛出内部服务器错误
             logging.exception("internal server error.")
             raise InternalServerError()
-
-
-def compact_response(response: Union[dict, Generator]) -> Response:
-    """
-    根据传入的响应内容类型，生成相应的 Response 对象。
-    
-    参数:
-    - response: 可以是字典或者生成器。如果为字典，则直接以 JSON 格式返回；如果为生成器，则以流的形式返回。
-    
-    返回值:
-    - Response: 根据输入的 response 参数类型，返回一个配置了相应内容和类型的 Response 对象。
-    """
-    if isinstance(response, dict):
-        # 如果响应是字典，则将其转换为 JSON 格式，并设置相应的状态码和 MIME 类型
-        return Response(response=json.dumps(response), status=200, mimetype='application/json')
-    else:
-        # 如果响应是生成器，则定义一个内部生成器函数将其内容逐个yield，并配置响应为流式传输
-        def generate() -> Generator:
-            yield from response
-
-        # 返回一个配置了生成器、状态码和 MIME 类型的 Response 对象，用于流式传输
-        return Response(stream_with_context(generate()), status=200,
-                        mimetype='text/event-stream')
 
 
 class MessageSuggestedQuestionApi(WebApiResource):
@@ -290,8 +251,8 @@ class MessageSuggestedQuestionApi(WebApiResource):
     """
 
     def get(self, app_model, end_user, message_id):
-        # 检查应用模式是否为'chat'
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotCompletionAppError()
 
         message_id = str(message_id)  # 确保消息ID为字符串格式
@@ -301,7 +262,8 @@ class MessageSuggestedQuestionApi(WebApiResource):
             questions = MessageService.get_suggested_questions_after_answer(
                 app_model=app_model,
                 user=end_user,
-                message_id=message_id
+                message_id=message_id,
+                invoke_from=InvokeFrom.WEB_APP
             )
         except MessageNotExistsError:
             raise NotFound("Message not found")  # 消息不存在异常处理

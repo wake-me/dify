@@ -5,6 +5,7 @@ from werkzeug.datastructures import FileStorage
 
 from core.model_manager import ModelManager
 from core.model_runtime.entities.model_entities import ModelType
+from models.model import App, AppMode, AppModelConfig
 from services.errors.audio import (
     AudioTooLargeServiceError,
     NoAudioUploadedServiceError,
@@ -24,20 +25,21 @@ class AudioService:
     """
 
     @classmethod
-    def transcript_asr(cls, tenant_id: str, file: FileStorage, end_user: Optional[str] = None):
-        """
-        语音转文本服务接口。
+    def transcript_asr(cls, app_model: App, file: FileStorage, end_user: Optional[str] = None):
+        if app_model.mode in [AppMode.ADVANCED_CHAT.value, AppMode.WORKFLOW.value]:
+            workflow = app_model.workflow
+            if workflow is None:
+                raise ValueError("Speech to text is not enabled")
 
-        :param tenant_id: 租户ID，用于识别不同的租户。
-        :param file: 包含音频数据的FileStorage对象。
-        :param end_user: 可选，最终用户标识。
-        :return: 包含转换后文本的字典。
-        :raises NoAudioUploadedServiceError: 未上传音频时抛出。
-        :raises UnsupportedAudioTypeServiceError: 音频类型不受支持时抛出。
-        :raises AudioTooLargeServiceError: 音频文件大小超过限制时抛出。
-        :raises ProviderNotSupportSpeechToTextServiceError: 供应商不支持语音转文本服务时抛出。
-        """
-        # 检查是否上传了音频文件
+            features_dict = workflow.features_dict
+            if 'speech_to_text' not in features_dict or not features_dict['speech_to_text'].get('enabled'):
+                raise ValueError("Speech to text is not enabled")
+        else:
+            app_model_config: AppModelConfig = app_model.app_model_config
+
+            if not app_model_config.speech_to_text_dict['enabled']:
+                raise ValueError("Speech to text is not enabled")
+
         if file is None:
             raise NoAudioUploadedServiceError()
 
@@ -58,7 +60,7 @@ class AudioService:
         # 获取语音转文本模型实例
         model_manager = ModelManager()
         model_instance = model_manager.get_default_model_instance(
-            tenant_id=tenant_id,
+            tenant_id=app_model.tenant_id,
             model_type=ModelType.SPEECH2TEXT
         )
         if model_instance is None:
@@ -72,22 +74,29 @@ class AudioService:
         return {"text": model_instance.invoke_speech2text(file=buffer, user=end_user)}
 
     @classmethod
-    def transcript_tts(cls, tenant_id: str, text: str, voice: str, streaming: bool, end_user: Optional[str] = None):
-        """
-        文本转语音服务接口。
+    def transcript_tts(cls, app_model: App, text: str, streaming: bool,
+                       voice: Optional[str] = None, end_user: Optional[str] = None):
+        if app_model.mode in [AppMode.ADVANCED_CHAT.value, AppMode.WORKFLOW.value]:
+            workflow = app_model.workflow
+            if workflow is None:
+                raise ValueError("TTS is not enabled")
 
-        :param tenant_id: 租户ID。
-        :param text: 需要转换为语音的文本。
-        :param voice: 语音合成的音色。
-        :param streaming: 是否采用流式转换。
-        :param end_user: 可选，最终用户标识。
-        :return: 转换后的音频数据。
-        :raises ProviderNotSupportTextToSpeechServiceError: 供应商不支持文本转语音服务时抛出。
-        """
-        # 获取文本转语音模型实例
+            features_dict = workflow.features_dict
+            if 'text_to_speech' not in features_dict or not features_dict['text_to_speech'].get('enabled'):
+                raise ValueError("TTS is not enabled")
+
+            voice = features_dict['text_to_speech'].get('voice') if voice is None else voice
+        else:
+            text_to_speech_dict = app_model.app_model_config.text_to_speech_dict
+
+            if not text_to_speech_dict.get('enabled'):
+                raise ValueError("TTS is not enabled")
+
+            voice = text_to_speech_dict.get('voice') if voice is None else voice
+
         model_manager = ModelManager()
         model_instance = model_manager.get_default_model_instance(
-            tenant_id=tenant_id,
+            tenant_id=app_model.tenant_id,
             model_type=ModelType.TTS
         )
         if model_instance is None:
@@ -95,7 +104,13 @@ class AudioService:
 
         # 使用模型进行文本转语音处理
         try:
-            return model_instance.invoke_tts(content_text=text.strip(), user=end_user, streaming=streaming, tenant_id=tenant_id, voice=voice)
+            return model_instance.invoke_tts(
+                content_text=text.strip(),
+                user=end_user,
+                streaming=streaming,
+                tenant_id=app_model.tenant_id,
+                voice=voice
+            )
         except Exception as e:
             raise e
 

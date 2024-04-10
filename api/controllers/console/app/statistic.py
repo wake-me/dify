@@ -7,12 +7,13 @@ from flask_login import current_user
 from flask_restful import Resource, reqparse
 
 from controllers.console import api
-from controllers.console.app import _get_app
+from controllers.console.app.wraps import get_app_model
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required
 from extensions.ext_database import db
 from libs.helper import datetime_string
 from libs.login import login_required
+from models.model import AppMode
 
 
 class DailyConversationStatistic(Resource):
@@ -26,22 +27,9 @@ class DailyConversationStatistic(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    def get(self, app_id):
-        """
-        处理获取指定应用的每日对话统计信息的请求。
-
-        参数:
-            app_id (str): 应用的ID。
-
-        返回:
-            jsonify: 包含每日对话统计数据的JSON响应。
-        """
-        # 获取当前登录的用户账户
+    @get_app_model
+    def get(self, app_model):
         account = current_user
-        # 将app_id转换为字符串类型
-        app_id = str(app_id)
-        # 根据app_id获取应用模型
-        app_model = _get_app(app_id)
 
         # 初始化请求参数解析器
         parser = reqparse.RequestParser()
@@ -120,21 +108,9 @@ class DailyTerminalsStatistic(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    def get(self, app_id):
-        """
-        获取指定APP ID的每日终端用户数量的统计信息。
-
-        参数:
-        - app_id: 字符串，指定的应用程序ID。
-
-        返回值:
-        - 一个包含每日终端用户数量统计信息的JSON对象。
-        """
-
-        # 当前登录的用户
+    @get_app_model
+    def get(self, app_model):
         account = current_user
-        app_id = str(app_id)  # 确保app_id为字符串类型
-        app_model = _get_app(app_id)  # 获取app模型
 
         # 解析请求参数
         parser = reqparse.RequestParser()
@@ -211,20 +187,9 @@ class DailyTokenCostStatistic(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    def get(self, app_id):
-        """
-        根据应用ID和可选的时间范围获取每日的令牌消耗量和总价格的统计信息。
-        
-        参数:
-        - app_id: 应用的ID。
-        
-        返回:
-        - 包含每日统计信息的JSON响应。
-        """
-        # 获取当前登录的用户账户
+    @get_app_model
+    def get(self, app_model):
         account = current_user
-        app_id = str(app_id)  # 将app_id转换为字符串
-        app_model = _get_app(app_id)  # 获取app模型
 
         # 解析请求参数中的开始和结束时间
         parser = reqparse.RequestParser()
@@ -305,21 +270,9 @@ class AverageSessionInteractionStatistic(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    def get(self, app_id):
-        """
-        获取指定应用的平均会话交互统计数据。
-        
-        参数:
-        - app_id: 字符串，指定的应用ID。
-        
-        返回值:
-        - 包含会话交互统计数据的JSON对象。
-        """
-        # 获取当前登录的用户账户
+    @get_app_model(mode=[AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT])
+    def get(self, app_model):
         account = current_user
-        app_id = str(app_id)  # 将app_id转换为字符串
-        # 根据app_id获取应用模型
-        app_model = _get_app(app_id, 'chat')
 
         # 初始化请求参数解析器
         parser = reqparse.RequestParser()
@@ -404,20 +357,9 @@ class UserSatisfactionRateStatistic(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    def get(self, app_id):
-        """
-        获取特定应用的用户满意度统计数据。
-        
-        参数:
-        - app_id: 应用的ID，字符串类型。
-        
-        返回:
-        - 满意度统计数据的JSON响应。
-        """
-        # 获取当前登录的用户账户
+    @get_app_model
+    def get(self, app_model):
         account = current_user
-        app_id = str(app_id)  # 确保app_id为字符串类型
-        app_model = _get_app(app_id)  # 获取应用模型
 
         # 解析请求参数中的开始和结束时间
         parser = reqparse.RequestParser()
@@ -495,22 +437,9 @@ class AverageResponseTimeStatistic(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    def get(self, app_id):
-        """
-        获取指定应用的平均响应时间统计数据。
-        
-        参数:
-        - app_id: 字符串类型，指定的应用ID。
-        
-        返回值:
-        - 包含平均响应时间数据的JSON对象。
-        """
-        # 获取当前登录的用户账户
+    @get_app_model(mode=AppMode.COMPLETION)
+    def get(self, app_model):
         account = current_user
-        # 将app_id转换为字符串类型
-        app_id = str(app_id)
-        # 根据app_id获取应用模型
-        app_model = _get_app(app_id, 'completion')
 
         # 初始化请求参数解析器
         parser = reqparse.RequestParser()
@@ -596,20 +525,9 @@ class TokensPerSecondStatistic(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    def get(self, app_id):
-        """
-        处理GET请求，获取指定应用的每秒令牌数统计信息。
-        
-        参数:
-        - app_id: 字符串类型，指定应用的ID。
-        
-        返回:
-        - 包含统计结果的JSON响应。
-        """
-        # 获取当前登录的用户账户
+    @get_app_model
+    def get(self, app_model):
         account = current_user
-        app_id = str(app_id)  # 确保app_id为字符串类型
-        app_model = _get_app(app_id)  # 获取应用模型
 
         # 解析请求参数：开始时间和结束时间
         parser = reqparse.RequestParser()

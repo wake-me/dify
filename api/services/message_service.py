@@ -1,16 +1,17 @@
 import json
 from typing import Optional, Union
 
-from core.generator.llm_generator import LLMGenerator
+from core.app.apps.advanced_chat.app_config_manager import AdvancedChatAppConfigManager
+from core.app.entities.app_invoke_entities import InvokeFrom
+from core.llm_generator.llm_generator import LLMGenerator
 from core.memory.token_buffer_memory import TokenBufferMemory
 from core.model_manager import ModelManager
 from core.model_runtime.entities.model_entities import ModelType
 from extensions.ext_database import db
 from libs.infinite_scroll_pagination import InfiniteScrollPagination
 from models.account import Account
-from models.model import App, AppModelConfig, EndUser, Message, MessageFeedback
+from models.model import App, AppMode, AppModelConfig, EndUser, Message, MessageFeedback
 from services.conversation_service import ConversationService
-from services.errors.app_model_config import AppModelConfigBrokenError
 from services.errors.conversation import ConversationCompletedError, ConversationNotExistsError
 from services.errors.message import (
     FirstMessageNotExistsError,
@@ -18,6 +19,7 @@ from services.errors.message import (
     MessageNotExistsError,
     SuggestedQuestionsAfterAnswerDisabledError,
 )
+from services.workflow_service import WorkflowService
 
 
 class MessageService:
@@ -252,27 +254,7 @@ class MessageService:
 
     @classmethod
     def get_suggested_questions_after_answer(cls, app_model: App, user: Optional[Union[Account, EndUser]],
-                                                message_id: str, check_enabled: bool = True) -> list[Message]:
-        """
-        在用户回答问题后，获取建议的问题列表。
-        
-        参数:
-        - cls: 类的引用。
-        - app_model: 应用模型实例，代表一个特定的应用。
-        - user: 用户账户，可以是普通用户或管理员，为可选参数。
-        - message_id: 消息的唯一标识符，用于定位用户的回答。
-        - check_enabled: 是否检查建议问题功能是否开启，默认为True。
-        
-        返回值:
-        - list[Message]: 建议的问题列表。
-        
-        抛出:
-        - ValueError: 如果用户参数为None。
-        - ConversationNotExistsError: 如果对话不存在。
-        - ConversationCompletedError: 如果对话已经结束。
-        - AppModelConfigBrokenError: 如果应用模型配置损坏。
-        - SuggestedQuestionsAfterAnswerDisabledError: 如果建议问题功能被禁用。
-        """
+                                             message_id: str, invoke_from: InvokeFrom) -> list[Message]:
         if not user:
             raise ValueError('user cannot be None')
 
@@ -297,40 +279,57 @@ class MessageService:
         if conversation.status != 'normal':
             raise ConversationCompletedError()
 
-        # 处理应用模型配置
-        if not conversation.override_model_configs:
-            app_model_config = db.session.query(AppModelConfig).filter(
-                AppModelConfig.id == conversation.app_model_config_id,
-                AppModelConfig.app_id == app_model.id
-            ).first()
+        model_manager = ModelManager()
 
-            if not app_model_config:
-                raise AppModelConfigBrokenError()
-        else:
-            # 使用覆盖的模型配置
-            conversation_override_model_configs = json.loads(conversation.override_model_configs)
-            app_model_config = AppModelConfig(
-                id=conversation.app_model_config_id,
-                app_id=app_model.id,
+        if app_model.mode == AppMode.ADVANCED_CHAT.value:
+            workflow_service = WorkflowService()
+            if invoke_from == InvokeFrom.DEBUGGER:
+                workflow = workflow_service.get_draft_workflow(app_model=app_model)
+            else:
+                workflow = workflow_service.get_published_workflow(app_model=app_model)
+
+            if workflow is None:
+                return []
+
+            app_config = AdvancedChatAppConfigManager.get_app_config(
+                app_model=app_model,
+                workflow=workflow
             )
 
-            app_model_config = app_model_config.from_model_config_dict(conversation_override_model_configs)
+            if not app_config.additional_features.suggested_questions_after_answer:
+                raise SuggestedQuestionsAfterAnswerDisabledError()
 
-        # 检查是否启用了建议问题功能
-        suggested_questions_after_answer = app_model_config.suggested_questions_after_answer_dict
+            model_instance = model_manager.get_default_model_instance(
+                tenant_id=app_model.tenant_id,
+                model_type=ModelType.LLM
+            )
+        else:
+            if not conversation.override_model_configs:
+                app_model_config = db.session.query(AppModelConfig).filter(
+                    AppModelConfig.id == conversation.app_model_config_id,
+                    AppModelConfig.app_id == app_model.id
+                ).first()
+            else:
+                conversation_override_model_configs = json.loads(conversation.override_model_configs)
+                app_model_config = AppModelConfig(
+                    id=conversation.app_model_config_id,
+                    app_id=app_model.id,
+                )
 
-        if check_enabled and suggested_questions_after_answer.get("enabled", False) is False:
-            raise SuggestedQuestionsAfterAnswerDisabledError()
+                app_model_config = app_model_config.from_model_config_dict(conversation_override_model_configs)
 
-        # 获取对话的记忆（只读）
-        model_manager = ModelManager()
-        model_instance = model_manager.get_model_instance(
-            tenant_id=app_model.tenant_id,
-            provider=app_model_config.model_dict['provider'],
-            model_type=ModelType.LLM,
-            model=app_model_config.model_dict['name']
-        )
+            suggested_questions_after_answer = app_model_config.suggested_questions_after_answer_dict
+            if suggested_questions_after_answer.get("enabled", False) is False:
+                raise SuggestedQuestionsAfterAnswerDisabledError()
 
+            model_instance = model_manager.get_model_instance(
+                tenant_id=app_model.tenant_id,
+                provider=app_model_config.model_dict['provider'],
+                model_type=ModelType.LLM,
+                model=app_model_config.model_dict['name']
+            )
+
+        # get memory of conversation (read-only)
         memory = TokenBufferMemory(
             conversation=conversation,
             model_instance=model_instance

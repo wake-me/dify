@@ -70,16 +70,18 @@ retriever_resource_fields = {
 
 # 定义消息的字段结构
 message_fields = {
-    'id': fields.String,  # 消息ID
-    'conversation_id': fields.String,  # 对话ID
-    'inputs': fields.Raw,  # 输入内容
-    'query': fields.String,  # 查询内容
-    'answer': fields.String,  # 答案
-    'feedback': fields.Nested(feedback_fields, attribute='user_feedback', allow_null=True),  # 用户反馈
-    'retriever_resources': fields.List(fields.Nested(retriever_resource_fields)),  # 检索器资源列表
-    'created_at': TimestampField,  # 创建时间
-    'agent_thoughts': fields.List(fields.Nested(agent_thought_fields)),  # 代理思考列表
-    'message_files': fields.List(fields.Nested(message_file_fields), attribute='files')  # 消息文件列表
+    'id': fields.String,
+    'conversation_id': fields.String,
+    'inputs': fields.Raw,
+    'query': fields.String,
+    'answer': fields.String(attribute='re_sign_file_url_answer'),
+    'feedback': fields.Nested(feedback_fields, attribute='user_feedback', allow_null=True),
+    'retriever_resources': fields.List(fields.Nested(retriever_resource_fields)),
+    'created_at': TimestampField,
+    'agent_thoughts': fields.List(fields.Nested(agent_thought_fields)),
+    'message_files': fields.List(fields.Nested(message_file_fields), attribute='files'),
+    'status': fields.String,
+    'error': fields.String,
 }
 
 # 定义消息无限滚动分页字段结构

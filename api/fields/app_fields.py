@@ -4,11 +4,12 @@ from libs.helper import TimestampField
 
 # 定义应用详情的基本字段
 app_detail_kernel_fields = {
-    'id': fields.String,  # 应用ID
-    'name': fields.String,  # 应用名称
-    'mode': fields.String,  # 应用模式
-    'icon': fields.String,  # 应用图标地址
-    'icon_background': fields.String,  # 图标背景颜色
+    'id': fields.String,
+    'name': fields.String,
+    'description': fields.String,
+    'mode': fields.String(attribute='mode_compatible_with_agent'),
+    'icon': fields.String,
+    'icon_background': fields.String,
 }
 
 # 定义相关应用列表的字段结构
@@ -19,43 +20,41 @@ related_app_list = {
 
 # 定义模型配置的字段结构
 model_config_fields = {
-    'opening_statement': fields.String,  # 开场白
-    'suggested_questions': fields.Raw(attribute='suggested_questions_list'),  # 建议问题
-    'suggested_questions_after_answer': fields.Raw(attribute='suggested_questions_after_answer_dict'),  # 答后建议问题
-    'speech_to_text': fields.Raw(attribute='speech_to_text_dict'),  # 语音转文本配置
-    'text_to_speech': fields.Raw(attribute='text_to_speech_dict'),  # 文本转语音配置
-    'retriever_resource': fields.Raw(attribute='retriever_resource_dict'),  # 数据检索资源
-    'annotation_reply': fields.Raw(attribute='annotation_reply_dict'),  # 注解回复
-    'more_like_this': fields.Raw(attribute='more_like_this_dict'),  # 类似问题推荐
-    'sensitive_word_avoidance': fields.Raw(attribute='sensitive_word_avoidance_dict'),  # 敏感词规避
-    'external_data_tools': fields.Raw(attribute='external_data_tools_list'),  # 外部数据工具
-    'model': fields.Raw(attribute='model_dict'),  # 模型配置
-    'user_input_form': fields.Raw(attribute='user_input_form_list'),  # 用户输入表单
-    'dataset_query_variable': fields.String,  # 数据集查询变量
-    'pre_prompt': fields.String,  # 提示信息
-    'agent_mode': fields.Raw(attribute='agent_mode_dict'),  # 代理模式配置
-    'prompt_type': fields.String,  # 提示类型
-    'chat_prompt_config': fields.Raw(attribute='chat_prompt_config_dict'),  # 聊天提示配置
-    'completion_prompt_config': fields.Raw(attribute='completion_prompt_config_dict'),  # 完成提示配置
-    'dataset_configs': fields.Raw(attribute='dataset_configs_dict'),  # 数据集配置
-    'file_upload': fields.Raw(attribute='file_upload_dict'),  # 文件上传配置
+    'opening_statement': fields.String,
+    'suggested_questions': fields.Raw(attribute='suggested_questions_list'),
+    'suggested_questions_after_answer': fields.Raw(attribute='suggested_questions_after_answer_dict'),
+    'speech_to_text': fields.Raw(attribute='speech_to_text_dict'),
+    'text_to_speech': fields.Raw(attribute='text_to_speech_dict'),
+    'retriever_resource': fields.Raw(attribute='retriever_resource_dict'),
+    'annotation_reply': fields.Raw(attribute='annotation_reply_dict'),
+    'more_like_this': fields.Raw(attribute='more_like_this_dict'),
+    'sensitive_word_avoidance': fields.Raw(attribute='sensitive_word_avoidance_dict'),
+    'external_data_tools': fields.Raw(attribute='external_data_tools_list'),
+    'model': fields.Raw(attribute='model_dict'),
+    'user_input_form': fields.Raw(attribute='user_input_form_list'),
+    'dataset_query_variable': fields.String,
+    'pre_prompt': fields.String,
+    'agent_mode': fields.Raw(attribute='agent_mode_dict'),
+    'prompt_type': fields.String,
+    'chat_prompt_config': fields.Raw(attribute='chat_prompt_config_dict'),
+    'completion_prompt_config': fields.Raw(attribute='completion_prompt_config_dict'),
+    'dataset_configs': fields.Raw(attribute='dataset_configs_dict'),
+    'file_upload': fields.Raw(attribute='file_upload_dict'),
+    'created_at': TimestampField
 }
 
 # 定义应用详情页面展示的字段结构
 app_detail_fields = {
-    'id': fields.String,  # 应用ID
-    'name': fields.String,  # 应用名称
-    'mode': fields.String,  # 应用模式
-    'is_agent': fields.Boolean,  # 是否为代理应用
-    'icon': fields.String,  # 应用图标地址
-    'icon_background': fields.String,  # 图标背景颜色
-    'enable_site': fields.Boolean,  # 是否启用网站访问
-    'enable_api': fields.Boolean,  # 是否启用API访问
-    'api_rpm': fields.Integer,  # API每分钟请求限制
-    'api_rph': fields.Integer,  # API每小时请求限制
-    'is_demo': fields.Boolean,  # 是否为演示应用
-    'model_config': fields.Nested(model_config_fields, attribute='app_model_config'),  # 模型配置
-    'created_at': TimestampField,  # 创建时间
+    'id': fields.String,
+    'name': fields.String,
+    'description': fields.String,
+    'mode': fields.String(attribute='mode_compatible_with_agent'),
+    'icon': fields.String,
+    'icon_background': fields.String,
+    'enable_site': fields.Boolean,
+    'enable_api': fields.Boolean,
+    'model_config': fields.Nested(model_config_fields, attribute='app_model_config', allow_null=True),
+    'created_at': TimestampField
 }
 
 # 定义提示配置的字段结构
@@ -71,17 +70,14 @@ model_config_partial_fields = {
 
 # 定义与应用程序相关的部分字段及其类型
 app_partial_fields = {
-    'id': fields.String,  # 应用程序的唯一标识符
-    'name': fields.String,  # 应用程序的名称
-    'mode': fields.String,  # 应用程序的模式
-    'is_agent': fields.Boolean,  # 标记是否为代理应用
-    'icon': fields.String,  # 应用程序的图标链接
-    'icon_background': fields.String,  # 图标背景颜色
-    'enable_site': fields.Boolean,  # 是否启用网站访问
-    'enable_api': fields.Boolean,  # 是否启用API访问
-    'is_demo': fields.Boolean,  # 标记是否为演示应用
-    'model_config': fields.Nested(model_config_partial_fields, attribute='app_model_config'),  # 应用的模型配置
-    'created_at': TimestampField  # 应用创建时间
+    'id': fields.String,
+    'name': fields.String,
+    'description': fields.String(attribute='desc_or_prompt'),
+    'mode': fields.String(attribute='mode_compatible_with_agent'),
+    'icon': fields.String,
+    'icon_background': fields.String,
+    'model_config': fields.Nested(model_config_partial_fields, attribute='app_model_config', allow_null=True),
+    'created_at': TimestampField
 }
 
 # 定义分页查询时的应用程序字段
@@ -127,22 +123,19 @@ site_fields = {
 
 # 定义包含站点信息的 app 详情字段
 app_detail_fields_with_site = {
-    'id': fields.String,  # 应用的唯一标识符
-    'name': fields.String,  # 应用的名称
-    'mode': fields.String,  # 应用的模式
-    'icon': fields.String,  # 应用的图标链接
-    'icon_background': fields.String,  # 图标背景颜色
-    'enable_site': fields.Boolean,  # 是否启用站点
-    'enable_api': fields.Boolean,  # 是否启用API
-    'api_rpm': fields.Integer,  # API每分钟请求数限制
-    'api_rph': fields.Integer,  # API每小时请求数限制
-    'is_agent': fields.Boolean,  # 是否为代理应用
-    'is_demo': fields.Boolean,  # 是否为演示应用
-    'model_config': fields.Nested(model_config_fields, attribute='app_model_config'),  # 应用的模型配置
-    'site': fields.Nested(site_fields),  # 包含的站点信息
-    'api_base_url': fields.String,  # API的基础URL
-    'created_at': TimestampField,  # 创建时间
-    'deleted_tools': fields.List(fields.String),  # 已删除的工具列表
+    'id': fields.String,
+    'name': fields.String,
+    'description': fields.String,
+    'mode': fields.String(attribute='mode_compatible_with_agent'),
+    'icon': fields.String,
+    'icon_background': fields.String,
+    'enable_site': fields.Boolean,
+    'enable_api': fields.Boolean,
+    'model_config': fields.Nested(model_config_fields, attribute='app_model_config', allow_null=True),
+    'site': fields.Nested(site_fields),
+    'api_base_url': fields.String,
+    'created_at': TimestampField,
+    'deleted_tools': fields.List(fields.String),
 }
 
 # 定义站点相关字段

@@ -1,6 +1,7 @@
-from core.generator.llm_generator import LLMGenerator
+from core.llm_generator.llm_generator import LLMGenerator
 from events.message_event import message_was_created
 from extensions.ext_database import db
+from models.model import AppMode
 
 
 @message_was_created.connect
@@ -27,7 +28,7 @@ def handle(sender, **kwargs):
 
     # 当且仅当为第一条消息且设置为自动生成对话名称时，尝试生成对话名称
     if auto_generate_conversation_name and is_first_message:
-        if conversation.mode == 'chat':
+        if conversation.mode != AppMode.COMPLETION.value:
             app_model = conversation.app
             if not app_model:
                 return

@@ -6,8 +6,10 @@ from werkzeug.exceptions import NotFound
 from controllers.console import api
 from controllers.console.explore.error import NotChatAppError
 from controllers.console.explore.wraps import InstalledAppResource
+from core.app.entities.app_invoke_entities import InvokeFrom
 from fields.conversation_fields import conversation_infinite_scroll_pagination_fields, simple_conversation_fields
 from libs.helper import uuid_value
+from models.model import AppMode
 from services.conversation_service import ConversationService
 from services.errors.conversation import ConversationNotExistsError, LastConversationNotExistsError
 from services.web_conversation_service import WebConversationService
@@ -36,8 +38,8 @@ class ConversationListApi(InstalledAppResource):
         - 根据请求参数进行分页和筛选后的对话列表。
         """
         app_model = installed_app.app
-        # 检查应用模式是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         # 解析请求参数
@@ -59,8 +61,8 @@ class ConversationListApi(InstalledAppResource):
                 user=current_user,
                 last_id=args['last_id'],
                 limit=args['limit'],
+                invoke_from=InvokeFrom.EXPLORE,
                 pinned=pinned,
-                exclude_debug_conversation=True
             )
         except LastConversationNotExistsError:
             # 处理未找到最后一条对话的情况
@@ -82,7 +84,8 @@ class ConversationApi(InstalledAppResource):
     def delete(self, installed_app, c_id):
         # 校验应用是否为聊天模式
         app_model = installed_app.app
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         conversation_id = str(c_id)
@@ -118,7 +121,8 @@ class ConversationRenameApi(InstalledAppResource):
     def post(self, installed_app, c_id):
         # 获取应用模型，并检查应用模式是否为聊天模式
         app_model = installed_app.app
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         conversation_id = str(c_id)  # 将会话ID转换为字符串格式
@@ -152,19 +156,9 @@ class ConversationPinApi(InstalledAppResource):
     """
 
     def patch(self, installed_app, c_id):
-        """
-        更新指定会话的置顶状态。
-
-        参数:
-        installed_app - 安装的应用对象，用于确定应用类型和获取应用模型
-        c_id - 会话的ID，需要转换为字符串格式
-
-        返回值:
-        返回一个包含结果信息的字典，如 {"result": "success"}
-        """
-
-        app_model = installed_app.app  # 获取应用模型
-        if app_model.mode != 'chat':  # 检查应用模式是否为聊天模式
+        app_model = installed_app.app
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         conversation_id = str(c_id)  # 将会话ID转换为字符串格式
@@ -194,9 +188,8 @@ class ConversationUnPinApi(InstalledAppResource):
     def patch(self, installed_app, c_id):
         # 获取关联的应用模型
         app_model = installed_app.app
-        
-        # 检查应用模式是否为聊天模式，如果不是则抛出异常
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         # 将对话ID转换为字符串格式

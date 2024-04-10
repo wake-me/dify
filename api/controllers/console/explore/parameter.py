@@ -1,13 +1,12 @@
-import json
 
 from flask import current_app
 from flask_restful import fields, marshal_with
 
 from controllers.console import api
+from controllers.console.app.error import AppUnavailableError
 from controllers.console.explore.wraps import InstalledAppResource
-from extensions.ext_database import db
-from models.model import AppModelConfig, InstalledApp
-from models.tools import ApiToolProvider
+from models.model import AppMode, InstalledApp
+from services.app_service import AppService
 
 
 class AppParameterApi(InstalledAppResource):
@@ -53,75 +52,53 @@ class AppParameterApi(InstalledAppResource):
         :return: 包含应用各种配置参数的字典，如开场白、建议问题等。
         """
         app_model = installed_app.app
-        app_model_config = app_model.app_model_config
+
+        if app_model.mode in [AppMode.ADVANCED_CHAT.value, AppMode.WORKFLOW.value]:
+            workflow = app_model.workflow
+            if workflow is None:
+                raise AppUnavailableError()
+
+            features_dict = workflow.features_dict
+            user_input_form = workflow.user_input_form(to_old_structure=True)
+        else:
+            app_model_config = app_model.app_model_config
+            features_dict = app_model_config.to_dict()
+
+            user_input_form = features_dict.get('user_input_form', [])
 
         # 组装并返回包含各种配置参数的字典
         return {
-            'opening_statement': app_model_config.opening_statement,  # 开场白
-            'suggested_questions': app_model_config.suggested_questions_list,  # 建议问题列表
-            'suggested_questions_after_answer': app_model_config.suggested_questions_after_answer_dict,  # 回答后的建议问题字典
-            'speech_to_text': app_model_config.speech_to_text_dict,  # 语音转文本配置
-            'text_to_speech': app_model_config.text_to_speech_dict,  # 文本转语音配置
-            'retriever_resource': app_model_config.retriever_resource_dict,  # 数据检索资源配置
-            'annotation_reply': app_model_config.annotation_reply_dict,  # 注解回复配置
-            'more_like_this': app_model_config.more_like_this_dict,  # 类似内容推荐配置
-            'user_input_form': app_model_config.user_input_form_list,  # 用户输入表单配置
-            'sensitive_word_avoidance': app_model_config.sensitive_word_avoidance_dict,  # 敏感词规避配置
-            'file_upload': app_model_config.file_upload_dict,  # 文件上传配置
-            'system_parameters': {  # 系统参数
-                'image_file_size_limit': current_app.config.get('UPLOAD_IMAGE_FILE_SIZE_LIMIT')  # 图片文件大小限制
+            'opening_statement': features_dict.get('opening_statement'),
+            'suggested_questions': features_dict.get('suggested_questions', []),
+            'suggested_questions_after_answer': features_dict.get('suggested_questions_after_answer',
+                                                                  {"enabled": False}),
+            'speech_to_text': features_dict.get('speech_to_text', {"enabled": False}),
+            'text_to_speech': features_dict.get('text_to_speech', {"enabled": False}),
+            'retriever_resource': features_dict.get('retriever_resource', {"enabled": False}),
+            'annotation_reply': features_dict.get('annotation_reply', {"enabled": False}),
+            'more_like_this': features_dict.get('more_like_this', {"enabled": False}),
+            'user_input_form': user_input_form,
+            'sensitive_word_avoidance': features_dict.get('sensitive_word_avoidance',
+                                                          {"enabled": False, "type": "", "configs": []}),
+            'file_upload': features_dict.get('file_upload', {"image": {
+                                                     "enabled": False,
+                                                     "number_limits": 3,
+                                                     "detail": "high",
+                                                     "transfer_methods": ["remote_url", "local_file"]
+                                                 }}),
+            'system_parameters': {
+                'image_file_size_limit': current_app.config.get('UPLOAD_IMAGE_FILE_SIZE_LIMIT')
             }
         }
 
+
 class ExploreAppMetaApi(InstalledAppResource):
     def get(self, installed_app: InstalledApp):
-        """
-        获取应用元数据
-        参数:
-        - installed_app: InstalledApp 类型，表示已安装的应用对象。
-        
-        返回值:
-        - meta: 字典类型，包含应用的工具图标信息。
-        """
-        # 获取应用的模型配置
-        app_model_config: AppModelConfig = installed_app.app.app_model_config
+        """Get app meta"""
+        app_model = installed_app.app
+        return AppService().get_app_meta(app_model)
 
-        # 获取代理配置，如果不存在则默认为空字典
-        agent_config = app_model_config.agent_mode_dict or {}
-        meta = {
-            'tool_icons': {}
-        }
 
-        # 获取所有工具信息
-        tools = agent_config.get('tools', [])
-        # 构造工具图标URL的前缀
-        url_prefix = (current_app.config.get("CONSOLE_API_URL")
-                  + "/console/api/workspaces/current/tool-provider/builtin/")
-        for tool in tools:
-            keys = list(tool.keys())
-            if len(keys) >= 4:
-                # 处理当前工具标准
-                provider_type = tool.get('provider_type')
-                provider_id = tool.get('provider_id')
-                tool_name = tool.get('tool_name')
-                if provider_type == 'builtin':
-                    # 为内建工具添加图标URL
-                    meta['tool_icons'][tool_name] = url_prefix + provider_id + '/icon'
-                elif provider_type == 'api':
-                    try:
-                        # 尝试从数据库中查询API工具提供者，并获取图标URL
-                        provider: ApiToolProvider = db.session.query(ApiToolProvider).filter(
-                            ApiToolProvider.id == provider_id
-                        )
-                        meta['tool_icons'][tool_name] = json.loads(provider.icon)
-                    except:
-                        # 如果查询失败，则设置默认图标
-                        meta['tool_icons'][tool_name] =  {
-                            "background": "#252525",
-                            "content": "\ud83d\ude01"
-                        }
-
-        return meta
-
-api.add_resource(AppParameterApi, '/installed-apps/<uuid:installed_app_id>/parameters', endpoint='installed_app_parameters')
+api.add_resource(AppParameterApi, '/installed-apps/<uuid:installed_app_id>/parameters',
+                 endpoint='installed_app_parameters')
 api.add_resource(ExploreAppMetaApi, '/installed-apps/<uuid:installed_app_id>/meta', endpoint='installed_app_meta')

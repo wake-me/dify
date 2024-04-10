@@ -2,21 +2,13 @@ from flask_restful import fields
 
 from libs.helper import TimestampField
 
-# 定义账户信息的字段结构
-account_fields = {
-    'id': fields.String,  # 账户ID
-    'name': fields.String,  # 账户名称
-    'email': fields.String  # 账户邮箱
-}
-
-# 定义注解信息的字段结构
 annotation_fields = {
-    "id": fields.String,  # 注解ID
-    "question": fields.String,  # 注解问题
-    "answer": fields.Raw(attribute='content'),  # 注解答案
-    "hit_count": fields.Integer,  # 点击次数
-    "created_at": TimestampField,  # 创建时间
-    # 'account': fields.Nested(account_fields, allow_null=True)  # 账户信息，使用嵌套方式，可为空
+    "id": fields.String,
+    "question": fields.String,
+    "answer": fields.Raw(attribute='content'),
+    "hit_count": fields.Integer,
+    "created_at": TimestampField,
+    # 'account': fields.Nested(simple_account_fields, allow_null=True)
 }
 
 # 定义注解列表的字段结构

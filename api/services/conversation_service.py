@@ -1,6 +1,9 @@
 from typing import Optional, Union
 
-from core.generator.llm_generator import LLMGenerator
+from sqlalchemy import or_
+
+from core.app.entities.app_invoke_entities import InvokeFrom
+from core.llm_generator.llm_generator import LLMGenerator
 from extensions.ext_database import db
 from libs.infinite_scroll_pagination import InfiniteScrollPagination
 from models.account import Account
@@ -22,23 +25,10 @@ class ConversationService:
     
     @classmethod
     def pagination_by_last_id(cls, app_model: App, user: Optional[Union[Account, EndUser]],
-                            last_id: Optional[str], limit: int,
-                            include_ids: Optional[list] = None, exclude_ids: Optional[list] = None,
-                            exclude_debug_conversation: bool = False) -> InfiniteScrollPagination:
-        """
-        根据用户的最后一条对话ID进行分页查询，支持包含和排除特定对话ID，以及是否排除调试对话的设置。
-        
-        :param cls: 类的引用，用于调用数据库会话等。
-        :param app_model: 应用模型，用于确定查询的应用。
-        :param user: 可选，进行查询的用户，可以是账户或终端用户。
-        :param last_id: 可选，最后一条对话的ID，用于分页查询。
-        :param limit: 查询限制的数量。
-        :param include_ids: 可选，需要包含的对话ID列表。
-        :param exclude_ids: 可选，需要排除的对话ID列表。
-        :param exclude_debug_conversation: 是否排除调试对话。
-        :return: 返回一个InfiniteScrollPagination对象，包含对话数据、限制数量和是否有更多数据的标志。
-        """
-        # 如果没有指定用户，则直接返回空数据的分页对象
+                              last_id: Optional[str], limit: int,
+                              invoke_from: InvokeFrom,
+                              include_ids: Optional[list] = None,
+                              exclude_ids: Optional[list] = None) -> InfiniteScrollPagination:
         if not user:
             return InfiniteScrollPagination(data=[], limit=limit, has_more=False)
 
@@ -49,6 +39,7 @@ class ConversationService:
             Conversation.from_source == ('api' if isinstance(user, EndUser) else 'console'),
             Conversation.from_end_user_id == (user.id if isinstance(user, EndUser) else None),
             Conversation.from_account_id == (user.id if isinstance(user, Account) else None),
+            or_(Conversation.invoke_from.is_(None), Conversation.invoke_from == invoke_from.value)
         )
 
         # 如果有指定包含的对话ID，则添加到查询条件中
@@ -59,11 +50,6 @@ class ConversationService:
         if exclude_ids is not None:
             base_query = base_query.filter(~Conversation.id.in_(exclude_ids))
 
-        # 如果需要排除调试对话，则添加条件
-        if exclude_debug_conversation:
-            base_query = base_query.filter(Conversation.override_model_configs == None)
-
-        # 如果提供了last_id，则基于此进行进一步的查询
         if last_id:
             last_conversation = base_query.filter(
                 Conversation.id == last_id,

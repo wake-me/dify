@@ -44,9 +44,8 @@ class InstalledAppsListApi(Resource):
                 'app_owner_tenant_id': installed_app.app_owner_tenant_id,
                 'is_pinned': installed_app.is_pinned,
                 'last_used_at': installed_app.last_used_at,
-                'editable': current_user.role in ["owner", "admin"],  # 标记应用是否可编辑
-                'uninstallable': current_tenant_id == installed_app.app_owner_tenant_id,  # 标记应用是否可卸载
-                'is_agent': installed_app.is_agent
+                'editable': current_user.role in ["owner", "admin"],
+                'uninstallable': current_tenant_id == installed_app.app_owner_tenant_id
             }
             for installed_app in installed_apps
         ]

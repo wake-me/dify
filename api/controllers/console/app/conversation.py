@@ -9,9 +9,10 @@ from sqlalchemy.orm import joinedload
 from werkzeug.exceptions import NotFound
 
 from controllers.console import api
-from controllers.console.app import _get_app
+from controllers.console.app.wraps import get_app_model
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required
+from core.app.entities.app_invoke_entities import InvokeFrom
 from extensions.ext_database import db
 from fields.conversation_fields import (
     conversation_detail_fields,
@@ -21,7 +22,7 @@ from fields.conversation_fields import (
 )
 from libs.helper import datetime_string
 from libs.login import login_required
-from models.model import Conversation, Message, MessageAnnotation
+from models.model import AppMode, Conversation, Message, MessageAnnotation
 
 
 class CompletionConversationApi(Resource):
@@ -38,20 +39,9 @@ class CompletionConversationApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
+    @get_app_model(mode=AppMode.COMPLETION)
     @marshal_with(conversation_pagination_fields)
-    def get(self, app_id):
-        """
-        处理GET请求，根据提供的参数获取对话完成任务的对话列表。
-
-        参数:
-            - app_id(str): 应用的ID，用于标识请求的应用。
-
-        返回:
-            - conversations: 分页后的对话列表，包含对话的详细信息。
-        """
-        app_id = str(app_id)  # 确保app_id为字符串类型
-
-        # 解析请求参数
+    def get(self, app_model):
         parser = reqparse.RequestParser()
         parser.add_argument('keyword', type=str, location='args')
         parser.add_argument('start', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
@@ -62,11 +52,7 @@ class CompletionConversationApi(Resource):
         parser.add_argument('limit', type=int_range(1, 100), default=20, location='args')
         args = parser.parse_args()
 
-        # 获取应用信息
-        app = _get_app(app_id, 'completion')
-
-        # 构建初始查询
-        query = db.select(Conversation).where(Conversation.app_id == app.id, Conversation.mode == 'completion')
+        query = db.select(Conversation).where(Conversation.app_id == app_model.id, Conversation.mode == 'completion')
 
         # 如果有关键词参数，则在对话内容或回答中搜索关键词
         if args['keyword']:
@@ -140,47 +126,23 @@ class CompletionConversationDetailApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
+    @get_app_model(mode=AppMode.COMPLETION)
     @marshal_with(conversation_message_detail_fields)
-    def get(self, app_id, conversation_id):
-        """
-        获取指定应用和对话的详细信息。
+    def get(self, app_model, conversation_id):
+        conversation_id = str(conversation_id)
 
-        Args:
-            app_id (int): 应用的ID。
-            conversation_id (int): 对话的ID。
-
-        Returns:
-            根据`conversation_message_detail_fields`定义的字段返回对话详细信息。
-        """
-        app_id = str(app_id)  # 将传入的app_id转换为字符串
-        conversation_id = str(conversation_id)  # 将传入的conversation_id转换为字符串
-
-        # 获取指定类型的对话
-        return _get_conversation(app_id, conversation_id, 'completion')
+        return _get_conversation(app_model, conversation_id)
 
     @setup_required
     @login_required
     @account_initialization_required
-    def delete(self, app_id, conversation_id):
-        """
-        删除指定的对话。
-
-        Args:
-            app_id (int): 应用的ID。
-            conversation_id (int): 对话的ID。
-
-        Returns:
-            删除成功返回状态码204，无内容返回。
-        """
-        app_id = str(app_id)  # 将传入的app_id转换为字符串
-        conversation_id = str(conversation_id)  # 将传入的conversation_id转换为字符串
-
-        # 获取指定的应用
-        app = _get_app(app_id, 'chat')
+    @get_app_model(mode=[AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT])
+    def delete(self, app_model, conversation_id):
+        conversation_id = str(conversation_id)
 
         # 查询指定ID和应用下的对话
         conversation = db.session.query(Conversation) \
-            .filter(Conversation.id == conversation_id, Conversation.app_id == app.id).first()
+            .filter(Conversation.id == conversation_id, Conversation.app_id == app_model.id).first()
 
         if not conversation:
             # 如果对话不存在，抛出异常
@@ -205,20 +167,9 @@ class ChatConversationApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
+    @get_app_model(mode=[AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT])
     @marshal_with(conversation_with_summary_pagination_fields)
-    def get(self, app_id):
-        """
-        获取符合条件的聊天对话列表。
-
-        参数:
-            - app_id: 应用的唯一标识符。
-
-        返回:
-            - 符合查询条件的对话列表，分页返回。
-        """
-        app_id = str(app_id)  # 确保app_id为字符串类型
-
-        # 解析请求参数
+    def get(self, app_model):
         parser = reqparse.RequestParser()
         parser.add_argument('keyword', type=str, location='args')
         parser.add_argument('start', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
@@ -230,11 +181,7 @@ class ChatConversationApi(Resource):
         parser.add_argument('limit', type=int_range(1, 100), required=False, default=20, location='args')
         args = parser.parse_args()
 
-        # 获取应用信息
-        app = _get_app(app_id, 'chat')
-
-        # 构建初始查询
-        query = db.select(Conversation).where(Conversation.app_id == app.id, Conversation.mode == 'chat')
+        query = db.select(Conversation).where(Conversation.app_id == app_model.id)
 
         # 如果有关键词，则在对话、消息或介绍中进行匹配
         if args['keyword']:
@@ -293,7 +240,9 @@ class ChatConversationApi(Resource):
                 .having(func.count(Message.id) >= args['message_count_gte'])
             )
 
-        # 按创建时间降序排列
+        if app_model.mode == AppMode.ADVANCED_CHAT.value:
+            query = query.where(Conversation.invoke_from != InvokeFrom.DEBUGGER.value)
+
         query = query.order_by(Conversation.created_at.desc())
 
         # 进行分页并返回结果
@@ -318,47 +267,23 @@ class ChatConversationDetailApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
+    @get_app_model(mode=[AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT])
     @marshal_with(conversation_detail_fields)
-    def get(self, app_id, conversation_id):
-        """
-        获取指定应用和对话的详细信息。
-        
-        Args:
-            app_id (int): 应用的ID。
-            conversation_id (int): 对话的ID。
-        
-        Returns:
-            conversation (dict): 包含指定对话详细信息的字典。
-        """
-        app_id = str(app_id)  # 将传入的app_id转换为字符串
-        conversation_id = str(conversation_id)  # 将传入的conversation_id转换为字符串
+    def get(self, app_model, conversation_id):
+        conversation_id = str(conversation_id)
 
-        # 获取指定的对话信息
-        return _get_conversation(app_id, conversation_id, 'chat')
+        return _get_conversation(app_model, conversation_id)
 
     @setup_required
     @login_required
+    @get_app_model(mode=[AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT])
     @account_initialization_required
-    def delete(self, app_id, conversation_id):
-        """
-        删除指定的对话记录。
-        
-        Args:
-            app_id (int): 应用的ID。
-            conversation_id (int): 对话的ID。
-        
-        Returns:
-            result (dict): 包含删除操作结果信息的字典。
-        """
-        app_id = str(app_id)  # 将传入的app_id转换为字符串
-        conversation_id = str(conversation_id)  # 将传入的conversation_id转换为字符串
-
-        # 获取应用信息
-        app = _get_app(app_id, 'chat')
+    def delete(self, app_model, conversation_id):
+        conversation_id = str(conversation_id)
 
         # 查询指定对话记录
         conversation = db.session.query(Conversation) \
-            .filter(Conversation.id == conversation_id, Conversation.app_id == app.id).first()
+            .filter(Conversation.id == conversation_id, Conversation.app_id == app_model.id).first()
 
         if not conversation:
             # 如果对话不存在，抛出异常
@@ -378,27 +303,9 @@ api.add_resource(ChatConversationApi, '/apps/<uuid:app_id>/chat-conversations')
 api.add_resource(ChatConversationDetailApi, '/apps/<uuid:app_id>/chat-conversations/<uuid:conversation_id>')
 
 
-def _get_conversation(app_id, conversation_id, mode):
-    """
-    获取指定的对话信息。
-    
-    参数:
-    app_id: 应用的唯一标识符。
-    conversation_id: 对话的唯一标识符。
-    mode: 模式或状态，用于获取应用或对话时的额外筛选条件。
-    
-    返回值:
-    返回查询到的Conversation对象。
-    
-    抛出:
-    NotFound: 如果指定的对话不存在则抛出异常。
-    """
-    # 获取应用信息
-    app = _get_app(app_id, mode)
-
-    # 从数据库中查询指定ID和对应APP的对话信息
+def _get_conversation(app_model, conversation_id):
     conversation = db.session.query(Conversation) \
-        .filter(Conversation.id == conversation_id, Conversation.app_id == app.id).first()
+        .filter(Conversation.id == conversation_id, Conversation.app_id == app_model.id).first()
 
     if not conversation:
         # 如果对话不存在，则抛出异常

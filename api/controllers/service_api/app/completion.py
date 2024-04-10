@@ -1,9 +1,5 @@
-import json
 import logging
-from collections.abc import Generator
-from typing import Union
 
-from flask import Response, stream_with_context
 from flask_restful import Resource, reqparse
 from werkzeug.exceptions import InternalServerError, NotFound
 
@@ -19,13 +15,14 @@ from controllers.service_api.app.error import (
     ProviderQuotaExceededError,
 )
 from controllers.service_api.wraps import FetchUserArg, WhereisUserArg, validate_app_token
-from core.application_queue_manager import ApplicationQueueManager
-from core.entities.application_entities import InvokeFrom
+from core.app.apps.base_app_queue_manager import AppQueueManager
+from core.app.entities.app_invoke_entities import InvokeFrom
 from core.errors.error import ModelCurrentlyNotSupportError, ProviderTokenNotInitError, QuotaExceededError
 from core.model_runtime.errors.invoke import InvokeError
+from libs import helper
 from libs.helper import uuid_value
-from models.model import App, EndUser
-from services.completion_service import CompletionService
+from models.model import App, AppMode, EndUser
+from services.app_generate_service import AppGenerateService
 
 
 class CompletionApi(Resource):
@@ -83,8 +80,7 @@ class CompletionApi(Resource):
         args['auto_generate_name'] = False
 
         try:
-            # 调用完成服务
-            response = CompletionService.completion(
+            response = AppGenerateService.generate(
                 app_model=app_model,
                 user=end_user,
                 args=args,
@@ -92,8 +88,7 @@ class CompletionApi(Resource):
                 streaming=streaming,
             )
 
-            # 返回压缩后的响应
-            return compact_response(response)
+            return helper.compact_generate_response(response)
         except services.errors.conversation.ConversationNotExistsError:
             raise NotFound("Conversation Not Exists.")
         except services.errors.conversation.ConversationCompletedError:
@@ -137,8 +132,7 @@ class CompletionStopApi(Resource):
         if app_model.mode != 'completion':
             raise AppUnavailableError()
 
-        # 设置任务停止标志
-        ApplicationQueueManager.set_stop_flag(task_id, InvokeFrom.SERVICE_API, end_user.id)
+        AppQueueManager.set_stop_flag(task_id, InvokeFrom.SERVICE_API, end_user.id)
 
         return {'result': 'success'}, 200
 
@@ -153,30 +147,8 @@ class ChatApi(Resource):
 
     @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.JSON, required=True))
     def post(self, app_model: App, end_user: EndUser):
-        """
-        处理聊天请求，根据提供的应用模型和终端用户信息，完成特定的聊天任务。
-
-        Args:
-            app_model: App 类型，代表应用模型，用于确定聊天的模式和配置。
-            end_user: EndUser 类型，代表发起聊天请求的终端用户。
-
-        Returns:
-            返回聊天响应结果，格式化后的响应数据。
-
-        Raises:
-            NotChatAppError: 如果应用模型不是聊天模式，则抛出异常。
-            NotFound: 如果对话不存在，则抛出异常。
-            ConversationCompletedError: 如果对话已经完成，则抛出异常。
-            AppUnavailableError: 如果应用模型配置错误，则抛出异常。
-            ProviderNotInitializeError: 如果服务提供者未初始化，则抛出异常。
-            ProviderQuotaExceededError: 如果达到服务提供者的配额限制，则抛出异常。
-            ProviderModelCurrentlyNotSupportError: 如果当前服务提供者不支持指定模型，则抛出异常。
-            CompletionRequestError: 如果完成请求发生错误，则抛出异常。
-            InternalServerError: 如果发生内部服务器错误，则抛出异常。
-        """
-
-        # 检查应用模型是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         # 解析请求参数
@@ -195,8 +167,7 @@ class ChatApi(Resource):
         streaming = args['response_mode'] == 'streaming'
 
         try:
-            # 调用完成服务，获取聊天响应
-            response = CompletionService.completion(
+            response = AppGenerateService.generate(
                 app_model=app_model,
                 user=end_user,
                 args=args,
@@ -204,8 +175,7 @@ class ChatApi(Resource):
                 streaming=streaming
             )
 
-            # 返回紧凑格式的聊天响应
-            return compact_response(response)
+            return helper.compact_generate_response(response)
         except services.errors.conversation.ConversationNotExistsError:
             raise NotFound("Conversation Not Exists.")
         except services.errors.conversation.ConversationCompletedError:
@@ -245,36 +215,13 @@ class ChatStopApi(Resource):
     
     @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.JSON, required=True))
     def post(self, app_model: App, end_user: EndUser, task_id):
-        """
-        处理停止聊天任务的POST请求。
-        
-        参数:
-        - app_model: 应用模型，包含应用的相关信息。
-        - end_user: 终端用户信息。
-        - task_id: 任务ID，标识需要停止的聊天任务。
-        
-        返回值:
-        - 一个包含结果信息的字典和HTTP状态码200，表示成功停止聊天任务。
-        """
-        # 检查应用模式是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
-        # 设置停止标志，以停止指定的任务
-        ApplicationQueueManager.set_stop_flag(task_id, InvokeFrom.SERVICE_API, end_user.id)
+        AppQueueManager.set_stop_flag(task_id, InvokeFrom.SERVICE_API, end_user.id)
 
         return {'result': 'success'}, 200
-
-
-def compact_response(response: Union[dict, Generator]) -> Response:
-    if isinstance(response, dict):
-        return Response(response=json.dumps(response), status=200, mimetype='application/json')
-    else:
-        def generate() -> Generator:
-            yield from response
-
-        return Response(stream_with_context(generate()), status=200,
-                        mimetype='text/event-stream')
 
 
 api.add_resource(CompletionApi, '/completion-messages')

@@ -275,17 +275,9 @@ class AccountService:
 
     @staticmethod
     def close_account(account: Account) -> None:
-        """
-        关闭账户
-        
-        参数:
-        account: Account - 需要关闭的账户对象
-        
-        返回值:
-        None
-        """
-        account.status = AccountStatus.CLOSED.value  # 更新账户状态为关闭
-        db.session.commit()  # 提交数据库事务，确保状态更新被保存
+        """Close account"""
+        account.status = AccountStatus.CLOSED.value
+        db.session.commit()
 
     @staticmethod
     def update_account(account, **kwargs):
@@ -815,9 +807,9 @@ class RegisterService:
 
             db.session.commit()  # 提交数据库事务
         except Exception as e:
-            db.session.rollback()  # 发生异常时回滚事务
-            logging.error(f'Register failed: {e}')  # 记录错误日志
-            raise AccountRegisterError(f'Registration failed: {e}') from e  # 抛出账户注册错误异常
+            db.session.rollback()
+            logging.error(f'Register failed: {e}')
+            raise AccountRegisterError(f'Registration failed: {e}') from e
 
         return account  # 返回创建的账户对象
 

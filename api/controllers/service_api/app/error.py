@@ -24,7 +24,13 @@ class NotChatAppError(BaseHTTPException):
     聊天应用错误。当聊天应用模式与正确的API路由不匹配时抛出。
     """
     error_code = 'not_chat_app'
-    description = "Please check if your Chat app mode matches the right API route."
+    description = "Please check if your app mode matches the right API route."
+    code = 400
+
+
+class NotWorkflowAppError(BaseHTTPException):
+    error_code = 'not_workflow_app'
+    description = "Please check if your app mode matches the right API route."
     code = 400
 
 

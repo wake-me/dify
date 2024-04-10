@@ -5,8 +5,10 @@ from werkzeug.exceptions import NotFound
 from controllers.web import api
 from controllers.web.error import NotChatAppError
 from controllers.web.wraps import WebApiResource
+from core.app.entities.app_invoke_entities import InvokeFrom
 from fields.conversation_fields import conversation_infinite_scroll_pagination_fields, simple_conversation_fields
 from libs.helper import uuid_value
+from models.model import AppMode
 from services.conversation_service import ConversationService
 from services.errors.conversation import ConversationNotExistsError, LastConversationNotExistsError
 from services.web_conversation_service import WebConversationService
@@ -26,22 +28,8 @@ class ConversationListApi(WebApiResource):
 
     @marshal_with(conversation_infinite_scroll_pagination_fields)
     def get(self, app_model, end_user):
-        """
-        获取对话列表的GET请求处理函数。
-
-        参数:
-        - app_model: 应用模型对象，用于检查应用是否为聊天模式。
-        - end_user: 请求的终端用户对象。
-
-        返回:
-        - 根据请求参数进行分页和排序后的对话列表。
-
-        异常:
-        - NotChatAppError: 如果应用模式不是聊天模式，则抛出此异常。
-        - NotFound: 如果根据请求参数找不到对应的对话，则抛出此异常。
-        """
-        # 检查应用模式是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         # 解析请求参数
@@ -63,7 +51,8 @@ class ConversationListApi(WebApiResource):
                 user=end_user,
                 last_id=args['last_id'],
                 limit=args['limit'],
-                pinned=pinned
+                invoke_from=InvokeFrom.WEB_APP,
+                pinned=pinned,
             )
         except LastConversationNotExistsError:
             # 如果查询不到最后的对话记录，抛出404异常
@@ -78,21 +67,8 @@ class ConversationApi(WebApiResource):
     """
 
     def delete(self, app_model, end_user, c_id):
-        """
-        删除指定的会话。
-
-        参数:
-        app_model: 应用模型，用于确定应用的配置和模式。
-        end_user: 终端用户信息，标识请求的用户。
-        c_id: 会话ID，唯一标识一个会话。
-
-        返回值:
-        返回一个包含结果信息的字典和HTTP状态码204，表示成功删除会话。
-        如果会话不存在或遇到其他错误，则抛出相应的异常。
-        """
-
-        # 检查应用模式是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         conversation_id = str(c_id)  # 转换会话ID为字符串格式
@@ -125,8 +101,8 @@ class ConversationRenameApi(WebApiResource):
 
     @marshal_with(simple_conversation_fields)
     def post(self, app_model, end_user, c_id):
-        # 检查当前应用是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         conversation_id = str(c_id)
@@ -160,24 +136,8 @@ class ConversationPinApi(WebApiResource):
     """
 
     def patch(self, app_model, end_user, c_id):
-        """
-        将指定对话置顶。
-
-        参数:
-        app_model: 应用模型，用于确定是否为聊天模式的应用。
-        end_user: 终端用户信息，指定对话的用户端。
-        c_id: 对话的ID，用于标识需要置顶的对话。
-
-        返回值:
-        返回一个包含结果信息的字典，例如: {"result": "success"}
-
-        异常:
-        如果不是聊天模式的应用，将抛出NotChatAppError异常。
-        如果对话不存在，将抛出NotFound异常。
-        """
-
-        # 检查应用模式是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         conversation_id = str(c_id)  # 转换对话ID为字符串格式
@@ -209,8 +169,8 @@ class ConversationUnPinApi(WebApiResource):
     """
 
     def patch(self, app_model, end_user, c_id):
-        # 检查应用模式是否为聊天模式，如果不是则抛出异常
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         conversation_id = str(c_id)  # 将对话ID转换为字符串格式

@@ -1,14 +1,18 @@
+import logging
+
 from flask_restful import Resource, fields, marshal_with, reqparse
 from flask_restful.inputs import int_range
-from werkzeug.exceptions import NotFound
+from werkzeug.exceptions import BadRequest, InternalServerError, NotFound
 
 import services
 from controllers.service_api import api
 from controllers.service_api.app.error import NotChatAppError
 from controllers.service_api.wraps import FetchUserArg, WhereisUserArg, validate_app_token
+from core.app.entities.app_invoke_entities import InvokeFrom
 from fields.conversation_fields import message_file_fields
 from libs.helper import TimestampField, uuid_value
-from models.model import App, EndUser
+from models.model import App, AppMode, EndUser
+from services.errors.message import SuggestedQuestionsAfterAnswerDisabledError
 from services.message_service import MessageService
 
 
@@ -55,16 +59,18 @@ class MessageListApi(Resource):
 
         # 定义消息对象的字段
     message_fields = {
-        'id': fields.String,  # 消息ID
-        'conversation_id': fields.String,  # 对话ID
-        'inputs': fields.Raw,  # 输入内容
-        'query': fields.String,  # 查询内容
-        'answer': fields.String,  # 回答内容
-        'message_files': fields.List(fields.Nested(message_file_fields), attribute='files'),  # 消息文件列表
-        'feedback': fields.Nested(feedback_fields, attribute='user_feedback', allow_null=True),  # 用户反馈
-        'retriever_resources': fields.List(fields.Nested(retriever_resource_fields)),  # 检索资源列表
-        'created_at': TimestampField,  # 创建时间
-        'agent_thoughts': fields.List(fields.Nested(agent_thought_fields))  # 代理思考记录
+        'id': fields.String,
+        'conversation_id': fields.String,
+        'inputs': fields.Raw,
+        'query': fields.String,
+        'answer': fields.String(attribute='re_sign_file_url_answer'),
+        'message_files': fields.List(fields.Nested(message_file_fields), attribute='files'),
+        'feedback': fields.Nested(feedback_fields, attribute='user_feedback', allow_null=True),
+        'retriever_resources': fields.List(fields.Nested(retriever_resource_fields)),
+        'created_at': TimestampField,
+        'agent_thoughts': fields.List(fields.Nested(agent_thought_fields)),
+        'status': fields.String,
+        'error': fields.String,
     }
 
     # 定义消息无限滚动分页字段
@@ -77,15 +83,8 @@ class MessageListApi(Resource):
     @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.QUERY))
     @marshal_with(message_infinite_scroll_pagination_fields)
     def get(self, app_model: App, end_user: EndUser):
-        """
-        根据给定的应用和终端用户信息，以及会话ID、第一条消息ID和限制数量，获取消息分页数据。
-        
-        :param app_model: 应用模型，用于验证应用状态和模式。
-        :param end_user: 终端用户模型，标识请求的终端用户。
-        :return: 返回经过分页处理的消息数据。
-        """
-        # 检查应用模式是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         # 解析请求参数
@@ -167,8 +166,9 @@ class MessageSuggestedApi(Resource):
     
     @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.QUERY))
     def get(self, app_model: App, end_user: EndUser, message_id):
-        message_id = str(message_id)  # 确保消息ID为字符串格式
-        if app_model.mode != 'chat':  # 检查应用模式是否为聊天模式
+        message_id = str(message_id)
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         try:
@@ -177,10 +177,15 @@ class MessageSuggestedApi(Resource):
                 app_model=app_model,
                 user=end_user,
                 message_id=message_id,
-                check_enabled=False
+                invoke_from=InvokeFrom.SERVICE_API
             )
         except services.errors.message.MessageNotExistsError:  # 消息不存在时抛出异常
             raise NotFound("Message Not Exists.")
+        except SuggestedQuestionsAfterAnswerDisabledError:
+            raise BadRequest("Message Not Exists.")
+        except Exception:
+            logging.exception("internal server error.")
+            raise InternalServerError()
 
         return {'result': 'success', 'data': questions}  # 返回成功结果和建议问题列表
 

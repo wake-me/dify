@@ -4,7 +4,7 @@ from werkzeug.exceptions import Forbidden, NotFound
 
 from constants.languages import supported_language
 from controllers.console import api
-from controllers.console.app import _get_app
+from controllers.console.app.wraps import get_app_model
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required
 from extensions.ext_database import db
@@ -59,25 +59,12 @@ class AppSite(Resource):
     @setup_required
     @login_required
     @account_initialization_required
+    @get_app_model
     @marshal_with(app_site_fields)
-    def post(self, app_id):
-        """
-        处理创建或更新应用站点信息的POST请求。
+    def post(self, app_model):
+        args = parse_app_site_args()
 
-        需要用户登录且角色为管理员或所有者才能访问。会根据请求中提供的参数更新相应的应用和站点信息。
-
-        参数:
-        - app_id: 应用的唯一标识符。
-
-        返回值:
-        - 更新后的站点信息。
-        """
-        args = parse_app_site_args()  # 解析请求参数
-
-        app_id = str(app_id)  # 确保app_id为字符串类型
-        app_model = _get_app(app_id)  # 获取应用模型
-
-        # 检查当前用户是否有权限进行操作
+        # The role of the current user in the ta table must be admin or owner
         if not current_user.is_admin_or_owner:
             raise Forbidden()  # 如果不是管理员或所有者，则抛出权限异常
 
@@ -132,12 +119,10 @@ class AppSiteAccessTokenReset(Resource):
     @setup_required
     @login_required
     @account_initialization_required
+    @get_app_model
     @marshal_with(app_site_fields)
-    def post(self, app_id):
-        app_id = str(app_id)  # 将传入的app_id转换为字符串格式
-        app_model = _get_app(app_id)  # 获取指定app_id的应用模型
-
-        # 检查当前用户在ta表中的角色是否为管理员或所有者
+    def post(self, app_model):
+        # The role of the current user in the ta table must be admin or owner
         if not current_user.is_admin_or_owner:
             raise Forbidden()  # 如果不是，抛出权限禁止的异常
 

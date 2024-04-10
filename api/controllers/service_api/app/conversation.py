@@ -6,9 +6,10 @@ import services
 from controllers.service_api import api
 from controllers.service_api.app.error import NotChatAppError
 from controllers.service_api.wraps import FetchUserArg, WhereisUserArg, validate_app_token
+from core.app.entities.app_invoke_entities import InvokeFrom
 from fields.conversation_fields import conversation_infinite_scroll_pagination_fields, simple_conversation_fields
 from libs.helper import uuid_value
-from models.model import App, EndUser
+from models.model import App, AppMode, EndUser
 from services.conversation_service import ConversationService
 
 
@@ -23,22 +24,8 @@ class ConversationApi(Resource):
     @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.QUERY))
     @marshal_with(conversation_infinite_scroll_pagination_fields)
     def get(self, app_model: App, end_user: EndUser):
-        """
-        获取对话列表的分页数据，支持无限滚动。
-
-        Args:
-            app_model: App模型实例，代表一个应用。
-            end_user: EndUser模型实例，代表终端用户。
-
-        Returns:
-            分页后的对话数据。
-
-        Raises:
-            NotChatAppError: 如果应用模式不是聊天模式，则抛出此错误。
-            NotFound: 如果请求的最后一条对话不存在，则抛出此错误。
-        """
-        # 检查应用模式是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         # 解析请求参数
@@ -48,11 +35,17 @@ class ConversationApi(Resource):
         args = parser.parse_args()
 
         try:
-            # 根据最后一条对话ID和限制数量进行分页查询
-            return ConversationService.pagination_by_last_id(app_model, end_user, args['last_id'], args['limit'])
+            return ConversationService.pagination_by_last_id(
+                app_model=app_model,
+                user=end_user,
+                last_id=args['last_id'],
+                limit=args['limit'],
+                invoke_from=InvokeFrom.SERVICE_API
+            )
         except services.errors.conversation.LastConversationNotExistsError:
             # 如果最后一条对话不存在，则抛出404错误
             raise NotFound("Last Conversation Not Exists.")
+
 
 class ConversationDetailApi(Resource):
     """
@@ -65,23 +58,8 @@ class ConversationDetailApi(Resource):
     @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.JSON))
     @marshal_with(simple_conversation_fields)
     def delete(self, app_model: App, end_user: EndUser, c_id):
-        """
-        删除指定的对话记录。
-        
-        Args:
-            app_model: App模型实例，代表一个应用。
-            end_user: EndUser模型实例，代表终端用户。
-            c_id: 对话的唯一标识符。
-        
-        Returns:
-            一个包含删除结果的字典和HTTP状态码204（No Content），若对话不存在则返回404状态码。
-            
-        Raises:
-            NotChatAppError: 如果应用模式不是'chat'，则抛出此错误。
-            NotFound: 如果指定的对话不存在，则抛出此错误。
-        """
-        # 检查应用模式是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         conversation_id = str(c_id)  # 将对话ID转换为字符串格式
@@ -114,23 +92,9 @@ class ConversationRenameApi(Resource):
     @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.JSON))
     @marshal_with(simple_conversation_fields)
     def post(self, app_model: App, end_user: EndUser, c_id):
-        """
-        提交请求以重命名会话。
-        
-        参数:
-        - app_model: 应用实例，用于验证应用权限和模式。
-        - end_user: 指定进行操作的终端用户。
-        - c_id: 要重命名的会话ID。
-        
-        返回:
-        - 重命名成功后的会话信息。
-        
-        异常:
-        - NotChatAppError: 如果应用模式不是'chat'，则抛出此错误。
-        - NotFound: 如果会话不存在，则抛出此错误。
-        """
-        if app_model.mode != 'chat':
-            raise NotChatAppError()  # 如果应用不是聊天模式，则抛出异常
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
+            raise NotChatAppError()
 
         conversation_id = str(c_id)  # 将会话ID转换为字符串格式
 

@@ -8,6 +8,7 @@ from werkzeug.exceptions import Forbidden
 from controllers.console import api
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required
+from core.model_runtime.utils.encoders import jsonable_encoder
 from libs.login import login_required
 from services.tools_manage_service import ToolManageService
 
@@ -62,12 +63,11 @@ class ToolBuiltinProviderListToolsApi(Resource):
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
-        # 调用工具管理服务，列出指定提供商的内置工具
-        return ToolManageService.list_builtin_tool_provider_tools(
+        return jsonable_encoder(ToolManageService.list_builtin_tool_provider_tools(
             user_id,
             tenant_id,
             provider,
-        )
+        ))
 
 class ToolBuiltinProviderDeleteApi(Resource):
     """
@@ -154,6 +154,20 @@ class ToolBuiltinProviderUpdateApi(Resource):
             provider,
             args['credentials'],
         )
+    
+class ToolBuiltinProviderGetCredentialsApi(Resource):
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self, provider):
+        user_id = current_user.id
+        tenant_id = current_user.current_tenant_id
+
+        return ToolManageService.get_builtin_tool_provider_credentials(
+            user_id,
+            tenant_id,
+            provider,
+        )
 
 class ToolBuiltinProviderIconApi(Resource):
     """
@@ -171,21 +185,9 @@ class ToolBuiltinProviderIconApi(Resource):
     
     @setup_required
     def get(self, provider):
-        """
-        根据提供的工具提供商标识符获取其图标，并作为文件响应返回。
-        
-        参数:
-        - provider: 工具提供商的标识符。
-        
-        返回值:
-        - 返回工具提供商图标的文件响应，包括适当的MIME类型和缓存设置。
-        """
-        # 从服务中获取图标数据和MIME类型
-        icon_bytes, minetype = ToolManageService.get_builtin_tool_provider_icon(provider)
-        # 从应用配置中读取图标缓存最大年龄
+        icon_bytes, mimetype = ToolManageService.get_builtin_tool_provider_icon(provider)
         icon_cache_max_age = int(current_app.config.get('TOOL_ICON_CACHE_MAX_AGE'))
-        # 返回图标文件响应，使用IO流和设置缓存最大年龄
-        return send_file(io.BytesIO(icon_bytes), mimetype=minetype, max_age=icon_cache_max_age)
+        return send_file(io.BytesIO(icon_bytes), mimetype=mimetype, max_age=icon_cache_max_age)
 
 class ToolModelProviderIconApi(Resource):
     """
@@ -249,12 +251,11 @@ class ToolModelProviderListToolsApi(Resource):
 
         args = parser.parse_args()
 
-        # 调用服务层方法，获取模型工具列表
-        return ToolManageService.list_model_tool_provider_tools(
+        return jsonable_encoder(ToolManageService.list_model_tool_provider_tools(
             user_id,
             tenant_id,
             args['provider'],
-        )
+        ))
 
 class ToolApiProviderAddApi(Resource):
     """
@@ -376,12 +377,11 @@ class ToolApiProviderListToolsApi(Resource):
         # 解析查询参数
         args = parser.parse_args()
 
-        # 调用服务层方法，获取指定提供商的工具列表并返回
-        return ToolManageService.list_api_tool_provider_tools(
+        return jsonable_encoder(ToolManageService.list_api_tool_provider_tools(
             user_id,
             tenant_id,
             args['provider'],
-        )
+        ))
 
 class ToolApiProviderUpdateApi(Resource):
     """
@@ -639,10 +639,37 @@ class ToolApiProviderPreviousTestApi(Resource):
             args['schema'],
         )
 
+class ToolBuiltinListApi(Resource):
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self):
+        user_id = current_user.id
+        tenant_id = current_user.current_tenant_id
+
+        return jsonable_encoder([provider.to_dict() for provider in ToolManageService.list_builtin_tools(
+            user_id,
+            tenant_id,
+        )])
+    
+class ToolApiListApi(Resource):
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self):
+        user_id = current_user.id
+        tenant_id = current_user.current_tenant_id
+
+        return jsonable_encoder([provider.to_dict() for provider in ToolManageService.list_api_tools(
+            user_id,
+            tenant_id,
+        )])
+
 api.add_resource(ToolProviderListApi, '/workspaces/current/tool-providers')
 api.add_resource(ToolBuiltinProviderListToolsApi, '/workspaces/current/tool-provider/builtin/<provider>/tools')
 api.add_resource(ToolBuiltinProviderDeleteApi, '/workspaces/current/tool-provider/builtin/<provider>/delete')
 api.add_resource(ToolBuiltinProviderUpdateApi, '/workspaces/current/tool-provider/builtin/<provider>/update')
+api.add_resource(ToolBuiltinProviderGetCredentialsApi, '/workspaces/current/tool-provider/builtin/<provider>/credentials')
 api.add_resource(ToolBuiltinProviderCredentialsSchemaApi, '/workspaces/current/tool-provider/builtin/<provider>/credentials_schema')
 api.add_resource(ToolBuiltinProviderIconApi, '/workspaces/current/tool-provider/builtin/<provider>/icon')
 api.add_resource(ToolModelProviderIconApi, '/workspaces/current/tool-provider/model/<provider>/icon')
@@ -650,8 +677,11 @@ api.add_resource(ToolModelProviderListToolsApi, '/workspaces/current/tool-provid
 api.add_resource(ToolApiProviderAddApi, '/workspaces/current/tool-provider/api/add')
 api.add_resource(ToolApiProviderGetRemoteSchemaApi, '/workspaces/current/tool-provider/api/remote')
 api.add_resource(ToolApiProviderListToolsApi, '/workspaces/current/tool-provider/api/tools')
-api.add_resource(ToolApiProviderUpdateApi, '/workspaces/current/tool-provider/api/update') 
+api.add_resource(ToolApiProviderUpdateApi, '/workspaces/current/tool-provider/api/update')
 api.add_resource(ToolApiProviderDeleteApi, '/workspaces/current/tool-provider/api/delete')
 api.add_resource(ToolApiProviderGetApi, '/workspaces/current/tool-provider/api/get')
 api.add_resource(ToolApiProviderSchemaApi, '/workspaces/current/tool-provider/api/schema')
 api.add_resource(ToolApiProviderPreviousTestApi, '/workspaces/current/tool-provider/api/test/pre')
+
+api.add_resource(ToolBuiltinListApi, '/workspaces/current/tools/builtin')
+api.add_resource(ToolApiListApi, '/workspaces/current/tools/api')

@@ -16,27 +16,12 @@ from controllers.console.workspace.error import (
 )
 from controllers.console.wraps import account_initialization_required
 from extensions.ext_database import db
+from fields.member_fields import account_fields
 from libs.helper import TimestampField, timezone
 from libs.login import login_required
 from models.account import AccountIntegrate, InvitationCode
 from services.account_service import AccountService
 from services.errors.account import CurrentPasswordIncorrectError as ServiceCurrentPasswordIncorrectError
-
-# 定义账户信息的字段集合
-# 字段集合以字典形式组织，每个键值对代表账户的一个属性，其中键为属性名，值为属性的数据类型
-account_fields = {
-    'id': fields.String,  # 账户的唯一标识符
-    'name': fields.String,  # 账户的名称
-    'avatar': fields.String,  # 账户的头像URL
-    'email': fields.String,  # 账户的电子邮箱地址
-    'is_password_set': fields.Boolean,  # 表示密码是否已设置的布尔值
-    'interface_language': fields.String,  # 用户界面的语言设置
-    'interface_theme': fields.String,  # 用户界面的主题设置
-    'timezone': fields.String,  # 账户所在的时区
-    'last_login_at': TimestampField,  # 上次登录的时间戳
-    'last_login_ip': fields.String,  # 上次登录的IP地址
-    'created_at': TimestampField  # 账户创建的时间戳
-}
 
 
 class AccountInitApi(Resource):

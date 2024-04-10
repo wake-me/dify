@@ -1,9 +1,5 @@
-import json
 import logging
-from collections.abc import Generator
-from typing import Union
 
-from flask import Response, stream_with_context
 from flask_restful import reqparse
 from werkzeug.exceptions import InternalServerError, NotFound
 
@@ -20,12 +16,14 @@ from controllers.web.error import (
     ProviderQuotaExceededError,
 )
 from controllers.web.wraps import WebApiResource
-from core.application_queue_manager import ApplicationQueueManager
-from core.entities.application_entities import InvokeFrom
+from core.app.apps.base_app_queue_manager import AppQueueManager
+from core.app.entities.app_invoke_entities import InvokeFrom
 from core.errors.error import ModelCurrentlyNotSupportError, ProviderTokenNotInitError, QuotaExceededError
 from core.model_runtime.errors.invoke import InvokeError
+from libs import helper
 from libs.helper import uuid_value
-from services.completion_service import CompletionService
+from models.model import AppMode
+from services.app_generate_service import AppGenerateService
 
 
 class CompletionApi(WebApiResource):
@@ -78,8 +76,7 @@ class CompletionApi(WebApiResource):
         args['auto_generate_name'] = False
 
         try:
-            # 调用完成服务，处理请求
-            response = CompletionService.completion(
+            response = AppGenerateService.generate(
                 app_model=app_model,
                 user=end_user,
                 args=args,
@@ -87,8 +84,7 @@ class CompletionApi(WebApiResource):
                 streaming=streaming
             )
 
-            # 返回紧凑的响应结果
-            return compact_response(response)
+            return helper.compact_generate_response(response)
         except services.errors.conversation.ConversationNotExistsError:
             raise NotFound("Conversation Not Exists.")
         except services.errors.conversation.ConversationCompletedError:
@@ -132,8 +128,7 @@ class CompletionStopApi(WebApiResource):
         if app_model.mode != 'completion':
             raise NotCompletionAppError()
 
-        # 设置任务停止标志
-        ApplicationQueueManager.set_stop_flag(task_id, InvokeFrom.WEB_APP, end_user.id)
+        AppQueueManager.set_stop_flag(task_id, InvokeFrom.WEB_APP, end_user.id)
 
         # 返回成功结果
         return {'result': 'success'}, 200
@@ -155,8 +150,8 @@ class ChatApi(WebApiResource):
     """
 
     def post(self, app_model, end_user):
-        # 检查应用模式是否为聊天模式
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
         # 解析请求参数
@@ -175,8 +170,7 @@ class ChatApi(WebApiResource):
         args['auto_generate_name'] = False
 
         try:
-            # 调用完成服务进行处理，并返回压缩后的响应
-            response = CompletionService.completion(
+            response = AppGenerateService.generate(
                 app_model=app_model,
                 user=end_user,
                 args=args,
@@ -184,7 +178,7 @@ class ChatApi(WebApiResource):
                 streaming=streaming
             )
 
-            return compact_response(response)
+            return helper.compact_generate_response(response)
         except services.errors.conversation.ConversationNotExistsError:
             # 处理对话不存在的异常
             raise NotFound("Conversation Not Exists.")
@@ -229,38 +223,15 @@ class ChatStopApi(WebApiResource):
     - 一个包含结果信息的字典和HTTP状态码200，表示成功停止任务。
     """
     def post(self, app_model, end_user, task_id):
-        # 检查应用模式是否为聊天模式，如果不是，则抛出异常
-        if app_model.mode != 'chat':
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode not in [AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT]:
             raise NotChatAppError()
 
-        # 设置任务停止标志，标识来自WEB应用的请求，并记录终端用户ID
-        ApplicationQueueManager.set_stop_flag(task_id, InvokeFrom.WEB_APP, end_user.id)
+        AppQueueManager.set_stop_flag(task_id, InvokeFrom.WEB_APP, end_user.id)
 
         # 返回成功结果和HTTP状态码200
         return {'result': 'success'}, 200
 
-
-def compact_response(response: Union[dict, Generator]) -> Response:
-    """
-    根据传入的响应内容类型，生成相应的 Response 对象。
-    
-    参数:
-    - response: 可以是字典或者生成器。如果为字典，则直接以 JSON 格式返回；如果为生成器，则以流的形式返回。
-    
-    返回值:
-    - Response: 根据输入的 response 参数类型，返回一个配置了相应内容和类型的 Response 对象。
-    """
-    if isinstance(response, dict):
-        # 如果响应是字典，则将其转换为 JSON 格式，并设置相应的状态码和 MIME 类型
-        return Response(response=json.dumps(response), status=200, mimetype='application/json')
-    else:
-        # 如果响应是生成器，则定义一个内部生成器函数将其内容逐个yield，并配置响应为流式传输
-        def generate() -> Generator:
-            yield from response
-
-        # 返回一个配置了生成器、状态码和 MIME 类型的 Response 对象，用于流式传输
-        return Response(stream_with_context(generate()), status=200,
-                        mimetype='text/event-stream')
 
 api.add_resource(CompletionApi, '/completion-messages')
 api.add_resource(CompletionStopApi, '/completion-messages/<string:task_id>/stop')

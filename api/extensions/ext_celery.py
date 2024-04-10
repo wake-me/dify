@@ -45,6 +45,7 @@ def init_app(app: Flask) -> Celery:
     # 更新Celery配置结果后端
     celery_app.conf.update(
         result_backend=app.config["CELERY_RESULT_BACKEND"],
+        broker_connection_retry_on_startup=True,
     )
 
     # 如果配置了使用SSL，则更新Broker配置以包含SSL选项

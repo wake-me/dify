@@ -20,7 +20,7 @@ from controllers.service_api.app.error import (
 from controllers.service_api.wraps import FetchUserArg, WhereisUserArg, validate_app_token
 from core.errors.error import ModelCurrentlyNotSupportError, ProviderTokenNotInitError, QuotaExceededError
 from core.model_runtime.errors.invoke import InvokeError
-from models.model import App, AppModelConfig, EndUser
+from models.model import App, EndUser
 from services.audio_service import AudioService
 from services.errors.audio import (
     AudioTooLargeServiceError,
@@ -40,43 +40,14 @@ class AudioApi(Resource):
 
     @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.FORM))
     def post(self, app_model: App, end_user: EndUser):
-        """
-        处理音频转文字的POST请求。
-
-        Args:
-            app_model: App模型实例，包含应用的相关配置和信息。
-            end_user: EndUser模型实例，代表请求的终端用户。
-
-        Returns:
-            返回音频转文字服务的响应结果。
-
-        Raises:
-            AppUnavailableError: 如果应用配置禁用了音频转文字功能，则抛出此错误。
-            NoAudioUploadedError: 如果没有上传音频文件，则抛出此错误。
-            AudioTooLargeError: 如果上传的音频文件过大，则抛出此错误。
-            UnsupportedAudioTypeError: 如果上传的音频类型不被支持，则抛出此错误。
-            ProviderNotSupportSpeechToTextError: 如果服务提供商不支持音频转文字功能，则抛出此错误。
-            ProviderNotInitializeError: 如果服务提供商的令牌未初始化，则抛出此错误。
-            ProviderQuotaExceededError: 如果达到服务提供商的配额限制，则抛出此错误。
-            ProviderModelCurrentlyNotSupportError: 如果当前服务提供商的模型不支持，则抛出此错误。
-            CompletionRequestError: 如果完成请求发生错误，则抛出此错误。
-            ValueError: 如果出现值错误，则抛出此错误。
-            InternalServerError: 如果发生内部服务器错误，则抛出此错误。
-        """
-        # 检查音频转文字功能是否启用
-        app_model_config: AppModelConfig = app_model.app_model_config
-        if not app_model_config.speech_to_text_dict['enabled']:
-            raise AppUnavailableError()
-
-        # 获取上传的音频文件
         file = request.files['file']
 
         try:
             # 调用音频转文字服务
             response = AudioService.transcript_asr(
-                tenant_id=app_model.tenant_id,
+                app_model=app_model,
                 file=file,
-                end_user=end_user.get_id()
+                end_user=end_user
             )
 
             return response
@@ -134,16 +105,17 @@ class TextApi(Resource):
         # 初始化请求解析器，用于解析POST请求中的参数
         parser = reqparse.RequestParser()
         parser.add_argument('text', type=str, required=True, nullable=False, location='json')
+        parser.add_argument('voice', type=str, location='json')
         parser.add_argument('streaming', type=bool, required=False, nullable=False, location='json')
         args = parser.parse_args()
 
         try:
             # 调用音频服务进行文本转语音处理
             response = AudioService.transcript_tts(
-                tenant_id=app_model.tenant_id,
+                app_model=app_model,
                 text=args['text'],
-                end_user=end_user.get_id(),
-                voice=app_model.app_model_config.text_to_speech_dict.get('voice'),
+                end_user=end_user,
+                voice=args.get('voice'),
                 streaming=args['streaming']
             )
 

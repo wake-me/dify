@@ -1,5 +1,6 @@
 from flask_restful import fields
 
+from fields.member_fields import simple_account_fields
 from libs.helper import TimestampField
 
 
@@ -16,33 +17,27 @@ class MessageTextField(fields.Raw):
     def format(self, value):
         return value[0]['text'] if value else ''
 
-# 定义了一系列字段用于序列化和反序列化
-account_fields = {
-    'id': fields.String,  # 账户ID
-    'name': fields.String,  # 账户名称
-    'email': fields.String  # 账户邮箱
-}
 
 feedback_fields = {
-    'rating': fields.String,  # 评分
-    'content': fields.String,  # 反馈内容
-    'from_source': fields.String,  # 反馈来源
-    'from_end_user_id': fields.String,  # 终端用户ID
-    'from_account': fields.Nested(account_fields, allow_null=True),  # 发送反馈的账户信息
+    'rating': fields.String,
+    'content': fields.String,
+    'from_source': fields.String,
+    'from_end_user_id': fields.String,
+    'from_account': fields.Nested(simple_account_fields, allow_null=True),
 }
 
 annotation_fields = {
-    'id': fields.String,  # 注解ID
-    'question': fields.String,  # 注解问题
-    'content': fields.String,  # 注解内容
-    'account': fields.Nested(account_fields, allow_null=True),  # 创建注解的账户信息
-    'created_at': TimestampField  # 创建时间
+    'id': fields.String,
+    'question': fields.String,
+    'content': fields.String,
+    'account': fields.Nested(simple_account_fields, allow_null=True),
+    'created_at': TimestampField
 }
 
 annotation_hit_history_fields = {
-    'annotation_id': fields.String(attribute='id'),  # 注解ID
-    'annotation_create_account': fields.Nested(account_fields, allow_null=True),  # 创建注解的账户信息
-    'created_at': TimestampField  # 创建时间
+    'annotation_id': fields.String(attribute='id'),
+    'annotation_create_account': fields.Nested(simple_account_fields, allow_null=True),
+    'created_at': TimestampField
 }
 
 message_file_fields = {
@@ -67,24 +62,28 @@ agent_thought_fields = {
 }
 
 message_detail_fields = {
-    'id': fields.String,  # 消息ID
-    'conversation_id': fields.String,  # 对话ID
-    'inputs': fields.Raw,  # 输入数据
-    'query': fields.String,  # 查询内容
-    'message': fields.Raw,  # 消息内容
-    'message_tokens': fields.Integer,  # 消息分词数
-    'answer': fields.String,  # 答案
-    'answer_tokens': fields.Integer,  # 答案分词数
-    'provider_response_latency': fields.Float,  # 提供者响应延迟
-    'from_source': fields.String,  # 来源
-    'from_end_user_id': fields.String,  # 终端用户ID
-    'from_account_id': fields.String,  # 发送消息的账户ID
-    'feedbacks': fields.List(fields.Nested(feedback_fields)),  # 反馈列表
-    'annotation': fields.Nested(annotation_fields, allow_null=True),  # 注解信息
-    'annotation_hit_history': fields.Nested(annotation_hit_history_fields, allow_null=True),  # 注解命中历史
-    'created_at': TimestampField,  # 创建时间
-    'agent_thoughts': fields.List(fields.Nested(agent_thought_fields)),  # 代理思考记录
-    'message_files': fields.List(fields.Nested(message_file_fields), attribute='files'),  # 消息文件列表
+    'id': fields.String,
+    'conversation_id': fields.String,
+    'inputs': fields.Raw,
+    'query': fields.String,
+    'message': fields.Raw,
+    'message_tokens': fields.Integer,
+    'answer': fields.String(attribute='re_sign_file_url_answer'),
+    'answer_tokens': fields.Integer,
+    'provider_response_latency': fields.Float,
+    'from_source': fields.String,
+    'from_end_user_id': fields.String,
+    'from_account_id': fields.String,
+    'feedbacks': fields.List(fields.Nested(feedback_fields)),
+    'workflow_run_id': fields.String,
+    'annotation': fields.Nested(annotation_fields, allow_null=True),
+    'annotation_hit_history': fields.Nested(annotation_hit_history_fields, allow_null=True),
+    'created_at': TimestampField,
+    'agent_thoughts': fields.List(fields.Nested(agent_thought_fields)),
+    'message_files': fields.List(fields.Nested(message_file_fields), attribute='files'),
+    'metadata': fields.Raw(attribute='message_metadata_dict'),
+    'status': fields.String,
+    'error': fields.String,
 }
 
 # 定义反馈统计数据的字段结构

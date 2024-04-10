@@ -73,7 +73,7 @@ class PublishedAppTool(db.Model):
     description = db.Column(db.Text, nullable=False)
     # 工具的llm描述，供LLM使用
     llm_description = db.Column(db.Text, nullable=False)
-    # 查询描述，查询将被视为工具的一个参数，需要此字段来向LLM描述该参数
+    # query description, query will be seem as a parameter of the tool, to describe this parameter to llm, we need this field
     query_description = db.Column(db.Text, nullable=False)
     # 查询名称，查询参数的名称
     query_name = db.Column(db.String(40), nullable=False)
@@ -176,14 +176,6 @@ class ApiToolProvider(db.Model):
         return: dict
         """
         return json.loads(self.credentials_str)
-    
-    @property
-    def is_taned(self) -> bool:
-        """
-        判断是否已分配给特定租户，返回布尔值
-        return: bool
-        """
-        return self.tenant_id is not None
     
     @property
     def user(self) -> Account:
@@ -318,10 +310,16 @@ class ToolFile(db.Model):
         db.Index('tool_file_conversation_id_idx', 'conversation_id'),
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 文件的唯一标识符
-    user_id = db.Column(UUID, nullable=False)  # 对话用户的ID
-    tenant_id = db.Column(UUID, nullable=False)  # 租户的ID
-    conversation_id = db.Column(UUID, nullable=False)  # 对话的ID
-    file_key = db.Column(db.String(255), nullable=False)  # 文件的键
-    mimetype = db.Column(db.String(255), nullable=False)  # 文件的MIME类型
-    original_url = db.Column(db.String(255), nullable=True)  # 文件的原始URL
+    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    # conversation user id
+    user_id = db.Column(UUID, nullable=False)
+    # tenant id
+    tenant_id = db.Column(UUID, nullable=False)
+    # conversation id
+    conversation_id = db.Column(UUID, nullable=True)
+    # file key
+    file_key = db.Column(db.String(255), nullable=False)
+    # mime type
+    mimetype = db.Column(db.String(255), nullable=False)
+    # original url
+    original_url = db.Column(db.String(255), nullable=True)

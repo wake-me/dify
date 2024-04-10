@@ -1,12 +1,16 @@
+import json
 import random
 import re
 import string
 import subprocess
 import uuid
+from collections.abc import Generator
 from datetime import datetime
 from hashlib import sha256
+from typing import Union
 from zoneinfo import available_timezones
 
+from flask import Response, stream_with_context
 from flask_restful import fields
 
 
@@ -24,22 +28,7 @@ def run(script):
 
 
 class TimestampField(fields.Raw):
-    """
-    一个字段类，用于格式化时间戳值。
-    
-    方法:
-    - format: 将时间戳对象格式化为整数。
-    """
-    def format(self, value):
-        """
-        格式化时间戳。
-        
-        参数:
-        - value: 时间戳对象。
-        
-        返回:
-        - 时间戳的整数表示。
-        """
+    def format(self, value) -> int:
         return int(value.timestamp())
 
 
@@ -296,3 +285,14 @@ def generate_text_hash(text: str) -> str:
     """
     hash_text = str(text) + 'None'  # 添加固定字符串以确保哈希值的唯一性
     return sha256(hash_text.encode()).hexdigest()
+
+
+def compact_generate_response(response: Union[dict, Generator]) -> Response:
+    if isinstance(response, dict):
+        return Response(response=json.dumps(response), status=200, mimetype='application/json')
+    else:
+        def generate() -> Generator:
+            yield from response
+
+        return Response(stream_with_context(generate()), status=200,
+                        mimetype='text/event-stream')

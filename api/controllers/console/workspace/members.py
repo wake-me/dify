@@ -1,34 +1,18 @@
 from flask import current_app
 from flask_login import current_user
-from flask_restful import Resource, abort, fields, marshal_with, reqparse
+from flask_restful import Resource, abort, marshal_with, reqparse
 
 import services
 from controllers.console import api
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required, cloud_edition_billing_resource_check
 from extensions.ext_database import db
-from libs.helper import TimestampField
+from fields.member_fields import account_with_role_list_fields
 from libs.login import login_required
 from models.account import Account
 from services.account_service import RegisterService, TenantService
 from services.errors.account import AccountAlreadyInTenantError
 
-# 定义账户信息的字段结构
-account_fields = {
-    'id': fields.String,  # 账户ID，字符串类型
-    'name': fields.String,  # 账户名称，字符串类型
-    'avatar': fields.String,  # 头像URL，字符串类型
-    'email': fields.String,  # 电子邮件地址，字符串类型
-    'last_login_at': TimestampField,  # 最后登录时间，时间戳类型
-    'created_at': TimestampField,  # 创建时间，时间戳类型
-    'role': fields.String,  # 账户角色，字符串类型
-    'status': fields.String,  # 账户状态，字符串类型
-}
-
-# 定义账户列表的字段结构，包含多个账户信息
-account_list_fields = {
-    'accounts': fields.List(fields.Nested(account_fields))  # 账户信息列表，每个账户信息都是嵌套字段结构
-}
 
 class MemberListApi(Resource):
     """
@@ -41,10 +25,10 @@ class MemberListApi(Resource):
         - 'accounts': 当前租户的所有成员信息列表。
     """
 
-    @setup_required  # 装饰器，确保系统设置已完成
-    @login_required  # 装饰器，确保用户已登录
-    @account_initialization_required  # 装饰器，确保用户账号已初始化
-    @marshal_with(account_list_fields)  # 装饰器，使用指定字段列表格式化返回数据
+    @setup_required
+    @login_required
+    @account_initialization_required
+    @marshal_with(account_with_role_list_fields)
     def get(self):
         # 从当前用户所属的租户中获取成员列表
         members = TenantService.get_tenant_members(current_user.current_tenant)

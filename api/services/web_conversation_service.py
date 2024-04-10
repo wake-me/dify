@@ -1,5 +1,6 @@
 from typing import Optional, Union
 
+from core.app.entities.app_invoke_entities import InvokeFrom
 from extensions.ext_database import db
 from libs.infinite_scroll_pagination import InfiniteScrollPagination
 from models.account import Account
@@ -11,20 +12,8 @@ from services.conversation_service import ConversationService
 class WebConversationService:
     @classmethod
     def pagination_by_last_id(cls, app_model: App, user: Optional[Union[Account, EndUser]],
-                            last_id: Optional[str], limit: int, pinned: Optional[bool] = None,
-                            exclude_debug_conversation: bool = False) -> InfiniteScrollPagination:
-        """
-        根据用户的最后一条消息ID进行分页查询，可选地根据是否固定了会话列表来包括或排除这些会话。
-        
-        :param cls: 类的引用，通常用于调用类方法。
-        :param app_model: 应用模型实例，用于查询与特定应用相关的会话。
-        :param user: 用户实例，可以是账户或终端用户，用于查询与特定用户相关的会话。
-        :param last_id: 最后一条消息的ID，用于分页查询。
-        :param limit: 查询结果的限制数量。
-        :param pinned: 可选参数，指定是否查询用户固定会话。True表示包括固定会话，False表示排除。
-        :param exclude_debug_conversation: 是否排除调试会话，默认为False。
-        :return: 返回一个InfiniteScrollPagination实例，包含分页查询的结果。
-        """
+                              last_id: Optional[str], limit: int, invoke_from: InvokeFrom,
+                              pinned: Optional[bool] = None) -> InfiniteScrollPagination:
         include_ids = None
         exclude_ids = None
         # 处理固定会话逻辑，根据pinned参数决定是包含还是排除这些会话
@@ -47,9 +36,9 @@ class WebConversationService:
             user=user,
             last_id=last_id,
             limit=limit,
+            invoke_from=invoke_from,
             include_ids=include_ids,
             exclude_ids=exclude_ids,
-            exclude_debug_conversation=exclude_debug_conversation
         )
 
     @classmethod
