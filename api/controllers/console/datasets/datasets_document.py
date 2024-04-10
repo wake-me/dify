@@ -828,6 +828,118 @@ class DocumentIndexingStatusApi(DocumentResource):
         # 返回处理后的文档状态信息
         return marshal(document, document_status_fields)
 
+class DocumentDetailApi(DocumentResource):
+    # 定义文档元数据的选择选项
+    METADATA_CHOICES = {'all', 'only', 'without'}
+
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self, dataset_id, document_id):
+        """
+        获取指定数据集和文档的详细信息。
+
+        参数:
+        - dataset_id: 数据集的唯一标识符。
+        - document_id: 文档的唯一标识符。
+
+        返回值:
+        - 一个包含文档信息的字典以及HTTP状态码200。
+        
+        可通过查询参数metadata来选择返回的文档信息详细程度。
+        'all'返回所有信息（默认）；
+        'only'返回文档的元数据；
+        'without'返回除元数据外的所有信息。
+        """
+
+        # 将传入的ID转换为字符串类型
+        dataset_id = str(dataset_id)
+        document_id = str(document_id)
+        # 获取文档对象
+        document = self.get_document(dataset_id, document_id)
+
+        # 获取metadata选项，若无效则抛出异常
+        metadata = request.args.get('metadata', 'all')
+        if metadata not in self.METADATA_CHOICES:
+            raise InvalidMetadataError(f'Invalid metadata value: {metadata}')
+
+        # 根据metadata选项构造返回的文档信息
+        if metadata == 'only':
+            # 仅返回文档的元数据
+            response = {
+                'id': document.id,
+                'doc_type': document.doc_type,
+                'doc_metadata': document.doc_metadata
+            }
+        elif metadata == 'without':
+            # 返回除元数据外的所有信息
+            process_rules = DatasetService.get_process_rules(dataset_id)  # 获取数据集处理规则
+            data_source_info = document.data_source_detail_dict  # 获取数据源信息
+            response = {
+                # 包含文档的详细信息
+                'id': document.id,
+                'position': document.position,
+                'data_source_type': document.data_source_type,
+                'data_source_info': data_source_info,
+                'dataset_process_rule_id': document.dataset_process_rule_id,
+                'dataset_process_rule': process_rules,
+                'name': document.name,
+                'created_from': document.created_from,
+                'created_by': document.created_by,
+                'created_at': document.created_at.timestamp(),
+                'tokens': document.tokens,
+                'indexing_status': document.indexing_status,
+                'completed_at': int(document.completed_at.timestamp()) if document.completed_at else None,
+                'updated_at': int(document.updated_at.timestamp()) if document.updated_at else None,
+                'indexing_latency': document.indexing_latency,
+                'error': document.error,
+                'enabled': document.enabled,
+                'disabled_at': int(document.disabled_at.timestamp()) if document.disabled_at else None,
+                'disabled_by': document.disabled_by,
+                'archived': document.archived,
+                'segment_count': document.segment_count,
+                'average_segment_length': document.average_segment_length,
+                'hit_count': document.hit_count,
+                'display_status': document.display_status,
+                'doc_form': document.doc_form
+            }
+        else:
+            # 返回所有信息
+            process_rules = DatasetService.get_process_rules(dataset_id)  # 获取数据集处理规则
+            data_source_info = document.data_source_detail_dict  # 获取数据源信息
+            response = {
+                # 包含文档的所有信息
+                'id': document.id,
+                'position': document.position,
+                'data_source_type': document.data_source_type,
+                'data_source_info': data_source_info,
+                'dataset_process_rule_id': document.dataset_process_rule_id,
+                'dataset_process_rule': process_rules,
+                'name': document.name,
+                'created_from': document.created_from,
+                'created_by': document.created_by,
+                'created_at': document.created_at.timestamp(),
+                'tokens': document.tokens,
+                'indexing_status': document.indexing_status,
+                'completed_at': int(document.completed_at.timestamp()) if document.completed_at else None,
+                'updated_at': int(document.updated_at.timestamp()) if document.updated_at else None,
+                'indexing_latency': document.indexing_latency,
+                'error': document.error,
+                'enabled': document.enabled,
+                'disabled_at': int(document.disabled_at.timestamp()) if document.disabled_at else None,
+                'disabled_by': document.disabled_by,
+                'archived': document.archived,
+                'doc_type': document.doc_type,
+                'doc_metadata': document.doc_metadata,
+                'segment_count': document.segment_count,
+                'average_segment_length': document.average_segment_length,
+                'hit_count': document.hit_count,
+                'display_status': document.display_status,
+                'doc_form': document.doc_form
+            }
+
+        return response, 200
+
 
 class DocumentProcessingApi(DocumentResource):
     @setup_required

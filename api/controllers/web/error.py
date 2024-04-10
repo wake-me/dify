@@ -37,10 +37,17 @@ class NotChatAppError(BaseHTTPException):
 
 
 class NotWorkflowAppError(BaseHTTPException):
+    """
+    一个用于表示非工作流应用错误的自定义HTTP异常类。
+    
+    属性:
+    error_code (str): 错误代码，用于标识错误类型。
+    description (str): 错误描述，提供关于错误的详细信息。
+    code (int): HTTP状态码，表示异常的HTTP响应状态。
+    """
     error_code = 'not_workflow_app'
     description = "Please check if your Workflow app mode matches the right API route."
     code = 400
-
 
 class ConversationCompletedError(BaseHTTPException):
     """

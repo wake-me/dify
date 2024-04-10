@@ -6,16 +6,17 @@ class WorkflowVariablesConfigManager:
     @classmethod
     def convert(cls, workflow: Workflow) -> list[VariableEntity]:
         """
-        Convert workflow start variables to variables
+        将工作流启动变量转换为变量实体列表
 
-        :param workflow: workflow instance
+        :param workflow: 工作流实例
+        :return: 变量实体列表
         """
         variables = []
 
-        # find start node
+        # 查找起始节点
         user_input_form = workflow.user_input_form()
 
-        # variables
+        # 遍历用户输入表单，创建变量实体列表
         for variable in user_input_form:
             variables.append(VariableEntity(**variable))
 

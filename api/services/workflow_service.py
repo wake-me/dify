@@ -31,52 +31,74 @@ class WorkflowService:
 
     def get_draft_workflow(self, app_model: App) -> Optional[Workflow]:
         """
-        Get draft workflow
+        获取草稿工作流
+        
+        参数:
+        app_model - App模型对象，用于查询对应的工作流草稿版本。
+        
+        返回值:
+        Workflow的Optional类型，如果找到对应草稿工作流则返回Workflow对象，否则返回None。
         """
-        # fetch draft workflow by app_model
+        # 根据应用模型查询草稿版本的工作流
         workflow = db.session.query(Workflow).filter(
             Workflow.tenant_id == app_model.tenant_id,
             Workflow.app_id == app_model.id,
             Workflow.version == 'draft'
         ).first()
 
-        # return draft workflow
+        # 返回查询到的草稿工作流
         return workflow
 
     def get_published_workflow(self, app_model: App) -> Optional[Workflow]:
         """
-        Get published workflow
+        获取发布的 workflow
+
+        参数:
+        app_model: App - 应用模型对象，包含应用的相关信息，例如 workflow_id。
+
+        返回值:
+        Optional[Workflow] - 如果找到对应的已发布 workflow，则返回 Workflow 对象；如果未找到或 app_model 中没有 workflow_id，则返回 None。
         """
 
         if not app_model.workflow_id:
-            return None
+            return None  # 如果 app_model 没有 workflow_id，直接返回 None
 
-        # fetch published workflow by workflow_id
+        # 根据 workflow_id 查询数据库，获取对应的已发布 workflow
         workflow = db.session.query(Workflow).filter(
-            Workflow.tenant_id == app_model.tenant_id,
-            Workflow.app_id == app_model.id,
-            Workflow.id == app_model.workflow_id
+            Workflow.tenant_id == app_model.tenant_id,  # 租户 ID 匹配
+            Workflow.app_id == app_model.id,  # 应用 ID 匹配
+            Workflow.id == app_model.workflow_id  # workflow ID 匹配
         ).first()
 
-        return workflow
+        return workflow  # 返回查询结果，可能是 Workflow 对象或 None
 
     def sync_draft_workflow(self, app_model: App,
                             graph: dict,
                             features: dict,
                             account: Account) -> Workflow:
         """
-        Sync draft workflow
+        同步草稿工作流
+        
+        参数:
+        - app_model: App 类型，代表一个应用模型，用于获取应用相关信息。
+        - graph: 字典类型，代表工作流的图表结构。
+        - features: 字典类型，代表应用的功能特性配置。
+        - account: Account 类型，代表进行操作的账户信息。
+        
+        返回值:
+        - Workflow: 返回一个工作流实例。
         """
-        # fetch draft workflow by app_model
+        
+        # 根据 app_model 获取草稿工作流
         workflow = self.get_draft_workflow(app_model=app_model)
 
-        # validate features structure
+        # 验证 features 结构的合法性
         self.validate_features_structure(
             app_model=app_model,
             features=features
         )
 
-        # create draft workflow if not found
+        # 如果未找到草稿工作流，则创建新的草稿工作流
         if not workflow:
             workflow = Workflow(
                 tenant_id=app_model.tenant_id,
@@ -88,37 +110,44 @@ class WorkflowService:
                 created_by=account.id
             )
             db.session.add(workflow)
-        # update draft workflow if found
+        # 如果找到草稿工作流，则更新其信息
         else:
             workflow.graph = json.dumps(graph)
             workflow.features = json.dumps(features)
             workflow.updated_by = account.id
             workflow.updated_at = datetime.utcnow()
 
-        # commit db session changes
+        # 提交数据库会话更改
         db.session.commit()
 
-        # return draft workflow
+        # 返回草稿工作流实例
         return workflow
 
     def publish_workflow(self, app_model: App,
                          account: Account,
                          draft_workflow: Optional[Workflow] = None) -> Workflow:
         """
-        Publish workflow from draft
+        从草稿发布工作流
 
-        :param app_model: App instance
-        :param account: Account instance
-        :param draft_workflow: Workflow instance
+        :param app_model: App实例
+        :param account: Account实例
+        :param draft_workflow: 工作流实例，可选参数，默认为None
+        :return: 发布后的工作流实例
+
+        此函数的目的是将草稿工作流发布为正式工作流。它首先检查提供的草稿工作流，
+        如果未提供则通过app_model获取草稿工作流。然后，基于提供的草稿工作流信息，
+        创建一个新的工作流实例并将其保存到数据库。最后，更新app_model的工作流ID，
+        触发相关应用工作流事件，并返回新发布的工作流实例。
         """
         if not draft_workflow:
-            # fetch draft workflow by app_model
+            # 如果未提供草稿工作流，则尝试根据app_model获取草稿工作流
             draft_workflow = self.get_draft_workflow(app_model=app_model)
 
         if not draft_workflow:
+            # 如果无法获取有效的草稿工作流，则抛出异常
             raise ValueError('No valid workflow found.')
 
-        # create new workflow
+        # 创建新的工作流实例
         workflow = Workflow(
             tenant_id=app_model.tenant_id,
             app_id=app_model.id,
@@ -129,38 +158,46 @@ class WorkflowService:
             created_by=account.id
         )
 
-        # commit db session changes
+        # 将新工作流实例添加到数据库并提交更改
         db.session.add(workflow)
         db.session.flush()
         db.session.commit()
 
+        # 更新app_model的工作流ID并提交更改
         app_model.workflow_id = workflow.id
         db.session.commit()
 
-        # trigger app workflow events
+        # 触发应用工作流更新事件
         app_published_workflow_was_updated.send(app_model, published_workflow=workflow)
 
-        # return new workflow
+        # 返回新发布的工作流实例
         return workflow
 
     def get_default_block_configs(self) -> list[dict]:
         """
-        Get default block configs
+        获取默认的区块配置列表
+        
+        该方法不接受任何参数，并返回一个包含默认区块配置的列表。
+        
+        返回值:
+            list[dict]: 默认区块配置的列表，每个配置以字典形式存储。
         """
-        # return default block config
+        # 创建WorkflowEngineManager实例以获取默认配置
         workflow_engine_manager = WorkflowEngineManager()
+        # 返回默认配置列表
         return workflow_engine_manager.get_default_configs()
 
     def get_default_block_config(self, node_type: str, filters: Optional[dict] = None) -> Optional[dict]:
         """
-        Get default config of node.
-        :param node_type: node type
-        :param filters: filter by node config parameters.
-        :return:
+        获取节点的默认配置。
+        :param node_type: 节点类型
+        :param filters: 根据节点配置参数进行过滤的条件
+        :return: 返回符合条件的节点默认配置，如果找不到则返回None
         """
+        # 将字符串类型的节点类型转换为对应的枚举类型
         node_type = NodeType.value_of(node_type)
 
-        # return default block config
+        # 通过工作流引擎管理器获取默认配置
         workflow_engine_manager = WorkflowEngineManager()
         return workflow_engine_manager.get_default_config(node_type, filters)
 
@@ -169,18 +206,28 @@ class WorkflowService:
                                 user_inputs: dict,
                                 account: Account) -> WorkflowNodeExecution:
         """
-        Run draft workflow node
+        执行草稿工作流节点
+
+        参数:
+        app_model: App - 应用模型，用于确定要执行的工作流草稿。
+        node_id: str - 需要执行的工作流节点的ID。
+        user_inputs: dict - 用户提供的输入，供工作流节点执行时使用。
+        account: Account - 执行工作流节点的账户信息。
+
+        返回值:
+        WorkflowNodeExecution - 工作流节点执行的结果。
         """
-        # fetch draft workflow by app_model
+        # 根据应用模型获取草稿工作流
         draft_workflow = self.get_draft_workflow(app_model=app_model)
         if not draft_workflow:
             raise ValueError('Workflow not initialized')
 
-        # run draft workflow node
+        # 初始化工作流引擎管理器并开始执行节点
         workflow_engine_manager = WorkflowEngineManager()
         start_at = time.perf_counter()
 
         try:
+            # 执行单个步骤的工作流节点
             node_instance, node_run_result = workflow_engine_manager.single_step_run_workflow_node(
                 workflow=draft_workflow,
                 node_id=node_id,
@@ -188,6 +235,7 @@ class WorkflowService:
                 user_id=account.id,
             )
         except WorkflowNodeRunFailedError as e:
+            # 如果节点执行失败，记录失败信息
             workflow_node_execution = WorkflowNodeExecution(
                 tenant_id=app_model.tenant_id,
                 app_id=app_model.id,
@@ -210,8 +258,8 @@ class WorkflowService:
 
             return workflow_node_execution
 
+        # 根据节点执行结果，创建并返回工作流节点执行记录
         if node_run_result.status == WorkflowNodeExecutionStatus.SUCCEEDED:
-            # create workflow node execution
             workflow_node_execution = WorkflowNodeExecution(
                 tenant_id=app_model.tenant_id,
                 app_id=app_model.id,
@@ -234,7 +282,7 @@ class WorkflowService:
                 finished_at=datetime.utcnow()
             )
         else:
-            # create workflow node execution
+            # 如果节点执行未成功，记录失败信息
             workflow_node_execution = WorkflowNodeExecution(
                 tenant_id=app_model.tenant_id,
                 app_id=app_model.id,
@@ -260,21 +308,22 @@ class WorkflowService:
 
     def convert_to_workflow(self, app_model: App, account: Account, args: dict) -> App:
         """
-        Basic mode of chatbot app(expert mode) to workflow
-        Completion App to Workflow App
+        将聊天机器人应用（专家模式）转换为工作流应用
+        完成从App到Workflow App的转换
 
-        :param app_model: App instance
-        :param account: Account instance
-        :param args: dict
-        :return:
+        :param app_model: App实例
+        :param account: Account实例
+        :param args: 包含转换所需参数的字典
+        :return: 转换后的工作流应用实例
         """
-        # chatbot convert to workflow mode
+        # 初始化工作流转换器
         workflow_converter = WorkflowConverter()
 
+        # 检查当前应用模式是否支持转换为工作流
         if app_model.mode not in [AppMode.CHAT.value, AppMode.COMPLETION.value]:
-            raise ValueError(f'Current App mode: {app_model.mode} is not supported convert to workflow.')
+            raise ValueError(f'当前应用模式: {app_model.mode} 不支持转换为工作流。')
 
-        # convert to workflow
+        # 执行转换操作
         new_app = workflow_converter.convert_to_workflow(
             app_model=app_model,
             account=account,
@@ -286,17 +335,33 @@ class WorkflowService:
         return new_app
 
     def validate_features_structure(self, app_model: App, features: dict) -> dict:
+        """
+        根据应用模型(app_model)的模式，验证特性(features)的结构是否合法。
+        
+        参数:
+        - app_model: App 类型，代表一个应用模型，用于确定应用的运行模式。
+        - features: dict 类型，代表需要验证结构的特性字典。
+        
+        返回:
+        - 验证结果的字典，包含验证的详细信息。
+        
+        异常:
+        - 如果应用模式无效，将抛出 ValueError。
+        """
         if app_model.mode == AppMode.ADVANCED_CHAT.value:
+            # 在高级聊天模式下，使用 AdvancedChatAppConfigManager 进行配置验证
             return AdvancedChatAppConfigManager.config_validate(
                 tenant_id=app_model.tenant_id,
                 config=features,
                 only_structure_validate=True
             )
         elif app_model.mode == AppMode.WORKFLOW.value:
+            # 在工作流模式下，使用 WorkflowAppConfigManager 进行配置验证
             return WorkflowAppConfigManager.config_validate(
                 tenant_id=app_model.tenant_id,
                 config=features,
                 only_structure_validate=True
             )
         else:
+            # 如果应用模式既不是高级聊天也不是工作流，则认为模式无效，抛出异常
             raise ValueError(f"Invalid app mode: {app_model.mode}")

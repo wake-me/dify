@@ -26,18 +26,24 @@ logger = logging.getLogger(__name__)
 class WorkflowRunApi(WebApiResource):
     def post(self, app_model: App, end_user: EndUser):
         """
-        Run workflow
+        执行工作流
+        :param app_model: 应用模型，代表一个具体的应用配置。
+        :param end_user: 终端用户，标识执行工作流的用户。
+        :return: 返回工作流执行的响应信息。
         """
+        # 检查应用模式是否为工作流模式
         app_mode = AppMode.value_of(app_model.mode)
         if app_mode != AppMode.WORKFLOW:
             raise NotWorkflowAppError()
 
+        # 解析请求参数
         parser = reqparse.RequestParser()
         parser.add_argument('inputs', type=dict, required=True, nullable=False, location='json')
         parser.add_argument('files', type=list, required=False, location='json')
         args = parser.parse_args()
 
         try:
+            # 生成工作流执行响应
             response = AppGenerateService.generate(
                 app_model=app_model,
                 user=end_user,
@@ -65,12 +71,18 @@ class WorkflowRunApi(WebApiResource):
 class WorkflowTaskStopApi(WebApiResource):
     def post(self, app_model: App, end_user: EndUser, task_id: str):
         """
-        Stop workflow task
+        停止工作流任务
+        :param app_model: 应用模型，代表一个具体的应用配置。
+        :param end_user: 终端用户，标识请求停止任务的用户。
+        :param task_id: 任务ID，标识需要停止的工作流任务。
+        :return: 返回停止任务的响应信息。
         """
+        # 检查应用模式是否为工作流模式
         app_mode = AppMode.value_of(app_model.mode)
         if app_mode != AppMode.WORKFLOW:
             raise NotWorkflowAppError()
 
+        # 设置任务停止标志
         AppQueueManager.set_stop_flag(task_id, InvokeFrom.WEB_APP, end_user.id)
 
         return {

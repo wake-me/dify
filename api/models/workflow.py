@@ -11,39 +11,40 @@ from models.account import Account
 
 class CreatedByRole(Enum):
     """
-    Created By Role Enum
+    Created By Role 枚举类，定义了创建者角色的枚举值。
     """
-    ACCOUNT = 'account'
-    END_USER = 'end_user'
+    ACCOUNT = 'account'  # 代表账户创建
+    END_USER = 'end_user'  # 代表最终用户创建
 
     @classmethod
     def value_of(cls, value: str) -> 'CreatedByRole':
         """
-        Get value of given mode.
+        根据给定的字符串值获取对应的 CreatedByRole 枚举实例。
 
-        :param value: mode value
-        :return: mode
+        :param value: 字符串值，期望是 ACCOUNT 或 END_USER 中的一个。
+        :return: 返回与给定值匹配的 CreatedByRole 枚举实例。
         """
         for mode in cls:
             if mode.value == value:
                 return mode
+        # 如果给定的值不在枚举定义范围内，则抛出异常
         raise ValueError(f'invalid created by role value {value}')
 
 
 class WorkflowType(Enum):
     """
-    Workflow Type Enum
+    工作流类型枚举
     """
-    WORKFLOW = 'workflow'
-    CHAT = 'chat'
+    WORKFLOW = 'workflow'  # 表示工作流类型
+    CHAT = 'chat'  # 表示聊天类型
 
     @classmethod
     def value_of(cls, value: str) -> 'WorkflowType':
         """
-        Get value of given mode.
+        根据给定的值获取工作流类型。
 
-        :param value: mode value
-        :return: mode
+        :param value: 工作流类型的值
+        :return: 对应的工作流类型枚举实例
         """
         for mode in cls:
             if mode.value == value:
@@ -53,47 +54,43 @@ class WorkflowType(Enum):
     @classmethod
     def from_app_mode(cls, app_mode: Union[str, 'AppMode']) -> 'WorkflowType':
         """
-        Get workflow type from app mode.
+        根据应用模式获取对应的工作流类型。
 
-        :param app_mode: app mode
-        :return: workflow type
+        :param app_mode: 应用模式，可以是字符串或AppMode枚举实例
+        :return: 对应的工作流类型枚举实例
         """
-        from models.model import AppMode
-        app_mode = app_mode if isinstance(app_mode, AppMode) else AppMode.value_of(app_mode)
-        return cls.WORKFLOW if app_mode == AppMode.WORKFLOW else cls.CHAT
-
+        from models.model import AppMode  # 导入AppMode枚举
+        app_mode = app_mode if isinstance(app_mode, AppMode) else AppMode.value_of(app_mode)  # 确保app_mode是AppMode实例
+        return cls.WORKFLOW if app_mode == AppMode.WORKFLOW else cls.CHAT  # 根据应用模式返回对应的工作流类型
 
 class Workflow(db.Model):
     """
-    Workflow, for `Workflow App` and `Chat App workflow mode`.
+    Workflow 类，用于Workflow App和Chat App workflow模式。
 
-    Attributes:
+    属性:
+    - id (uuid): 工作流ID，主键。
+    - tenant_id (uuid): 工作空间ID。
+    - app_id (uuid): 应用ID。
+    - type (string): 工作流类型。
 
-    - id (uuid) Workflow ID, pk
-    - tenant_id (uuid) Workspace ID
-    - app_id (uuid) App ID
-    - type (string) Workflow type
+        'workflow' 代表Workflow App。
 
-        `workflow` for `Workflow App`
+        'chat' 代表Chat App workflow模式。
 
-        `chat` for `Chat App workflow mode`
+    - version (string): 版本号。
 
-    - version (string) Version
+        'draft' 代表草稿版本（每个应用仅有一个），其他为版本号（冗余）。
 
-        `draft` for draft version (only one for each app), other for version number (redundant)
+    - graph (text): 工作流画布配置（JSON）。
 
-    - graph (text) Workflow canvas configuration (JSON)
+        包括Node、Edge等整个画布配置的JSON。
+        - nodes (array[object]): 节点列表，参见 Node Schema。
+        - edges (array[object]): 边列表，参见 Edge Schema。
 
-        The entire canvas configuration JSON, including Node, Edge, and other configurations
-
-        - nodes (array[object]) Node list, see Node Schema
-
-        - edges (array[object]) Edge list, see Edge Schema
-
-    - created_by (uuid) Creator ID
-    - created_at (timestamp) Creation time
-    - updated_by (uuid) `optional` Last updater ID
-    - updated_at (timestamp) `optional` Last update time
+    - created_by (uuid): 创建者ID。
+    - created_at (timestamp): 创建时间。
+    - updated_by (uuid): `可选` 最后更新者ID。
+    - updated_at (timestamp): `可选` 最后更新时间。
     """
 
     __tablename__ = 'workflows'
@@ -116,22 +113,55 @@ class Workflow(db.Model):
 
     @property
     def created_by_account(self):
+        """
+        获取创建者账号信息。
+
+        返回:
+        - Account对象: 创建该工作流的账户信息。
+        """
         return Account.query.get(self.created_by)
 
     @property
     def updated_by_account(self):
+        """
+        获取最后更新者账号信息，如果未更新则返回None。
+
+        返回:
+        - Account对象或None: 最后更新该工作流的账户信息，如果未更新则为None。
+        """
         return Account.query.get(self.updated_by) if self.updated_by else None
 
     @property
     def graph_dict(self):
+        """
+        将graph字段从JSON字符串转换为字典。
+
+        返回:
+        - dict或None: graph字段的JSON解析结果，如果graph为空则为None。
+        """
         return json.loads(self.graph) if self.graph else None
 
     @property
     def features_dict(self):
+        """
+        将features字段从JSON字符串转换为字典。
+
+        返回:
+        - dict: features字段的JSON解析结果，如果features为空则为空字典。
+        """
         return json.loads(self.features) if self.features else {}
 
     def user_input_form(self, to_old_structure: bool = False) -> list:
-        # get start node from graph
+        """
+        根据工作流图生成用户输入表单。
+
+        参数:
+        - to_old_structure (bool): 是否将表单结构转换为旧版格式，默认为False。
+
+        返回:
+        - list: 用户输入表单的结构，可能是旧版或新版格式。
+        """
+        # 从graph中获取开始节点
         if not self.graph:
             return []
 
@@ -143,7 +173,7 @@ class Workflow(db.Model):
         if not start_node:
             return []
 
-        # get user_input_form from start node
+        # 从开始节点获取user_input_form
         variables = start_node.get('data', {}).get('variables', [])
 
         if to_old_structure:
@@ -159,84 +189,86 @@ class Workflow(db.Model):
 
 class WorkflowRunTriggeredFrom(Enum):
     """
-    Workflow Run Triggered From Enum
+    Workflow Run Triggered From 枚举类
+    用于定义工作流运行的触发来源
     """
-    DEBUGGING = 'debugging'
-    APP_RUN = 'app-run'
+    DEBUGGING = 'debugging'  # 来源于调试
+    APP_RUN = 'app-run'  # 来源于应用运行
 
     @classmethod
     def value_of(cls, value: str) -> 'WorkflowRunTriggeredFrom':
         """
-        Get value of given mode.
+        根据给定的值获取枚举实例。
 
-        :param value: mode value
-        :return: mode
+        :param value: 指定的触发来源字符串
+        :return: 对应的枚举实例
         """
         for mode in cls:
             if mode.value == value:
                 return mode
+        # 如果给定的值不在枚举范围内，则抛出异常
         raise ValueError(f'invalid workflow run triggered from value {value}')
-
 
 class WorkflowRunStatus(Enum):
     """
-    Workflow Run Status Enum
+    工作流运行状态枚举
+
+    描述工作流可能的运行状态，包括运行中、成功、失败和已停止。
     """
-    RUNNING = 'running'
-    SUCCEEDED = 'succeeded'
-    FAILED = 'failed'
-    STOPPED = 'stopped'
+    RUNNING = 'running'    # 工作流正在运行
+    SUCCEEDED = 'succeeded'  # 工作流运行成功
+    FAILED = 'failed'      # 工作流运行失败
+    STOPPED = 'stopped'    # 工作流已停止
 
     @classmethod
     def value_of(cls, value: str) -> 'WorkflowRunStatus':
         """
-        Get value of given mode.
+        根据给定的字符串值获取相应的枚举实例。
 
-        :param value: mode value
-        :return: mode
+        :param value: 字符串值，代表想要获取的枚举实例的状态值。
+        :return: 返回与给定状态值相匹配的枚举实例。
         """
         for mode in cls:
             if mode.value == value:
                 return mode
+        # 如果给定的状态值在枚举中不存在，则抛出异常
         raise ValueError(f'invalid workflow run status value {value}')
-
 
 class WorkflowRun(db.Model):
     """
-    Workflow Run
+    工作流执行
 
-    Attributes:
+    属性:
+    - id (uuid) 执行ID
+    - tenant_id (uuid) 工作空间ID
+    - app_id (uuid) 应用ID
+    - sequence_number (int) 自增序列号，从1开始，在应用内部递增
+    - workflow_id (uuid) 工作流ID
+    - type (string) 工作流类型
+    - triggered_from (string) 触发源
 
-    - id (uuid) Run ID
-    - tenant_id (uuid) Workspace ID
-    - app_id (uuid) App ID
-    - sequence_number (int) Auto-increment sequence number, incremented within the App, starting from 1
-    - workflow_id (uuid) Workflow ID
-    - type (string) Workflow type
-    - triggered_from (string) Trigger source
+        `debugging`：画布调试触发
 
-        `debugging` for canvas debugging
+        `app-run`：（已发布）应用执行触发
 
-        `app-run` for (published) app execution
+    - version (string) 版本
+    - graph (text) 工作流画布配置（JSON格式）
+    - inputs (text) 输入参数
+    - status (string) 执行状态，`running` / `succeeded` / `failed` / `stopped`
+    - outputs (text) `可选` 输出内容
+    - error (string) `可选` 错误原因
+    - elapsed_time (float) `可选` 耗时（秒）
+    - total_tokens (int) `可选` 总共使用的令牌数
+    - total_steps (int) 总步骤数（冗余，默认为0）
+    - created_by_role (string) 创建者角色
 
-    - version (string) Version
-    - graph (text) Workflow canvas configuration (JSON)
-    - inputs (text) Input parameters
-    - status (string) Execution status, `running` / `succeeded` / `failed` / `stopped`
-    - outputs (text) `optional` Output content
-    - error (string) `optional` Error reason
-    - elapsed_time (float) `optional` Time consumption (s)
-    - total_tokens (int) `optional` Total tokens used
-    - total_steps (int) Total steps (redundant), default 0
-    - created_by_role (string) Creator role
+        - `account`：控制台账户
 
-        - `account` Console account
+        - `end_user`：终端用户
 
-        - `end_user` End user
-
-    - created_by (uuid) Runner ID
-    - created_at (timestamp) Run time
-    - finished_at (timestamp) End time
+    - created_by (uuid) 创建者ID
+    - created_at (timestamp) 创建时间
+    - finished_at (timestamp) 完成时间
     """
 
     __tablename__ = 'workflow_runs'
@@ -245,6 +277,7 @@ class WorkflowRun(db.Model):
         db.Index('workflow_run_triggerd_from_idx', 'tenant_id', 'app_id', 'triggered_from'),
     )
 
+    # 数据库表字段定义
     id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
     tenant_id = db.Column(UUID, nullable=False)
     app_id = db.Column(UUID, nullable=False)
@@ -268,12 +301,22 @@ class WorkflowRun(db.Model):
 
     @property
     def created_by_account(self):
+        """
+        获取创建者是账户的情况
+        返回值:
+            如果创建者角色为账户，则返回Account对象；否则返回None。
+        """
         created_by_role = CreatedByRole.value_of(self.created_by_role)
         return Account.query.get(self.created_by) \
             if created_by_role == CreatedByRole.ACCOUNT else None
 
     @property
     def created_by_end_user(self):
+        """
+        获取创建者是终端用户的情况
+        返回值:
+            如果创建者角色为终端用户，则返回EndUser对象；否则返回None。
+        """
         from models.model import EndUser
         created_by_role = CreatedByRole.value_of(self.created_by_role)
         return EndUser.query.get(self.created_by) \
@@ -281,18 +324,38 @@ class WorkflowRun(db.Model):
 
     @property
     def graph_dict(self):
+        """
+        将graph字段转换为字典格式
+        返回值:
+            如果graph字段存在，则返回其JSON解析后的字典；否则返回None。
+        """
         return json.loads(self.graph) if self.graph else None
 
     @property
     def inputs_dict(self):
+        """
+        将inputs字段转换为字典格式
+        返回值:
+            如果inputs字段存在，则返回其JSON解析后的字典；否则返回None。
+        """
         return json.loads(self.inputs) if self.inputs else None
 
     @property
     def outputs_dict(self):
+        """
+        将outputs字段转换为字典格式
+        返回值:
+            如果outputs字段存在，则返回其JSON解析后的字典；否则返回None。
+        """
         return json.loads(self.outputs) if self.outputs else None
 
     @property
     def message(self) -> Optional['Message']:
+        """
+        获取与该工作流执行相关联的消息
+        返回值:
+            返回与之关联的第一条Message对象，如果没有则返回None。
+        """
         from models.model import Message
         return db.session.query(Message).filter(
             Message.app_id == self.app_id,
@@ -301,98 +364,103 @@ class WorkflowRun(db.Model):
 
     @property
     def workflow(self):
+        """
+        获取与该工作流执行相关联的工作流对象
+        返回值:
+            返回与该工作流执行相关联的工作流对象，如果没有找到则返回None。
+        """
         return db.session.query(Workflow).filter(Workflow.id == self.workflow_id).first()
 
 
 class WorkflowNodeExecutionTriggeredFrom(Enum):
     """
-    Workflow Node Execution Triggered From Enum
+    工作流节点执行触发来源枚举
     """
-    SINGLE_STEP = 'single-step'
-    WORKFLOW_RUN = 'workflow-run'
+    SINGLE_STEP = 'single-step'  # 由单步触发
+    WORKFLOW_RUN = 'workflow-run'  # 由工作流运行触发
 
     @classmethod
     def value_of(cls, value: str) -> 'WorkflowNodeExecutionTriggeredFrom':
         """
-        Get value of given mode.
+        根据给定的值获取对应的枚举成员。
 
-        :param value: mode value
-        :return: mode
+        :param value: 枚举成员的值
+        :return: 对应的枚举成员
         """
         for mode in cls:
             if mode.value == value:
                 return mode
+        # 如果给定的值不存在于枚举中，则抛出异常
         raise ValueError(f'invalid workflow node execution triggered from value {value}')
-
 
 class WorkflowNodeExecutionStatus(Enum):
     """
-    Workflow Node Execution Status Enum
+    工作流节点执行状态枚举
     """
-    RUNNING = 'running'
-    SUCCEEDED = 'succeeded'
-    FAILED = 'failed'
+    RUNNING = 'running'    # 执行中
+    SUCCEEDED = 'succeeded'    # 成功
+    FAILED = 'failed'      # 失败
 
     @classmethod
     def value_of(cls, value: str) -> 'WorkflowNodeExecutionStatus':
         """
-        Get value of given mode.
+        根据给定的值获取工作流节点执行状态。
 
-        :param value: mode value
-        :return: mode
+        :param value: 状态值
+        :return: 对应的工作流节点执行状态枚举实例
         """
         for mode in cls:
             if mode.value == value:
                 return mode
+        # 如果给定的值不在枚举中，则抛出异常
         raise ValueError(f'invalid workflow node execution status value {value}')
-
 
 class WorkflowNodeExecution(db.Model):
     """
-    Workflow Node Execution
+    工作流节点执行模型
 
-    - id (uuid) Execution ID
-    - tenant_id (uuid) Workspace ID
-    - app_id (uuid) App ID
-    - workflow_id (uuid) Workflow ID
-    - triggered_from (string) Trigger source
+    - id (uuid) 执行ID
+    - tenant_id (uuid) 工作空间ID
+    - app_id (uuid) 应用ID
+    - workflow_id (uuid) 工作流ID
+    - triggered_from (string) 触发源
 
-        `single-step` for single-step debugging
+        `single-step` 表示单步调试
 
-        `workflow-run` for workflow execution (debugging / user execution)
+        `workflow-run` 表示工作流执行（调试/用户执行）
 
-    - workflow_run_id (uuid) `optional` Workflow run ID
+    - workflow_run_id (uuid) `可选` 工作流运行ID
 
-        Null for single-step debugging.
+        单步调试时为Null。
 
-    - index (int) Execution sequence number, used for displaying Tracing Node order
-    - predecessor_node_id (string) `optional` Predecessor node ID, used for displaying execution path
-    - node_id (string) Node ID
-    - node_type (string) Node type, such as `start`
-    - title (string) Node title
-    - inputs (json) All predecessor node variable content used in the node
-    - process_data (json) Node process data
-    - outputs (json) `optional` Node output variables
-    - status (string) Execution status, `running` / `succeeded` / `failed`
-    - error (string) `optional` Error reason
-    - elapsed_time (float) `optional` Time consumption (s)
-    - execution_metadata (text) Metadata
+    - index (int) 执行序列号，用于显示跟踪节点顺序
+    - predecessor_node_id (string) `可选` 前驱节点ID，用于显示执行路径
+    - node_id (string) 节点ID
+    - node_type (string) 节点类型，如 `start`
+    - title (string) 节点标题
+    - inputs (json) 所有前驱节点变量内容，用于节点使用
+    - process_data (json) 节点处理数据
+    - outputs (json) `可选` 节点输出变量
+    - status (string) 执行状态，`running` / `succeeded` / `failed`
+    - error (string) `可选` 错误原因
+    - elapsed_time (float) `可选` 消耗时间（秒）
+    - execution_metadata (text) 元数据
 
-        - total_tokens (int) `optional` Total tokens used
+        - total_tokens (int) `可选` 总共使用的令牌数
 
-        - total_price (decimal) `optional` Total cost
+        - total_price (decimal) `可选` 总成本
 
-        - currency (string) `optional` Currency, such as USD / RMB
+        - currency (string) `可选` 货币类型，如 USD / RMB
 
-    - created_at (timestamp) Run time
-    - created_by_role (string) Creator role
+    - created_at (timestamp) 运行时间
+    - created_by_role (string) 创建者角色
 
-        - `account` Console account
+        - `account` 控制台账户
 
-        - `end_user` End user
+        - `end_user` 终端用户
 
-    - created_by (uuid) Runner ID
-    - finished_at (timestamp) End time
+    - created_by (uuid) 运行者ID
+    - finished_at (timestamp) 结束时间
     """
 
     __tablename__ = 'workflow_node_executions'
@@ -404,6 +472,7 @@ class WorkflowNodeExecution(db.Model):
                  'triggered_from', 'node_id'),
     )
 
+    # 数据库表字段定义
     id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
     tenant_id = db.Column(UUID, nullable=False)
     app_id = db.Column(UUID, nullable=False)
@@ -429,12 +498,20 @@ class WorkflowNodeExecution(db.Model):
 
     @property
     def created_by_account(self):
+        """
+        获取创建者为账户的信息
+        :return: 账户信息或者None
+        """
         created_by_role = CreatedByRole.value_of(self.created_by_role)
         return Account.query.get(self.created_by) \
             if created_by_role == CreatedByRole.ACCOUNT else None
 
     @property
     def created_by_end_user(self):
+        """
+        获取创建者为终端用户的信息
+        :return: 终端用户信息或者None
+        """
         from models.model import EndUser
         created_by_role = CreatedByRole.value_of(self.created_by_role)
         return EndUser.query.get(self.created_by) \
@@ -442,22 +519,42 @@ class WorkflowNodeExecution(db.Model):
 
     @property
     def inputs_dict(self):
+        """
+        将输入数据转换为字典格式
+        :return: 输入数据的字典表示或者None
+        """
         return json.loads(self.inputs) if self.inputs else None
 
     @property
     def outputs_dict(self):
+        """
+        将输出数据转换为字典格式
+        :return: 输出数据的字典表示或者None
+        """
         return json.loads(self.outputs) if self.outputs else None
 
     @property
     def process_data_dict(self):
+        """
+        将处理数据转换为字典格式
+        :return: 处理数据的字典表示或者None
+        """
         return json.loads(self.process_data) if self.process_data else None
 
     @property
     def execution_metadata_dict(self):
+        """
+        将执行元数据转换为字典格式
+        :return: 执行元数据的字典表示或者None
+        """
         return json.loads(self.execution_metadata) if self.execution_metadata else None
 
     @property
     def extras(self):
+        """
+        获取额外信息，如节点类型为工具时的图标信息
+        :return: 包含额外信息的字典
+        """
         extras = {}
         if self.execution_metadata_dict:
             from core.workflow.entities.node_entities import NodeType
@@ -474,53 +571,55 @@ class WorkflowNodeExecution(db.Model):
 
 class WorkflowAppLogCreatedFrom(Enum):
     """
-    Workflow App Log Created From Enum
+    Workflow App Log Created From 枚举类
+    用于定义工作流应用日志的来源
     """
-    SERVICE_API = 'service-api'
-    WEB_APP = 'web-app'
-    INSTALLED_APP = 'installed-app'
+
+    SERVICE_API = 'service-api'  # 来自服务API
+    WEB_APP = 'web-app'  # 来自Web应用
+    INSTALLED_APP = 'installed-app'  # 来自安装应用
 
     @classmethod
     def value_of(cls, value: str) -> 'WorkflowAppLogCreatedFrom':
         """
-        Get value of given mode.
+        根据给定的值获取枚举实例。
 
-        :param value: mode value
-        :return: mode
+        :param value: 指定的来源值
+        :return: 对应的枚举实例
         """
         for mode in cls:
             if mode.value == value:
                 return mode
+        # 如果给定的值不在枚举中，则抛出异常
         raise ValueError(f'invalid workflow app log created from value {value}')
-
 
 class WorkflowAppLog(db.Model):
     """
-    Workflow App execution log, excluding workflow debugging records.
+    Workflow App执行日志，不包括workflow调试记录。
 
-    Attributes:
-
-    - id (uuid) run ID
-    - tenant_id (uuid) Workspace ID
+    属性:
+    
+    - id (uuid) 运行ID
+    - tenant_id (uuid) 工作空间ID
     - app_id (uuid) App ID
-    - workflow_id (uuid) Associated Workflow ID
-    - workflow_run_id (uuid) Associated Workflow Run ID
-    - created_from (string) Creation source
+    - workflow_id (uuid) 关联的Workflow ID
+    - workflow_run_id (uuid) 关联的Workflow Run ID
+    - created_from (string) 创建来源
 
-        `service-api` App Execution OpenAPI
-
+        `service-api` App执行OpenAPI
+        
         `web-app` WebApp
+        
+        `installed-app` 安装的App
 
-        `installed-app` Installed App
+    - created_by_role (string) 创建者角色
 
-    - created_by_role (string) Creator role
+        - `account` 控制台账户
 
-        - `account` Console account
+        - `end_user` 终端用户
 
-        - `end_user` End user
-
-    - created_by (uuid) Creator ID, depends on the user table according to created_by_role
-    - created_at (timestamp) Creation time
+    - created_by (uuid) 创建者ID，根据created_by_role依赖于用户表
+    - created_at (timestamp) 创建时间
     """
 
     __tablename__ = 'workflow_app_logs'
@@ -541,16 +640,34 @@ class WorkflowAppLog(db.Model):
 
     @property
     def workflow_run(self):
+        """
+        获取关联的Workflow Run实例。
+        
+        返回值:
+        - WorkflowRun对象
+        """
         return WorkflowRun.query.get(self.workflow_run_id)
 
     @property
     def created_by_account(self):
+        """
+        根据创建者角色查询创建者账户。
+        
+        返回值:
+        - 如果创建者是账户，则返回Account对象；否则返回None。
+        """
         created_by_role = CreatedByRole.value_of(self.created_by_role)
         return Account.query.get(self.created_by) \
             if created_by_role == CreatedByRole.ACCOUNT else None
 
     @property
     def created_by_end_user(self):
+        """
+        根据创建者角色查询创建者终端用户。
+        
+        返回值:
+        - 如果创建者是终端用户，则返回EndUser对象；否则返回None。
+        """
         from models.model import EndUser
         created_by_role = CreatedByRole.value_of(self.created_by_role)
         return EndUser.query.get(self.created_by) \

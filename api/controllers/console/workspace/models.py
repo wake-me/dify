@@ -338,17 +338,35 @@ class ModelProviderModelValidateApi(Resource):
 
 
 class ModelProviderModelParameterRuleApi(Resource):
+    """
+    提供模型参数规则的API接口类
+
+    方法:
+    - get: 根据提供者和模型名称获取模型的参数规则
+    """
 
     @setup_required
     @login_required
     @account_initialization_required
     def get(self, provider: str):
+        """
+        获取指定提供者和模型的参数规则
+        
+        参数:
+        - provider: str，模型的提供者名称
+        
+        返回值:
+        - 返回一个包含模型参数规则的JSON响应
+        """
+        # 解析请求参数
         parser = reqparse.RequestParser()
         parser.add_argument('model', type=str, required=True, nullable=False, location='args')
         args = parser.parse_args()
 
+        # 获取当前用户所属的租户ID
         tenant_id = current_user.current_tenant_id
 
+        # 使用模型提供者服务获取模型参数规则
         model_provider_service = ModelProviderService()
         parameter_rules = model_provider_service.get_model_parameter_rules(
             tenant_id=tenant_id,
@@ -356,30 +374,52 @@ class ModelProviderModelParameterRuleApi(Resource):
             model=args['model']
         )
 
+        # 返回参数规则的JSON编码结果
         return jsonable_encoder({
             "data": parameter_rules
         })
 
-
 class ModelProviderAvailableModelApi(Resource):
+    """
+    提供可用模型的API接口类。
+    
+    方法:
+    - get: 根据模型类型获取可用模型的信息。
+    
+    参数:
+    - model_type: 模型的类型，用于筛选模型。
+    
+    返回值:
+    - 返回一个JSON编码的响应，包含模型信息列表。
+    """
 
     @setup_required
     @login_required
     @account_initialization_required
     def get(self, model_type):
+        """
+        根据模型类型获取当前用户可用的模型信息。
+        
+        参数:
+        - model_type: 模型的类型，用于查询特定类型的模型。
+        
+        返回值:
+        - 返回一个包含模型信息的JSON响应。
+        """
+        # 获取当前用户的租户ID
         tenant_id = current_user.current_tenant_id
 
+        # 实例化模型提供者服务，并查询指定类型和租户ID的模型
         model_provider_service = ModelProviderService()
         models = model_provider_service.get_models_by_model_type(
             tenant_id=tenant_id,
             model_type=model_type
         )
 
+        # 返回编码后的模型信息
         return jsonable_encoder({
             "data": models
         })
-
-
 api.add_resource(ModelProviderModelApi, '/workspaces/current/model-providers/<string:provider>/models')
 api.add_resource(ModelProviderModelCredentialApi,
                  '/workspaces/current/model-providers/<string:provider>/models/credentials')

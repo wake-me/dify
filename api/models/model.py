@@ -37,26 +37,27 @@ class DifySetup(db.Model):
 
 
 class AppMode(Enum):
-    COMPLETION = 'completion'
-    WORKFLOW = 'workflow'
-    CHAT = 'chat'
-    ADVANCED_CHAT = 'advanced-chat'
-    AGENT_CHAT = 'agent-chat'
-    CHANNEL = 'channel'
+    # 应用模式枚举类
+    COMPLETION = 'completion'  # 生成模式
+    WORKFLOW = 'workflow'  # 工作流模式
+    CHAT = 'chat'  # 聊天模式
+    ADVANCED_CHAT = 'advanced-chat'  # 高级聊天模式
+    AGENT_CHAT = 'agent-chat'  # 代理聊天模式
+    CHANNEL = 'channel'  # 频道模式
 
     @classmethod
     def value_of(cls, value: str) -> 'AppMode':
         """
-        Get value of given mode.
+        根据字符串值获取对应的应用模式枚举实例。
 
-        :param value: mode value
-        :return: mode
+        :param value: 模式对应的字符串值。
+        :return: 对应的AppMode枚举实例。
         """
         for mode in cls:
             if mode.value == value:
                 return mode
+        # 如果传入的值没有对应的枚举实例，则抛出异常
         raise ValueError(f'invalid mode value {value}')
-
 
 class App(db.Model):
     """
@@ -140,15 +141,36 @@ class App(db.Model):
 
     @property
     def app_model_config(self) -> Optional['AppModelConfig']:
+        """
+        获取应用模型配置。
+        
+        通过app_model_config_id来查询数据库，尝试获取对应的AppModelConfig对象。
+        如果app_model_config_id存在，则返回查询到的第一个对象；否则，返回None。
+        
+        返回值:
+            Optional['AppModelConfig']: AppModelConfig对象，如果未查询到则为None。
+        """
         if self.app_model_config_id:
+            # 根据id查询AppModelConfig对象
             return db.session.query(AppModelConfig).filter(AppModelConfig.id == self.app_model_config_id).first()
 
         return None
 
     @property
     def workflow(self):
+        """
+        获取工作流。
+        
+        通过workflow_id来查询数据库，尝试获取对应的工作流Workflow对象。
+        如果workflow_id存在，则返回查询到的第一个Workflow对象；否则，返回None。
+        
+        返回值:
+            Optional[Workflow]: Workflow对象，如果未查询到则为None。
+        """
         if self.workflow_id:
+            # 从workflow模块导入Workflow类
             from .workflow import Workflow
+            # 根据id查询Workflow对象
             return db.session.query(Workflow).filter(Workflow.id == self.workflow_id).first()
 
         return None

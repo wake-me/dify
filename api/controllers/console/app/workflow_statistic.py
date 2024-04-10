@@ -18,18 +18,32 @@ from models.workflow import WorkflowRunTriggeredFrom
 
 
 class WorkflowDailyRunsStatistic(Resource):
+    """
+    提供每日工作流运行统计信息的资源类。
+    
+    要求用户登录、账户初始化且应用模型已设置。提供通过日期范围查询指定应用的工作流运行次数的功能。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     @get_app_model
     def get(self, app_model):
-        account = current_user
+        """
+        查询并返回指定应用的每日工作流运行统计信息。
+        
+        :param app_model: 应用模型实例，用于确定要查询的工作流所属的应用。
+        :return: 包含每日工作流运行次数的统计信息的JSON响应。
+        """
+        account = current_user  # 当前登录的用户
 
+        # 解析请求参数：开始和结束日期
         parser = reqparse.RequestParser()
         parser.add_argument('start', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
         parser.add_argument('end', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
         args = parser.parse_args()
 
+        # 构建SQL查询语句
         sql_query = '''
         SELECT date(DATE_TRUNC('day', created_at AT TIME ZONE 'UTC' AT TIME ZONE :tz )) AS date, count(id) AS runs
             FROM workflow_runs 
@@ -38,9 +52,11 @@ class WorkflowDailyRunsStatistic(Resource):
         '''
         arg_dict = {'tz': account.timezone, 'app_id': app_model.id, 'triggered_from': WorkflowRunTriggeredFrom.APP_RUN.value}
 
+        # 处理时区转换
         timezone = pytz.timezone(account.timezone)
         utc_timezone = pytz.utc
 
+        # 如果提供了开始日期，添加到SQL查询中
         if args['start']:
             start_datetime = datetime.strptime(args['start'], '%Y-%m-%d %H:%M')
             start_datetime = start_datetime.replace(second=0)
@@ -51,6 +67,7 @@ class WorkflowDailyRunsStatistic(Resource):
             sql_query += ' and created_at >= :start'
             arg_dict['start'] = start_datetime_utc
 
+        # 如果提供了结束日期，添加到SQL查询中
         if args['end']:
             end_datetime = datetime.strptime(args['end'], '%Y-%m-%d %H:%M')
             end_datetime = end_datetime.replace(second=0)
@@ -63,6 +80,7 @@ class WorkflowDailyRunsStatistic(Resource):
 
         sql_query += ' GROUP BY date order by date'
 
+        # 执行查询并将结果格式化为响应数据
         response_data = []
 
         with db.engine.begin() as conn:
@@ -73,23 +91,44 @@ class WorkflowDailyRunsStatistic(Resource):
                     'runs': i.runs
                 })
 
+        # 返回JSON格式的统计信息
         return jsonify({
             'data': response_data
         })
 
 class WorkflowDailyTerminalsStatistic(Resource):
+    """
+    日常工作流终端统计信息资源类。
+
+    该类提供了通过API获取日常工作流终端统计信息的功能。
+    需要用户登录、账户初始化、应用模型选定以及设置。
+    """
+
     @setup_required
     @login_required
     @account_initialization_required
     @get_app_model
     def get(self, app_model):
+        """
+        获取指定应用模型的日常工作流终端统计信息。
+
+        参数:
+        - app_model: 应用模型对象，用于确定统计信息的应用范围。
+
+        返回值:
+        - 统计信息的JSON响应，包含每日的终端数量。
+        """
+
+        # 当前登录的用户账户
         account = current_user
 
+        # 解析请求参数：开始和结束时间
         parser = reqparse.RequestParser()
         parser.add_argument('start', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
         parser.add_argument('end', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
         args = parser.parse_args()
 
+        # 构建SQL查询语句
         sql_query = '''
                 SELECT date(DATE_TRUNC('day', created_at AT TIME ZONE 'UTC' AT TIME ZONE :tz )) AS date, count(distinct workflow_runs.created_by) AS terminal_count
                     FROM workflow_runs 
@@ -98,9 +137,11 @@ class WorkflowDailyTerminalsStatistic(Resource):
                 '''
         arg_dict = {'tz': account.timezone, 'app_id': app_model.id, 'triggered_from': WorkflowRunTriggeredFrom.APP_RUN.value}
 
+        # 处理时区转换
         timezone = pytz.timezone(account.timezone)
         utc_timezone = pytz.utc
 
+        # 如果提供了开始时间，则添加到SQL查询中
         if args['start']:
             start_datetime = datetime.strptime(args['start'], '%Y-%m-%d %H:%M')
             start_datetime = start_datetime.replace(second=0)
@@ -111,6 +152,7 @@ class WorkflowDailyTerminalsStatistic(Resource):
             sql_query += ' and created_at >= :start'
             arg_dict['start'] = start_datetime_utc
 
+        # 如果提供了结束时间，则添加到SQL查询中
         if args['end']:
             end_datetime = datetime.strptime(args['end'], '%Y-%m-%d %H:%M')
             end_datetime = end_datetime.replace(second=0)
@@ -121,6 +163,7 @@ class WorkflowDailyTerminalsStatistic(Resource):
             sql_query += ' and created_at < :end'
             arg_dict['end'] = end_datetime_utc
 
+        # 完善查询语句并执行查询
         sql_query += ' GROUP BY date order by date'
 
         response_data = []
@@ -133,23 +176,42 @@ class WorkflowDailyTerminalsStatistic(Resource):
                     'terminal_count': i.terminal_count
                 })
 
+        # 构建并返回响应
         return jsonify({
             'data': response_data
         })
 
 class WorkflowDailyTokenCostStatistic(Resource):
+    """
+    日工作流令牌消耗统计资源类，提供获取指定应用的日工作流令牌消耗统计数据。
+
+    方法:
+    - get: 获取指定应用的日工作流令牌消耗统计数据。
+    """
+
     @setup_required
     @login_required
     @account_initialization_required
     @get_app_model
     def get(self, app_model):
-        account = current_user
+        """
+        获取指定应用的日工作流令牌消耗统计数据。
 
+        参数:
+        - app_model: 应用模型实例，代表当前请求的应用。
+
+        返回值:
+        - 包含日工作流令牌消耗统计数据的JSON响应。
+        """
+        account = current_user  # 当前用户账号
+
+        # 解析请求参数：开始和结束时间
         parser = reqparse.RequestParser()
         parser.add_argument('start', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
         parser.add_argument('end', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
         args = parser.parse_args()
 
+        # 构建SQL查询语句
         sql_query = '''
                 SELECT 
                     date(DATE_TRUNC('day', created_at AT TIME ZONE 'UTC' AT TIME ZONE :tz )) AS date, 
@@ -160,9 +222,11 @@ class WorkflowDailyTokenCostStatistic(Resource):
                 '''
         arg_dict = {'tz': account.timezone, 'app_id': app_model.id, 'triggered_from': WorkflowRunTriggeredFrom.APP_RUN.value}
 
+        # 处理时区转换
         timezone = pytz.timezone(account.timezone)
         utc_timezone = pytz.utc
 
+        # 如果指定了开始时间，添加到SQL查询条件中
         if args['start']:
             start_datetime = datetime.strptime(args['start'], '%Y-%m-%d %H:%M')
             start_datetime = start_datetime.replace(second=0)
@@ -173,6 +237,7 @@ class WorkflowDailyTokenCostStatistic(Resource):
             sql_query += ' and created_at >= :start'
             arg_dict['start'] = start_datetime_utc
 
+        # 如果指定了结束时间，添加到SQL查询条件中
         if args['end']:
             end_datetime = datetime.strptime(args['end'], '%Y-%m-%d %H:%M')
             end_datetime = end_datetime.replace(second=0)
@@ -183,6 +248,7 @@ class WorkflowDailyTokenCostStatistic(Resource):
             sql_query += ' and created_at < :end'
             arg_dict['end'] = end_datetime_utc
 
+        # 执行SQL查询并构建响应数据
         sql_query += ' GROUP BY date order by date'
 
         response_data = []
@@ -195,23 +261,44 @@ class WorkflowDailyTokenCostStatistic(Resource):
                     'token_count': i.token_count,
                 })
 
+        # 返回JSON响应
         return jsonify({
             'data': response_data
         })
 
 class WorkflowAverageAppInteractionStatistic(Resource):
+    """
+    工作流平均应用交互统计
+
+    资源类，用于提供工作流应用交互的平均统计信息。
+    需要用户登录、账户初始化并且应用必须处于工作流模式。
+    """
+
     @setup_required
     @login_required
     @account_initialization_required
     @get_app_model(mode=[AppMode.WORKFLOW])
     def get(self, app_model):
+        """
+        获取指定应用的工作流平均交互统计数据
+
+        参数:
+        - app_model: 应用模型对象，用于确定要获取数据的应用。
+
+        返回值:
+        - 包含平均交互统计数据的JSON响应。
+        """
+
+        # 当前登录的用户
         account = current_user
 
+        # 解析请求参数
         parser = reqparse.RequestParser()
         parser.add_argument('start', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
         parser.add_argument('end', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
         args = parser.parse_args()
 
+        # 构造SQL查询语句
         sql_query = """
             SELECT 
                 AVG(sub.interactions) as interactions,
@@ -231,9 +318,11 @@ class WorkflowAverageAppInteractionStatistic(Resource):
             """
         arg_dict = {'tz': account.timezone, 'app_id': app_model.id, 'triggered_from': WorkflowRunTriggeredFrom.APP_RUN.value}
 
+        # 处理时区
         timezone = pytz.timezone(account.timezone)
         utc_timezone = pytz.utc
 
+        # 根据请求参数动态修改SQL查询语句
         if args['start']:
             start_datetime = datetime.strptime(args['start'], '%Y-%m-%d %H:%M')
             start_datetime = start_datetime.replace(second=0)
@@ -258,6 +347,7 @@ class WorkflowAverageAppInteractionStatistic(Resource):
         else:
             sql_query = sql_query.replace('{{end}}', '')
 
+        # 执行查询并构造响应数据
         response_data = []
         
         with db.engine.begin() as conn:
@@ -268,6 +358,7 @@ class WorkflowAverageAppInteractionStatistic(Resource):
                     'interactions': float(i.interactions.quantize(Decimal('0.01')))
                 })
 
+        # 返回JSON响应
         return jsonify({
             'data': response_data
         })

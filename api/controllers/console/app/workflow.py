@@ -26,23 +26,31 @@ logger = logging.getLogger(__name__)
 
 
 class DraftWorkflowApi(Resource):
+    # 要求登录、设置和账户初始化，并确认应用模式为高级聊天或工作流模式
     @setup_required
     @login_required
     @account_initialization_required
     @get_app_model(mode=[AppMode.ADVANCED_CHAT, AppMode.WORKFLOW])
+    # 使用工作流字段进行结果封装
     @marshal_with(workflow_fields)
     def get(self, app_model: App):
         """
-        Get draft workflow
+        获取草稿工作流
+        
+        参数:
+        app_model (App): 应用模型，用于确定要获取草稿工作流的具体应用。
+        
+        返回值:
+        返回工作流对象，如果未找到，则抛出DraftWorkflowNotExist异常。
         """
-        # fetch draft workflow by app_model
+        # 通过应用模型获取草稿工作流
         workflow_service = WorkflowService()
         workflow = workflow_service.get_draft_workflow(app_model=app_model)
 
         if not workflow:
             raise DraftWorkflowNotExist()
 
-        # return workflow, if not found, return None (initiate graph by frontend)
+        # 返回工作流，未找到时由前端初始化图表
         return workflow
 
     @setup_required
@@ -51,10 +59,22 @@ class DraftWorkflowApi(Resource):
     @get_app_model(mode=[AppMode.ADVANCED_CHAT, AppMode.WORKFLOW])
     def post(self, app_model: App):
         """
-        Sync draft workflow
+        同步草稿工作流
+        
+        该方法用于根据接收到的请求内容（JSON或纯文本），同步更新指定应用模型的工作流草稿。
+        请求需要包含工作流的结构（graph）和特征（features）。
+        成功更新后，返回操作成功信息和更新时间。
+        
+        参数:
+        - app_model: App 实例，代表需要同步工作流的应用模型。
+        
+        返回值:
+        - 一个包含操作结果和更新时间的字典。若操作失败，则返回相应的错误信息。
         """
+
         content_type = request.headers.get('Content-Type')
 
+        # 根据请求头部的Content-Type解析请求体
         if 'application/json' in content_type:
             parser = reqparse.RequestParser()
             parser.add_argument('graph', type=dict, required=True, nullable=False, location='json')
@@ -62,6 +82,7 @@ class DraftWorkflowApi(Resource):
             args = parser.parse_args()
         elif 'text/plain' in content_type:
             try:
+                # 尝试解析纯文本格式的工作流和特征数据
                 data = json.loads(request.data.decode('utf-8'))
                 if 'graph' not in data or 'features' not in data:
                     raise ValueError('graph or features not found in data')
@@ -74,10 +95,13 @@ class DraftWorkflowApi(Resource):
                     'features': data.get('features')
                 }
             except json.JSONDecodeError:
+                # 若解析失败，返回无效JSON数据错误
                 return {'message': 'Invalid JSON data'}, 400
         else:
+            # 支持的Content-Type类型外的请求，返回不支持的媒体类型错误
             abort(415)
 
+        # 使用工作流服务同步更新草稿工作流
         workflow_service = WorkflowService()
         workflow = workflow_service.sync_draft_workflow(
             app_model=app_model,
@@ -86,6 +110,7 @@ class DraftWorkflowApi(Resource):
             account=current_user
         )
 
+        # 返回操作成功信息和更新时间
         return {
             "result": "success",
             "updated_at": TimestampField().format(workflow.updated_at or workflow.created_at)
@@ -93,14 +118,31 @@ class DraftWorkflowApi(Resource):
 
 
 class AdvancedChatDraftWorkflowRunApi(Resource):
+    # 该类用于处理高级聊天草稿工作流的运行API请求
+    
     @setup_required
     @login_required
     @account_initialization_required
     @get_app_model(mode=[AppMode.ADVANCED_CHAT])
     def post(self, app_model: App):
         """
-        Run draft workflow
+        执行草稿工作流
+        
+        该方法用于根据提供的参数执行高级聊天应用的草稿工作流。
+        
+        参数:
+        - app_model: App 类型，代表当前被操作的应用模型
+        
+        返回值:
+        - 返回执行工作流后的响应数据，格式化后的生成响应。
+        
+        异常:
+        - NotFound: 对话不存在时抛出
+        - ConversationCompletedError: 对话已完成时抛出
+        - ValueError: 参数值无效时抛出
+        - InternalServerError: 内部服务器错误时抛出
         """
+        # 解析请求参数
         parser = reqparse.RequestParser()
         parser.add_argument('inputs', type=dict, location='json')
         parser.add_argument('query', type=str, required=True, location='json', default='')
@@ -109,6 +151,7 @@ class AdvancedChatDraftWorkflowRunApi(Resource):
         args = parser.parse_args()
 
         try:
+            # 调用服务以生成工作流的响应
             response = AppGenerateService.generate(
                 app_model=app_model,
                 user=current_user,
@@ -117,6 +160,7 @@ class AdvancedChatDraftWorkflowRunApi(Resource):
                 streaming=True
             )
 
+            # 返回格式化后的生成响应
             return helper.compact_generate_response(response)
         except services.errors.conversation.ConversationNotExistsError:
             raise NotFound("Conversation Not Exists.")
@@ -125,25 +169,36 @@ class AdvancedChatDraftWorkflowRunApi(Resource):
         except ValueError as e:
             raise e
         except Exception as e:
+            # 记录并抛出内部服务器错误
             logging.exception("internal server error.")
             raise InternalServerError()
 
 
 class DraftWorkflowRunApi(Resource):
+    # 草稿工作流运行API
     @setup_required
     @login_required
     @account_initialization_required
     @get_app_model(mode=[AppMode.WORKFLOW])
     def post(self, app_model: App):
         """
-        Run draft workflow
+        运行草稿工作流
+        
+        参数:
+        - app_model: App模型实例，代表要运行的工作流应用
+        
+        返回值:
+        - 返回一个紧凑的生成响应，包含工作流运行的结果信息
         """
+
+        # 解析请求参数
         parser = reqparse.RequestParser()
         parser.add_argument('inputs', type=dict, required=True, nullable=False, location='json')
         parser.add_argument('files', type=list, required=False, location='json')
         args = parser.parse_args()
 
         try:
+            # 调用服务生成工作流运行实例
             response = AppGenerateService.generate(
                 app_model=app_model,
                 user=current_user,
@@ -152,31 +207,45 @@ class DraftWorkflowRunApi(Resource):
                 streaming=True
             )
 
+            # 返回处理后的生成响应
             return helper.compact_generate_response(response)
         except ValueError as e:
+            # 抛出值错误异常
             raise e
         except Exception as e:
+            # 记录内部服务器错误日志，并抛出内部服务器错误异常
             logging.exception("internal server error.")
             raise InternalServerError()
 
 
 class WorkflowTaskStopApi(Resource):
+    # 此类用于处理工作流任务停止的API请求
+    
     @setup_required
     @login_required
     @account_initialization_required
     @get_app_model(mode=[AppMode.ADVANCED_CHAT, AppMode.WORKFLOW])
     def post(self, app_model: App, task_id: str):
         """
-        Stop workflow task
+        停止工作流任务
+        
+        :param app_model: 应用模型，指定了应用的配置和模式
+        :type app_model: App
+        :param task_id: 任务的唯一标识符
+        :type task_id: str
+        :return: 停止任务操作的结果信息
+        :rtype: dict
         """
+        # 设置停止标志，以通知任务应该停止
         AppQueueManager.set_stop_flag(task_id, InvokeFrom.DEBUGGER, current_user.id)
 
         return {
             "result": "success"
         }
 
-
 class DraftWorkflowNodeRunApi(Resource):
+    # 该类用于处理草稿工作流节点的运行API请求
+    
     @setup_required
     @login_required
     @account_initialization_required
@@ -184,12 +253,24 @@ class DraftWorkflowNodeRunApi(Resource):
     @marshal_with(workflow_run_node_execution_fields)
     def post(self, app_model: App, node_id: str):
         """
-        Run draft workflow node
+        执行草稿工作流节点
+        
+        该方法用于触发指定应用模型和节点ID的工作流节点的草稿版本执行。
+        需要用户登录、账户初始化且应用模式为高级聊天或工作流。
+        
+        参数:
+        - app_model: App, 表示应用模型实例，定义了应用的配置和行为。
+        - node_id: str, 表示要执行的工作流节点的ID。
+        
+        返回值:
+        - 返回工作流节点执行的详细信息。
         """
         parser = reqparse.RequestParser()
+        # 解析请求中的输入参数
         parser.add_argument('inputs', type=dict, required=True, nullable=False, location='json')
         args = parser.parse_args()
 
+        # 使用工作流服务来执行指定的草稿工作流节点
         workflow_service = WorkflowService()
         workflow_node_execution = workflow_service.run_draft_workflow_node(
             app_model=app_model,
@@ -202,6 +283,13 @@ class DraftWorkflowNodeRunApi(Resource):
 
 
 class PublishedWorkflowApi(Resource):
+    """
+    发布的工作流API资源类，提供获取和发布工作流的功能。
+
+    方法:
+    - get: 获取发布的工作流
+    - post: 发布工作流
+    """
 
     @setup_required
     @login_required
@@ -210,13 +298,19 @@ class PublishedWorkflowApi(Resource):
     @marshal_with(workflow_fields)
     def get(self, app_model: App):
         """
-        Get published workflow
+        获取发布的工作流。
+
+        参数:
+        - app_model: 应用模型，用于确定要获取工作流的应用。
+
+        返回值:
+        - 返回找到的工作流对象，如果未找到则返回None。
         """
-        # fetch published workflow by app_model
+        # 通过应用模型获取发布的工作流
         workflow_service = WorkflowService()
         workflow = workflow_service.get_published_workflow(app_model=app_model)
 
-        # return workflow, if not found, return None
+        # 返回工作流
         return workflow
 
     @setup_required
@@ -225,11 +319,19 @@ class PublishedWorkflowApi(Resource):
     @get_app_model(mode=[AppMode.ADVANCED_CHAT, AppMode.WORKFLOW])
     def post(self, app_model: App):
         """
-        Publish workflow
+        发布工作流。
+
+        参数:
+        - app_model: 应用模型，指定要发布工作流的应用。
+
+        返回值:
+        - 包含发布结果和创建时间的字典。
         """
+        # 为指定应用模型和当前用户发布工作流
         workflow_service = WorkflowService()
         workflow = workflow_service.publish_workflow(app_model=app_model, account=current_user)
 
+        # 返回发布成功的信息及创建时间
         return {
             "result": "success",
             "created_at": TimestampField().format(workflow.created_at)
@@ -237,40 +339,63 @@ class PublishedWorkflowApi(Resource):
 
 
 class DefaultBlockConfigsApi(Resource):
+    # 该类用于处理与默认区块配置相关的API请求
+
     @setup_required
     @login_required
     @account_initialization_required
     @get_app_model(mode=[AppMode.ADVANCED_CHAT, AppMode.WORKFLOW])
     def get(self, app_model: App):
         """
-        Get default block config
+        获取默认区块配置
+        
+        该方法用于根据应用模式获取默认的区块配置信息。
+        
+        参数:
+        - app_model: App - 表示当前应用的模型实例，用于确定应用的模式。
+        
+        返回值:
+        - 返回一个包含默认区块配置信息的响应。
         """
-        # Get default block configs
+        
+        # 初始化工作流服务并获取默认区块配置
         workflow_service = WorkflowService()
         return workflow_service.get_default_block_configs()
 
 
 class DefaultBlockConfigApi(Resource):
+    # 该类用于处理默认区块配置的API请求
+    
     @setup_required
     @login_required
     @account_initialization_required
     @get_app_model(mode=[AppMode.ADVANCED_CHAT, AppMode.WORKFLOW])
     def get(self, app_model: App, block_type: str):
         """
-        Get default block config
+        获取默认区块配置
+        
+        该方法用于根据指定的区块类型和应用模型，获取默认的区块配置。
+        
+        参数:
+        - app_model: App, 表示应用模型，决定了获取的区块配置适用于哪种类型的应用。
+        - block_type: str, 表示区块的类型，用于指定要获取哪种类型的区块配置。
+        
+        返回值:
+        - 返回一个包含默认区块配置的数据。
         """
+        
         parser = reqparse.RequestParser()
-        parser.add_argument('q', type=str, location='args')
+        parser.add_argument('q', type=str, location='args')  # 解析查询参数q，用于指定过滤条件
         args = parser.parse_args()
 
         filters = None
         if args.get('q'):
             try:
-                filters = json.loads(args.get('q'))
+                filters = json.loads(args.get('q'))  # 尝试将查询参数q解析为JSON格式的过滤条件
             except json.JSONDecodeError:
-                raise ValueError('Invalid filters')
-
-        # Get default block configs
+                raise ValueError('Invalid filters')  # 如果解析失败，则抛出无效过滤条件的错误
+        
+        # 通过工作流服务获取默认区块配置
         workflow_service = WorkflowService()
         return workflow_service.get_default_block_config(
             node_type=block_type,
@@ -285,11 +410,15 @@ class ConvertToWorkflowApi(Resource):
     @get_app_model(mode=[AppMode.CHAT, AppMode.COMPLETION])
     def post(self, app_model: App):
         """
-        Convert basic mode of chatbot app to workflow mode
-        Convert expert mode of chatbot app to workflow mode
-        Convert Completion App to Workflow App
+        将聊天机器人应用的基本模式转换为工作流模式；
+        将聊天机器人应用的专家模式转换为工作流模式；
+        将完成应用转换为工作流应用。
+
+        :param app_model: App模型，表示当前要转换的应用。
+        :return: 包含新应用ID的字典。
         """
         if request.data:
+            # 解析请求中携带的参数
             parser = reqparse.RequestParser()
             parser.add_argument('name', type=str, required=False, nullable=True, location='json')
             parser.add_argument('icon', type=str, required=False, nullable=True, location='json')
@@ -298,7 +427,7 @@ class ConvertToWorkflowApi(Resource):
         else:
             args = {}
 
-        # convert to workflow mode
+        # 执行转换操作
         workflow_service = WorkflowService()
         new_app_model = workflow_service.convert_to_workflow(
             app_model=app_model,
@@ -306,7 +435,7 @@ class ConvertToWorkflowApi(Resource):
             args=args
         )
 
-        # return app id
+        # 返回新应用的ID
         return {
             'new_app_id': new_app_model.id,
         }
