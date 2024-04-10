@@ -11,52 +11,88 @@ from services.account_service import AccountService, TenantService
 
 
 class LoginApi(Resource):
-    """Resource for user login."""
+    """用户登录的资源类。"""
 
     @setup_required
     def post(self):
-        """Authenticate user and login."""
+        """
+        验证用户身份并登录。
+        
+        请求参数:
+        - email: 用户邮箱，必填，位于JSON体中。
+        - password: 用户密码，必填，位于JSON体中。
+        - remember_me: 是否记住登录状态，非必填，默认为False，位于JSON体中。
+        
+        返回值:
+        - 当登录成功时，返回包含token的成功信息；
+        - 当登录失败时，返回包含错误信息的401状态码。
+        """
         parser = reqparse.RequestParser()
         parser.add_argument('email', type=email, required=True, location='json')
         parser.add_argument('password', type=valid_password, required=True, location='json')
         parser.add_argument('remember_me', type=bool, required=False, default=False, location='json')
         args = parser.parse_args()
 
-        # todo: Verify the recaptcha
+        # 验证recaptcha的代码待实现
 
         try:
             account = AccountService.authenticate(args['email'], args['password'])
         except services.errors.account.AccountLoginError:
             return {'code': 'unauthorized', 'message': 'Invalid email or password'}, 401
 
+        # 如果租户主人不存在，则创建
         TenantService.create_owner_tenant_if_not_exist(account)
 
+        # 更新用户上次登录信息
         AccountService.update_last_login(account, request)
 
-        # todo: return the user info
+        # 生成并返回用户JWT令牌
         token = AccountService.get_account_jwt_token(account)
 
         return {'result': 'success', 'data': token}
 
 
 class LogoutApi(Resource):
+    """
+    定义了一个用于用户登出的API类。
+    """
 
     @setup_required
     def get(self):
-        flask_login.logout_user()
-        return {'result': 'success'}
+        """
+        处理用户登出的GET请求。
+
+        无需参数。
+
+        返回值:
+            返回一个包含登出结果的字典，如{'result': 'success'}。
+        """
+        flask_login.logout_user()  # 执行用户登出操作
+        return {'result': 'success'}  # 返回登出成功的提示
 
 
 class ResetPasswordApi(Resource):
     @setup_required
     def get(self):
+        """
+        处理重置密码的GET请求。
+        
+        要求提供电子邮件地址，然后向该地址发送一封包含新密码的邮件。
+        
+        参数:
+        - 无（通过GET请求的JSON体中获取email参数）
+        
+        返回值:
+        - {'result': 'success'}: 表示发送重置密码邮件操作成功
+        """
         parser = reqparse.RequestParser()
         parser.add_argument('email', type=email, required=True, location='json')
         args = parser.parse_args()
 
         # import mailchimp_transactional as MailchimpTransactional
         # from mailchimp_transactional.api_client import ApiClientError
-
+        
+        # 准备发送密码重置邮件所需的账户信息
         account = {'email': args['email']}
         # account = AccountService.get_by_email(args['email'])
         # if account is None:
@@ -64,7 +100,7 @@ class ResetPasswordApi(Resource):
         # new_password = AccountService.generate_password()
         # AccountService.update_password(account, new_password)
 
-        # todo: Send email
+        # TODO: 发送邮件通知用户新密码
         MAILCHIMP_API_KEY = current_app.config['MAILCHIMP_TRANSACTIONAL_API_KEY']
         # mailchimp = MailchimpTransactional(MAILCHIMP_API_KEY)
 

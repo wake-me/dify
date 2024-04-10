@@ -22,27 +22,41 @@ from tasks.document_indexing_sync_task import document_indexing_sync_task
 
 
 class DataSourceApi(Resource):
+    """
+    数据源API接口类，用于获取工作空间的数据源集成信息。
+    """
 
     @setup_required
     @login_required
     @account_initialization_required
     @marshal_with(integrate_list_fields)
     def get(self):
-        # get workspace data source integrates
+        """
+        获取当前工作空间的数据源集成信息。
+        
+        要求用户已登录、账号已设置且需要进行权限验证。
+        返回数据源集成的列表，包括已绑定和未绑定的提供者信息。
+        
+        返回值:
+            - 一个包含数据源集成信息的字典列表，以及HTTP状态码200。
+        """
+        # 从数据库查询当前工作空间未被禁用的数据源集成信息
         data_source_integrates = db.session.query(DataSourceBinding).filter(
             DataSourceBinding.tenant_id == current_user.current_tenant_id,
             DataSourceBinding.disabled == False
         ).all()
 
+        # 构造基础URL和数据源OAuth路径
         base_url = request.url_root.rstrip('/')
         data_source_oauth_base_path = "/console/api/oauth/data-source"
-        providers = ["notion"]
+        providers = ["notion"]  # 定义支持的数据源提供者列表
 
         integrate_data = []
         for provider in providers:
-            # existing_integrate = next((ai for ai in data_source_integrates if ai.provider == provider), None)
+            # 遍历提供者列表，为每个提供者构建集成信息
             existing_integrates = filter(lambda item: item.provider == provider, data_source_integrates)
             if existing_integrates:
+                # 如果存在已绑定的集成，则构建其信息
                 for existing_integrate in list(existing_integrates):
                     integrate_data.append({
                         'id': existing_integrate.id,
@@ -52,8 +66,9 @@ class DataSourceApi(Resource):
                         'disabled': existing_integrate.disabled,
                         'source_info': existing_integrate.source_info,
                         'link': f'{base_url}{data_source_oauth_base_path}/{provider}'
-                })
+                    })
             else:
+                # 如果未绑定，则构建未绑定的信息
                 integrate_data.append({
                     'id': None,
                     'provider': provider,
@@ -69,50 +84,78 @@ class DataSourceApi(Resource):
     @login_required
     @account_initialization_required
     def patch(self, binding_id, action):
-        binding_id = str(binding_id)
-        action = str(action)
+        """
+        根据提供的绑定ID和操作类型，更新数据源绑定的状态（启用或禁用）。
+        
+        :param binding_id: 数据源绑定的唯一标识符。
+        :param action: 操作类型，支持'enable'启用和'disable'禁用。
+        :return: 操作成功的响应，包含结果信息和HTTP状态码。
+        """
+        binding_id = str(binding_id)  # 确保binding_id为字符串类型
+        action = str(action)  # 确保action为字符串类型
+        # 根据绑定ID查询数据源绑定信息
         data_source_binding = DataSourceBinding.query.filter_by(
             id=binding_id
         ).first()
         if data_source_binding is None:
-            raise NotFound('Data source binding not found.')
-        # enable binding
+            raise NotFound('Data source binding not found.')  # 数据源绑定不存在时抛出异常
+        
+        # 启用绑定逻辑
         if action == 'enable':
             if data_source_binding.disabled:
                 data_source_binding.disabled = False
-                data_source_binding.updated_at = datetime.datetime.utcnow()
+                data_source_binding.updated_at = datetime.datetime.utcnow()  # 更新禁用状态和修改时间
                 db.session.add(data_source_binding)
-                db.session.commit()
+                db.session.commit()  # 提交数据库事务
             else:
-                raise ValueError('Data source is not disabled.')
-        # disable binding
+                raise ValueError('Data source is not disabled.')  # 数据源已是启用状态时抛出异常
+        
+        # 禁用绑定逻辑
         if action == 'disable':
             if not data_source_binding.disabled:
                 data_source_binding.disabled = True
-                data_source_binding.updated_at = datetime.datetime.utcnow()
+                data_source_binding.updated_at = datetime.datetime.utcnow()  # 更新启用状态和修改时间
                 db.session.add(data_source_binding)
-                db.session.commit()
+                db.session.commit()  # 提交数据库事务
             else:
-                raise ValueError('Data source is disabled.')
-        return {'result': 'success'}, 200
-
+                raise ValueError('Data source is disabled.')  # 数据源已是禁用状态时抛出异常
+        
+        return {'result': 'success'}, 200  # 返回操作成功响应
 
 class DataSourceNotionListApi(Resource):
+    """
+    数据源接口：Notion列表API
+    用于获取当前用户有权限访问的Notion页面信息，包括已导入和未导入的数据源。
+    """
 
     @setup_required
     @login_required
     @account_initialization_required
     @marshal_with(integrate_notion_info_list_fields)
     def get(self):
+        """
+        获取Notion页面信息列表
+        参数:
+            - dataset_id: 数据集ID，可选，用于查询已导入的数据源Notion页面ID。
+        返回值:
+            - 一个包含所有授权页面信息的列表，以及HTTP状态码200。
+        抛出:
+            - NotFound: 当查询的数据集不存在时。
+            - ValueError: 当数据集类型不是Notion导入类型时。
+        """
+        # 获取请求中的数据集ID
         dataset_id = request.args.get('dataset_id', default=None, type=str)
         exist_page_ids = []
-        # import notion in the exist dataset
+        
+        # 处理已存在的Notion数据源页面
         if dataset_id:
+            # 根据数据集ID查询数据集
             dataset = DatasetService.get_dataset(dataset_id)
             if not dataset:
                 raise NotFound('Dataset not found.')
             if dataset.data_source_type != 'notion_import':
                 raise ValueError('Dataset is not notion type.')
+            # 查询已启用的Notion文档
             documents = Document.query.filter_by(
                 dataset_id=dataset_id,
                 tenant_id=current_user.current_tenant_id,
@@ -123,7 +166,8 @@ class DataSourceNotionListApi(Resource):
                 for document in documents:
                     data_source_info = json.loads(document.data_source_info)
                     exist_page_ids.append(data_source_info['notion_page_id'])
-        # get all authorized pages
+        
+        # 查询所有未绑定的Notion页面
         data_source_bindings = DataSourceBinding.query.filter_by(
             tenant_id=current_user.current_tenant_id,
             provider='notion',
@@ -137,12 +181,13 @@ class DataSourceNotionListApi(Resource):
         for data_source_binding in data_source_bindings:
             source_info = data_source_binding.source_info
             pages = source_info['pages']
-            # Filter out already bound pages
+            # 标记已绑定的页面
             for page in pages:
                 if page['page_id'] in exist_page_ids:
                     page['is_bound'] = True
                 else:
                     page['is_bound'] = False
+            # 构建预导入信息
             pre_import_info = {
                 'workspace_name': source_info['workspace_name'],
                 'workspace_icon': source_info['workspace_icon'],
@@ -161,8 +206,26 @@ class DataSourceNotionApi(Resource):
     @login_required
     @account_initialization_required
     def get(self, workspace_id, page_id, page_type):
+        """
+        根据给定的工作空间ID、页面ID和页面类型，从Notion中提取文本文档的内容。
+
+        参数:
+        - workspace_id: 工作空间的ID，将被转换为字符串格式。
+        - page_id: 页面的ID，将被转换为字符串格式。
+        - page_type: 页面的类型。
+
+        返回值:
+        - 一个包含页面内容的字典，以及HTTP状态码200。
+        
+        抛出:
+        - NotFound: 如果找不到对应的数据源绑定时抛出。
+        """
+
+        # 将输入的ID转换为字符串格式
         workspace_id = str(workspace_id)
         page_id = str(page_id)
+
+        # 查询与当前用户、Notion提供者、未禁用且指定工作空间ID匹配的数据源绑定
         data_source_binding = DataSourceBinding.query.filter(
             db.and_(
                 DataSourceBinding.tenant_id == current_user.current_tenant_id,
@@ -171,9 +234,12 @@ class DataSourceNotionApi(Resource):
                 DataSourceBinding.source_info['workspace_id'] == f'"{workspace_id}"'
             )
         ).first()
+        
+        # 如果找不到对应的数据源绑定，抛出未找到异常
         if not data_source_binding:
             raise NotFound('Data source binding not found.')
 
+        # 初始化NotionExtractor以提取内容
         extractor = NotionExtractor(
             notion_workspace_id=workspace_id,
             notion_obj_id=page_id,
@@ -182,7 +248,10 @@ class DataSourceNotionApi(Resource):
             tenant_id=current_user.current_tenant_id
         )
 
+        # 提取文本文档
         text_docs = extractor.extract()
+        
+        # 返回提取的页面内容
         return {
             'content': "\n".join([doc.page_content for doc in text_docs])
         }, 200
@@ -191,19 +260,34 @@ class DataSourceNotionApi(Resource):
     @login_required
     @account_initialization_required
     def post(self):
+        """
+        处理POST请求，用于从Notion中提取信息并进行文档处理和索引的估计。
+
+        参数:
+        - notion_info_list: Notion信息列表，包含workspace_id和pages信息，必需。
+        - process_rule: 处理规则字典，定义如何处理和索引文档，必需。
+        - doc_form: 文档形式，默认为'text_model'，非必需。
+        - doc_language: 文档语言，默认为'English'，非必需。
+
+        返回值:
+        - response: 执行估计操作后的响应数据，通常包含估计结果或错误信息。
+        - 200: HTTP状态码，表示请求成功处理。
+        """
         parser = reqparse.RequestParser()
         parser.add_argument('notion_info_list', type=list, required=True, nullable=True, location='json')
         parser.add_argument('process_rule', type=dict, required=True, nullable=True, location='json')
         parser.add_argument('doc_form', type=str, default='text_model', required=False, nullable=False, location='json')
         parser.add_argument('doc_language', type=str, default='English', required=False, nullable=False, location='json')
         args = parser.parse_args()
-        # validate args
+        # 验证参数的合法性
         DocumentService.estimate_args_validate(args)
         notion_info_list = args['notion_info_list']
         extract_settings = []
+        # 遍历Notion信息列表，为每个页面创建提取设置
         for notion_info in notion_info_list:
             workspace_id = notion_info['workspace_id']
             for page in notion_info['pages']:
+                # 创建提取设置对象，包含Notion页面和工作区信息以及文档模型
                 extract_setting = ExtractSetting(
                     datasource_type="notion_import",
                     notion_info={
@@ -215,47 +299,87 @@ class DataSourceNotionApi(Resource):
                     document_model=args['doc_form']
                 )
                 extract_settings.append(extract_setting)
+        # 初始化索引运行器，并执行索引估计操作
         indexing_runner = IndexingRunner()
         response = indexing_runner.indexing_estimate(current_user.current_tenant_id, extract_settings,
-                                                     args['process_rule'], args['doc_form'],
-                                                     args['doc_language'])
+                                                    args['process_rule'], args['doc_form'],
+                                                    args['doc_language'])
         return response, 200
 
 
 class DataSourceNotionDatasetSyncApi(Resource):
-
+    """
+    数据源Notion数据集同步API类，用于处理与Notion数据集的同步请求。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def get(self, dataset_id):
-        dataset_id_str = str(dataset_id)
-        dataset = DatasetService.get_dataset(dataset_id_str)
-        if dataset is None:
+        """
+        获取并同步指定数据集的所有文档。
+
+        参数:
+        - dataset_id: 数据集的ID，类型为int或能够被转换为str的值。
+
+        返回值:
+        - 200: 请求成功，数据集文档开始同步。
+        - NotFound: 数据集不存在时抛出的异常。
+        """
+        dataset_id_str = str(dataset_id)  # 将dataset_id转换为字符串
+        dataset = DatasetService.get_dataset(dataset_id_str)  # 根据ID获取数据集
+        if dataset is None:  # 数据集不存在时抛出异常
             raise NotFound("Dataset not found.")
 
-        documents = DocumentService.get_document_by_dataset_id(dataset_id_str)
-        for document in documents:
+        documents = DocumentService.get_document_by_dataset_id(dataset_id_str)  # 根据数据集ID获取所有文档
+        for document in documents:  # 遍历文档列表，为每个文档安排同步任务
             document_indexing_sync_task.delay(dataset_id_str, document.id)
-        return 200
+        return 200  # 请求成功，返回200状态码
 
 
 class DataSourceNotionDocumentSyncApi(Resource):
+    """
+    数据源Notion文档同步API，用于处理数据集和Notion文档的同步请求。
+    
+    Attributes:
+        None
+    """
 
     @setup_required
     @login_required
     @account_initialization_required
     def get(self, dataset_id, document_id):
+        """
+        同步指定的数据集ID和文档ID对应的Notion文档。
+        
+        Parameters:
+            dataset_id (int): 数据集的ID。
+            document_id (int): 文档的ID。
+            
+        Returns:
+            int: 请求处理成功返回200。
+            
+        Raises:
+            NotFound: 如果指定的数据集或文档不存在时抛出。
+        """
+        # 将传入的ID转换为字符串格式
         dataset_id_str = str(dataset_id)
         document_id_str = str(document_id)
+        
+        # 获取指定ID的数据集
         dataset = DatasetService.get_dataset(dataset_id_str)
         if dataset is None:
-            raise NotFound("Dataset not found.")
-
+            raise NotFound("Dataset not found.")  # 如果数据集不存在，抛出异常
+        
+        # 获取指定数据集和文档ID的文档
         document = DocumentService.get_document(dataset_id_str, document_id_str)
         if document is None:
-            raise NotFound("Document not found.")
+            raise NotFound("Document not found.")  # 如果文档不存在，抛出异常
+        
+        # 异步执行文档索引同步任务
         document_indexing_sync_task.delay(dataset_id_str, document_id_str)
-        return 200
+        
+        return 200  # 请求处理成功，返回200
 
 
 api.add_resource(DataSourceApi, '/data-source/integrates', '/data-source/integrates/<uuid:binding_id>/<string:action>')

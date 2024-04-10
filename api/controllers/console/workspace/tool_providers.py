@@ -13,23 +13,56 @@ from services.tools_manage_service import ToolManageService
 
 
 class ToolProviderListApi(Resource):
+    """
+    提供工具提供商列表的API接口
+    """
+
     @setup_required
     @login_required
     @account_initialization_required
     def get(self):
-        user_id = current_user.id
-        tenant_id = current_user.current_tenant_id
+        """
+        获取当前用户和租户下的工具提供商列表
+        
+        参数:
+        - 无
+        
+        返回值:
+        - 工具提供商列表
+        """
+        user_id = current_user.id  # 获取当前用户ID
+        tenant_id = current_user.current_tenant_id  # 获取当前用户所属的租户ID
 
+        # 调用服务层方法，获取工具提供商列表
         return ToolManageService.list_tool_providers(user_id, tenant_id)
 
 class ToolBuiltinProviderListToolsApi(Resource):
+    """
+    提供内置工具提供商工具列表的API接口
+    
+    方法: GET
+    参数:
+    - provider: 工具提供商的标识符
+    
+    返回值:
+    - 返回工具管理服务中列出的指定提供商的内置工具信息
+    """
+
     @setup_required
     @login_required
     @account_initialization_required
     def get(self, provider):
+        """
+        获取指定提供商的内置工具列表
+        
+        需要完成设置、登录和账户初始化
+        """
+        
+        # 获取当前登录用户的ID和所在租户的ID
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
+        # 调用工具管理服务，列出指定提供商的内置工具
         return ToolManageService.list_builtin_tool_provider_tools(
             user_id,
             tenant_id,
@@ -37,16 +70,33 @@ class ToolBuiltinProviderListToolsApi(Resource):
         )
 
 class ToolBuiltinProviderDeleteApi(Resource):
+    """
+    提供删除内置工具提供商的API接口。
+    
+    方法: POST
+    路径: /api/tool/builtin/provider/delete
+    参数:
+    - provider: 要删除的工具提供商名称
+    
+    返回值:
+    - 删除操作的结果，通常为一个包含操作成功与否信息的字典。
+    
+    需要身份验证和权限检查，确保只有管理员或工具所有者才能执行此操作。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def post(self, provider):
+        # 检查用户是否有权限删除工具提供商，如果不是管理员或所有者，则抛出权限异常
         if not current_user.is_admin_or_owner:
             raise Forbidden()
         
+        # 获取当前用户的ID和所属租户的ID
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
+        # 调用服务层方法，执行删除操作，并返回结果
         return ToolManageService.delete_builtin_tool_provider(
             user_id,
             tenant_id,
@@ -54,21 +104,50 @@ class ToolBuiltinProviderDeleteApi(Resource):
         )
     
 class ToolBuiltinProviderUpdateApi(Resource):
+    """
+    用于更新内置工具提供商的API接口类。
+    
+    方法:
+    POST: 更新指定提供商的凭证信息。
+    
+    参数:
+    provider (str): 工具提供商的标识符。
+    
+    返回值:
+    更新操作的结果。    
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def post(self, provider):
+        """
+        更新内置工具提供商的凭证信息。
+        
+        权限:
+        必须是管理员或工具所有者才有权限执行此操作。
+        
+        参数:
+        provider (str): 要更新的工具提供商标识符。
+        
+        返回:
+        更新操作的结果。
+        """
+        # 检查当前用户是否有权限更新提供商信息
         if not current_user.is_admin_or_owner:
             raise Forbidden()
         
+        # 获取当前用户的ID和租户ID
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
+        # 解析请求中的凭证信息
         parser = reqparse.RequestParser()
         parser.add_argument('credentials', type=dict, required=True, nullable=False, location='json')
 
         args = parser.parse_args()
 
+        # 更新内置工具提供商的凭证信息
         return ToolManageService.update_builtin_tool_provider(
             user_id,
             tenant_id,
@@ -77,31 +156,100 @@ class ToolBuiltinProviderUpdateApi(Resource):
         )
 
 class ToolBuiltinProviderIconApi(Resource):
+    """
+    提供内置工具提供商图标API的类。
+    
+    方法:
+    - get: 根据提供的工具提供商获取其图标。
+    
+    参数:
+    - provider: 工具提供商的标识符。
+    
+    返回值:
+    - 返回工具提供商图标的文件响应，以便在浏览器中显示。
+    """
+    
     @setup_required
     def get(self, provider):
+        """
+        根据提供的工具提供商标识符获取其图标，并作为文件响应返回。
+        
+        参数:
+        - provider: 工具提供商的标识符。
+        
+        返回值:
+        - 返回工具提供商图标的文件响应，包括适当的MIME类型和缓存设置。
+        """
+        # 从服务中获取图标数据和MIME类型
         icon_bytes, minetype = ToolManageService.get_builtin_tool_provider_icon(provider)
+        # 从应用配置中读取图标缓存最大年龄
         icon_cache_max_age = int(current_app.config.get('TOOL_ICON_CACHE_MAX_AGE'))
+        # 返回图标文件响应，使用IO流和设置缓存最大年龄
         return send_file(io.BytesIO(icon_bytes), mimetype=minetype, max_age=icon_cache_max_age)
 
 class ToolModelProviderIconApi(Resource):
+    """
+    提供模型工具提供商图标接口的类。
+    
+    方法:
+    - get: 根据提供的提供商获取其图标。
+    
+    参数:
+    - provider: 模型工具的提供商标识。
+    
+    返回值:
+    - 返回一个发送文件的响应，该文件为指定模型工具提供商的图标。
+    """
+    
     @setup_required
     def get(self, provider):
+        """
+        根据提供的提供商获取其图标，并返回图标文件。
+        
+        参数:
+        - provider: 模型工具的提供商标识。
+        
+        返回值:
+        - 返回一个发送文件的响应，该文件为指定模型工具提供商的图标。
+        """
+        # 从服务中获取模型工具提供商的图标数据和类型
         icon_bytes, mimetype = ToolManageService.get_model_tool_provider_icon(provider)
+        # 将图标数据作为文件返回给请求者
         return send_file(io.BytesIO(icon_bytes), mimetype=mimetype)
     
 class ToolModelProviderListToolsApi(Resource):
+    """
+    提供模型工具提供商列表的API接口
+    
+    该接口需要用户登录、账户初始化并且设置完成后方可使用。
+    通过GET请求获取指定提供商提供的模型工具列表。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def get(self):
+        """
+        获取模型工具提供商的工具列表
+        
+        参数:
+        - 无（所有必要的参数通过URL查询字符串提供）
+        
+        返回值:
+        - 返回指定提供商的模型工具列表
+        """
+        
+        # 获取当前登录用户的ID和租户ID
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
+        # 解析请求参数
         parser = reqparse.RequestParser()
         parser.add_argument('provider', type=str, required=True, nullable=False, location='args')
 
         args = parser.parse_args()
 
+        # 调用服务层方法，获取模型工具列表
         return ToolManageService.list_model_tool_provider_tools(
             user_id,
             tenant_id,
@@ -109,16 +257,34 @@ class ToolModelProviderListToolsApi(Resource):
         )
 
 class ToolApiProviderAddApi(Resource):
+    """
+    用于添加API工具提供者的资源类。
+    
+    要求用户已登录、账户已初始化且具有管理员或所有者权限。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def post(self):
+        """
+        处理POST请求，以添加一个新的API工具提供者。
+        
+        需要管理员或所有者权限，否则将抛出Forbidden异常。
+        
+        返回：
+            添加成功则返回相关信息，否则抛出异常。
+        """
+        
+        # 检查当前用户是否具有管理员或所有者权限
         if not current_user.is_admin_or_owner:
             raise Forbidden()
         
+        # 获取当前用户信息
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
+        # 解析请求参数
         parser = reqparse.RequestParser()
         parser.add_argument('credentials', type=dict, required=True, nullable=False, location='json')
         parser.add_argument('schema_type', type=str, required=True, nullable=False, location='json')
@@ -129,6 +295,7 @@ class ToolApiProviderAddApi(Resource):
 
         args = parser.parse_args()
 
+        # 调用服务层方法，创建API工具提供者
         return ToolManageService.create_api_tool_provider(
             user_id,
             tenant_id,
@@ -141,16 +308,32 @@ class ToolApiProviderAddApi(Resource):
         )
 
 class ToolApiProviderGetRemoteSchemaApi(Resource):
+    """
+    提供获取远程模式的API接口。
+    
+    需要完成设置、登录和账户初始化。
+    
+    GET请求参数:
+    - url: 字符串类型，必需，不可为空，通过查询参数传入。
+    
+    返回值:
+    - 返回获取到的远程模式信息。
+    """
+
     @setup_required
     @login_required
     @account_initialization_required
     def get(self):
+        # 初始化请求解析器
         parser = reqparse.RequestParser()
 
+        # 添加请求参数
         parser.add_argument('url', type=str, required=True, nullable=False, location='args')
 
+        # 解析请求参数
         args = parser.parse_args()
 
+        # 调用服务层方法，获取远程模式信息
         return ToolManageService.get_api_tool_provider_remote_schema(
             current_user.id,
             current_user.current_tenant_id,
@@ -158,19 +341,42 @@ class ToolApiProviderGetRemoteSchemaApi(Resource):
         )
     
 class ToolApiProviderListToolsApi(Resource):
+    """
+    提供工具API提供者列表的接口类。
+    
+    该类用于通过API获取特定提供者的工具列表。需要用户登录、账户初始化且设定了特定的装饰器来确保安全性。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def get(self):
+        """
+        获取特定提供商的工具列表。
+        
+        路径参数：无
+        
+        查询参数：
+        - provider (string): 必需，指定要查询工具的提供商名称。
+        
+        返回值：
+        - 返回一个包含特定提供商工具列表的响应。
+        """
+        
+        # 获取当前登录用户的ID和租户ID
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
+        # 创建请求解析器用于解析查询参数
         parser = reqparse.RequestParser()
 
+        # 添加查询参数'provider'，用于指定工具提供商
         parser.add_argument('provider', type=str, required=True, nullable=False, location='args')
 
+        # 解析查询参数
         args = parser.parse_args()
 
+        # 调用服务层方法，获取指定提供商的工具列表并返回
         return ToolManageService.list_api_tool_provider_tools(
             user_id,
             tenant_id,
@@ -178,16 +384,34 @@ class ToolApiProviderListToolsApi(Resource):
         )
 
 class ToolApiProviderUpdateApi(Resource):
+    """
+    用于更新API工具的提供者信息的接口类。
+    
+    要求用户已登录、账户已初始化且具有管理员或所有者权限。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def post(self):
+        """
+        更新API工具的提供者信息。
+        
+        需要管理员或工具所有者的权限。接收并更新工具的提供者认证信息、架构类型、架构、图标、隐私政策等。
+        
+        返回值:
+            调用ToolManageService.update_api_tool_provider方法的结果。
+        """
+        
+        # 检查用户是否有权限
         if not current_user.is_admin_or_owner:
             raise Forbidden()
         
+        # 获取当前用户信息
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
+        # 解析请求参数
         parser = reqparse.RequestParser()
         parser.add_argument('credentials', type=dict, required=True, nullable=False, location='json')
         parser.add_argument('schema_type', type=str, required=True, nullable=False, location='json')
@@ -199,6 +423,7 @@ class ToolApiProviderUpdateApi(Resource):
 
         args = parser.parse_args()
 
+        # 调用服务层方法，更新API工具的提供者信息
         return ToolManageService.update_api_tool_provider(
             user_id,
             tenant_id,
@@ -212,22 +437,43 @@ class ToolApiProviderUpdateApi(Resource):
         )
 
 class ToolApiProviderDeleteApi(Resource):
+    """
+    提供删除API供应商的功能接口。
+    
+    要求用户已登录、账号已初始化且有管理员或所有者权限。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def post(self):
+        """
+        删除指定的API供应商。
+        
+        参数:
+        - 无（所有必要的参数通过JSON体传入）
+        
+        返回值:
+        - 删除操作的结果。
+        
+        异常:
+        - 如果用户不是管理员或所有者，则抛出Forbidden异常。
+        """
+        
+        # 检查用户权限
         if not current_user.is_admin_or_owner:
             raise Forbidden()
         
+        # 获取当前用户信息
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
+        # 解析请求参数
         parser = reqparse.RequestParser()
-
         parser.add_argument('provider', type=str, required=True, nullable=False, location='json')
-
         args = parser.parse_args()
 
+        # 调用服务层方法，执行删除操作
         return ToolManageService.delete_api_tool_provider(
             user_id,
             tenant_id,
@@ -235,19 +481,41 @@ class ToolApiProviderDeleteApi(Resource):
         )
 
 class ToolApiProviderGetApi(Resource):
+    """
+    获取工具API提供者的接口类。
+    
+    该类用于通过提供的参数获取特定工具API的提供者信息。
+    需要用户登录、账户初始化并且设置完成后方可使用。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def get(self):
+        """
+        获取指定工具API的提供者信息。
+        
+        参数:
+        - 无（所有必要的参数通过URL的查询参数提供）
+        
+        返回值:
+        - 返回一个包含工具API提供者信息的响应。
+        """
+        
+        # 获取当前登录用户的ID和当前租户的ID
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
+        # 创建请求解析器用于解析查询参数
         parser = reqparse.RequestParser()
 
+        # 添加必要的查询参数'provider'，用于指定要查询的API提供者
         parser.add_argument('provider', type=str, required=True, nullable=False, location='args')
 
+        # 解析并获取查询参数
         args = parser.parse_args()
 
+        # 调用服务层方法，获取指定工具API提供者的信息
         return ToolManageService.get_api_tool_provider(
             user_id,
             tenant_id,
@@ -255,34 +523,102 @@ class ToolApiProviderGetApi(Resource):
         )
 
 class ToolBuiltinProviderCredentialsSchemaApi(Resource):
+    """
+    提供内置提供商凭证架构的API接口类。
+    
+    方法:
+    - get: 获取指定提供商的内置凭证架构信息。
+    
+    参数:
+    - provider: 字符串，指定的工具提供商标识。
+    
+    返回值:
+    - 返回一个列表，包含指定提供商的凭证架构信息。
+    """
+
     @setup_required
     @login_required
     @account_initialization_required
     def get(self, provider):
+        """
+        获取指定工具提供商的内置凭证架构信息。
+        
+        参数:
+        - provider: 字符串，指定的工具提供商标识。
+        
+        返回值:
+        - 调用ToolManageService.list_builtin_provider_credentials_schema方法，
+          返回一个列表，包含指定提供商的凭证架构信息。
+        """
         return ToolManageService.list_builtin_provider_credentials_schema(provider)
 
 class ToolApiProviderSchemaApi(Resource):
+    """
+    ToolApiProviderSchemaApi类，用于处理工具API提供者模式的API请求。
+
+    属性:
+        Resource: 父类，提供RESTful API资源的基本方法。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def post(self):
+        """
+        处理POST请求，用于解析并验证API模式。
+
+        要求用户已登录、账号已初始化，且系统已设置。
+
+        参数:
+            无
+
+        返回:
+            调用ToolManageService.parser_api_schema方法后的返回结果。
+        """
+        
         parser = reqparse.RequestParser()
+        # 创建请求解析器，用于解析JSON请求体中的'schema'参数
 
         parser.add_argument('schema', type=str, required=True, nullable=False, location='json')
+        # 添加'schema'参数解析规则，要求为非空字符串
 
         args = parser.parse_args()
+        # 解析请求体中的参数
 
         return ToolManageService.parser_api_schema(
             schema=args['schema'],
         )
+        # 调用服务层方法，处理解析后的API模式
 
 class ToolApiProviderPreviousTestApi(Resource):
+    """
+    提供工具API的先前测试接口。
+    
+    该资源需要登录、账户初始化并且设置好之后才能访问。
+    使用POST方法来请求一个工具的API测试预览。
+    """
+    
     @setup_required
     @login_required
     @account_initialization_required
     def post(self):
+        """
+        执行工具API的测试预览。
+        
+        请求参数:
+        - tool_name: 工具名称，必需。
+        - provider_name: 提供者名称，可选。
+        - credentials: 凭证信息，必需。
+        - parameters: 参数，必需。
+        - schema_type: 架构类型，必需。
+        - schema: 架构信息，必需。
+        
+        返回值:
+        - 返回测试API工具预览的结果。
+        """
         parser = reqparse.RequestParser()
 
+        # 解析请求参数
         parser.add_argument('tool_name', type=str, required=True, nullable=False, location='json')
         parser.add_argument('provider_name', type=str, required=False, nullable=False, location='json')
         parser.add_argument('credentials', type=dict, required=True, nullable=False, location='json')
@@ -292,6 +628,7 @@ class ToolApiProviderPreviousTestApi(Resource):
 
         args = parser.parse_args()
 
+        # 调用服务层方法，执行测试API工具的预览
         return ToolManageService.test_api_tool_preview(
             current_user.current_tenant_id,
             args['provider_name'] if args['provider_name'] else '',

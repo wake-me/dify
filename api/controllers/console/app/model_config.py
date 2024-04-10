@@ -19,17 +19,27 @@ from services.app_model_config_service import AppModelConfigService
 
 
 class ModelConfigResource(Resource):
+    # ModelConfigResource类：处理模型配置的资源
 
     @setup_required
     @login_required
     @account_initialization_required
     def post(self, app_id):
-        """Modify app model config"""
-        app_id = str(app_id)
+        """
+        修改应用模型配置
 
-        app = _get_app(app_id)
+        参数:
+        - app_id: 应用ID，用于标识需要修改模型配置的应用
 
-        # validate config
+        返回值:
+        - 一个包含结果信息的字典，例如{'result': 'success'}
+        """
+
+        app_id = str(app_id)  # 确保app_id为字符串类型
+
+        app = _get_app(app_id)  # 根据app_id获取应用对象
+
+        # 验证配置信息的合法性
         model_configuration = AppModelConfigService.validate_configuration(
             tenant_id=current_user.current_tenant_id,
             account=current_user,
@@ -40,14 +50,16 @@ class ModelConfigResource(Resource):
         new_app_model_config = AppModelConfig(
             app_id=app.id,
         )
+        # 从验证过的配置字典创建新的应用模型配置对象
         new_app_model_config = new_app_model_config.from_model_config_dict(model_configuration)
 
-        # get original app model config
+        # 获取原始应用模型配置
         original_app_model_config: AppModelConfig = db.session.query(AppModelConfig).filter(
             AppModelConfig.id == app.app_model_config_id
         ).first()
+
         agent_mode = original_app_model_config.agent_mode_dict
-        # decrypt agent tool parameters if it's secret-input
+        # 解密代理工具参数（如果是密文输入）
         parameter_map = {}
         masked_parameter_map = {}
         tool_map = {}
@@ -56,7 +68,7 @@ class ModelConfigResource(Resource):
                 continue
             
             agent_tool_entity = AgentToolEntity(**tool)
-            # get tool
+            # 获取工具运行时配置
             try:
                 tool_runtime = ToolManager.get_agent_tool_runtime(
                     tenant_id=current_user.current_tenant_id,
@@ -72,7 +84,7 @@ class ModelConfigResource(Resource):
             except Exception as e:
                 continue
 
-            # get decrypted parameters
+            # 获取解密后的参数
             if agent_tool_entity.tool_parameters:
                 parameters = manager.decrypt_tool_parameters(agent_tool_entity.tool_parameters or {})
                 masked_parameter = manager.mask_tool_parameters(parameters or {})
@@ -85,12 +97,12 @@ class ModelConfigResource(Resource):
             parameter_map[key] = parameters
             tool_map[key] = tool_runtime
 
-        # encrypt agent tool parameters if it's secret-input
+        # 如果是密文输入，则加密代理工具参数
         agent_mode = new_app_model_config.agent_mode_dict
         for tool in agent_mode.get('tools') or []:
             agent_tool_entity = AgentToolEntity(**tool)
             
-            # get tool
+            # 获取工具运行时配置
             key = f'{agent_tool_entity.provider_id}.{agent_tool_entity.provider_type}.{agent_tool_entity.tool_name}'
             if key in tool_map:
                 tool_runtime = tool_map[key]
@@ -112,7 +124,7 @@ class ModelConfigResource(Resource):
             )
             manager.delete_tool_parameters_cache()
 
-            # override parameters if it equals to masked parameters
+            # 如果参数等于遮罩参数，则覆盖参数值
             if agent_tool_entity.tool_parameters:
                 if key not in masked_parameter_map:
                     continue
@@ -120,11 +132,11 @@ class ModelConfigResource(Resource):
                 if agent_tool_entity.tool_parameters == masked_parameter_map[key]:
                     agent_tool_entity.tool_parameters = parameter_map[key]
 
-            # encrypt parameters
+            # 加密参数
             if agent_tool_entity.tool_parameters:
                 tool['tool_parameters'] = manager.encrypt_tool_parameters(agent_tool_entity.tool_parameters or {})
 
-        # update app model config
+        # 更新应用模型配置
         new_app_model_config.agent_mode = json.dumps(agent_mode)
 
         db.session.add(new_app_model_config)
@@ -133,12 +145,12 @@ class ModelConfigResource(Resource):
         app.app_model_config_id = new_app_model_config.id
         db.session.commit()
 
+        # 发送应用模型配置更新事件
         app_model_config_was_updated.send(
             app,
             app_model_config=new_app_model_config
         )
 
         return {'result': 'success'}
-
 
 api.add_resource(ModelConfigResource, '/apps/<uuid:app_id>/model-config')
