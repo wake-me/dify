@@ -32,13 +32,14 @@ class AgentChatAppRunner(AppRunner):
             conversation: Conversation,
             message: Message) -> None:
         """
-        Run assistant application
-        :param application_generate_entity: application generate entity
-        :param queue_manager: application queue manager
-        :param conversation: conversation
-        :param message: message
-        :return:
+        运行助手应用程序
+        :param application_generate_entity: 应用生成实体，包含应用配置、输入、查询等信息
+        :param queue_manager: 应用队列管理器，用于消息的发布和订阅
+        :param conversation: 会话对象，包含会话的相关信息
+        :param message: 消息对象，包含消息的内容、发送者等信息
+        :return: 无返回值
         """
+        # 加载应用配置并验证应用是否存在
         app_config = application_generate_entity.app_config
         app_config = cast(AgentChatAppConfig, app_config)
 
@@ -46,15 +47,11 @@ class AgentChatAppRunner(AppRunner):
         if not app_record:
             raise ValueError("App not found")
 
+        # 处理输入参数和查询，并进行前置计算，确定模型处理能力范围
         inputs = application_generate_entity.inputs
         query = application_generate_entity.query
         files = application_generate_entity.files
 
-        # Pre-calculate the number of tokens of the prompt messages,
-        # and return the rest number of tokens by model context token size limit and max token size limit.
-        # If the rest number of tokens is not enough, raise exception.
-        # Include: prompt template, inputs, query(optional), files(optional)
-        # Not Include: memory, external data, dataset context
         self.get_pre_calculate_rest_tokens(
             app_record=app_record,
             model_config=application_generate_entity.model_config,
@@ -64,9 +61,9 @@ class AgentChatAppRunner(AppRunner):
             query=query
         )
 
+        # 如果存在会话ID，则获取会话内存（只读）
         memory = None
         if application_generate_entity.conversation_id:
-            # get memory of conversation (read-only)
             model_instance = ModelInstance(
                 provider_model_bundle=application_generate_entity.model_config.provider_model_bundle,
                 model=application_generate_entity.model_config.model
@@ -77,9 +74,7 @@ class AgentChatAppRunner(AppRunner):
                 model_instance=model_instance
             )
 
-        # organize all inputs and template to prompt messages
-        # Include: prompt template, inputs, query(optional), files(optional)
-        #          memory(optional)
+        # 组织输入和模板到提示消息中
         prompt_messages, _ = self.organize_prompt_messages(
             app_record=app_record,
             model_config=application_generate_entity.model_config,
@@ -90,9 +85,8 @@ class AgentChatAppRunner(AppRunner):
             memory=memory
         )
 
-        # moderation
+        # 中介审核，处理敏感词避免
         try:
-            # process sensitive_word_avoidance
             _, inputs, query = self.moderation_for_inputs(
                 app_id=app_record.id,
                 tenant_id=app_config.tenant_id,
@@ -110,8 +104,8 @@ class AgentChatAppRunner(AppRunner):
             )
             return
 
+        # 如果存在查询，进行注解回复处理
         if query:
-            # annotation reply
             annotation_reply = self.query_app_annotations_to_reply(
                 app_record=app_record,
                 message=message,
@@ -135,7 +129,7 @@ class AgentChatAppRunner(AppRunner):
                 )
                 return
 
-        # fill in variable inputs from external data tools if exists
+        # 如果存在外部数据工具，填充输入变量
         external_data_tools = app_config.external_data_variables
         if external_data_tools:
             inputs = self.fill_in_inputs_from_external_data_tools(
@@ -146,9 +140,7 @@ class AgentChatAppRunner(AppRunner):
                 query=query
             )
 
-        # reorganize all inputs and template to prompt messages
-        # Include: prompt template, inputs, query(optional), files(optional)
-        #          memory(optional), external data, dataset context(optional)
+        # 重新组织输入和模板到提示消息中，包括外部数据和数据集上下文
         prompt_messages, _ = self.organize_prompt_messages(
             app_record=app_record,
             model_config=application_generate_entity.model_config,
@@ -159,7 +151,7 @@ class AgentChatAppRunner(AppRunner):
             memory=memory
         )
 
-        # check hosting moderation
+        # 进行宿主中介审核
         hosting_moderation_result = self.check_hosting_moderation(
             application_generate_entity=application_generate_entity,
             queue_manager=queue_manager,
@@ -169,17 +161,16 @@ class AgentChatAppRunner(AppRunner):
         if hosting_moderation_result:
             return
 
+        # 加载代理实体并处理工具变量
         agent_entity = app_config.agent
 
-        # load tool variables
         tool_conversation_variables = self._load_tool_variables(conversation_id=conversation.id,
-                                                   user_id=application_generate_entity.user_id,
-                                                   tenant_id=app_config.tenant_id)
+                                                            user_id=application_generate_entity.user_id,
+                                                            tenant_id=app_config.tenant_id)
 
-        # convert db variables to tool variables
         tool_variables = self._convert_db_variables_to_tool_variables(tool_conversation_variables)
 
-        # init model instance
+        # 初始化模型实例
         model_instance = ModelInstance(
             provider_model_bundle=application_generate_entity.model_config.provider_model_bundle,
             model=application_generate_entity.model_config.model
@@ -194,18 +185,19 @@ class AgentChatAppRunner(AppRunner):
             memory=memory,
         )
 
-        # change function call strategy based on LLM model
+        # 根据LLM模型，改变函数调用策略
         llm_model = cast(LargeLanguageModel, model_instance.model_type_instance)
         model_schema = llm_model.get_model_schema(model_instance.model, model_instance.credentials)
 
         if set([ModelFeature.MULTI_TOOL_CALL, ModelFeature.TOOL_CALL]).intersection(model_schema.features or []):
             agent_entity.strategy = AgentEntity.Strategy.FUNCTION_CALLING
 
+        # 更新会话和消息对象，并关闭数据库会话
         conversation = db.session.query(Conversation).filter(Conversation.id == conversation.id).first()
         message = db.session.query(Message).filter(Message.id == message.id).first()
         db.session.close()
 
-        # start agent runner
+        # 根据代理调用策略，启动相应运行器处理会话和消息
         if agent_entity.strategy == AgentEntity.Strategy.CHAIN_OF_THOUGHT:
             assistant_cot_runner = CotAgentRunner(
                 tenant_id=app_config.tenant_id,
@@ -250,7 +242,7 @@ class AgentChatAppRunner(AppRunner):
                 query=query,
             )
 
-        # handle invoke result
+        # 处理调用结果
         self._handle_invoke_result(
             invoke_result=invoke_result,
             queue_manager=queue_manager,
@@ -260,18 +252,27 @@ class AgentChatAppRunner(AppRunner):
 
     def _load_tool_variables(self, conversation_id: str, user_id: str, tenant_id: str) -> ToolConversationVariables:
         """
-        load tool variables from database
+        从数据库加载工具会话变量。
+        
+        参数:
+        conversation_id (str): 会话ID。
+        user_id (str): 用户ID。
+        tenant_id (str): 租户ID。
+        
+        返回:
+        ToolConversationVariables: 加载的工具会话变量实例。
         """
+        # 从数据库查询现有的工具会话变量
         tool_variables: ToolConversationVariables = db.session.query(ToolConversationVariables).filter(
             ToolConversationVariables.conversation_id == conversation_id,
             ToolConversationVariables.tenant_id == tenant_id
         ).first()
 
         if tool_variables:
-            # save tool variables to session, so that we can update it later
+            # 如果变量已存在，则将其添加到会话中以备后续更新
             db.session.add(tool_variables)
         else:
-            # create new tool variables
+            # 如果变量不存在，则创建新的工具会话变量并保存到数据库
             tool_variables = ToolConversationVariables(
                 conversation_id=conversation_id,
                 user_id=user_id,
@@ -279,41 +280,53 @@ class AgentChatAppRunner(AppRunner):
                 variables_str='[]',
             )
             db.session.add(tool_variables)
-            db.session.commit()
+            db.session.commit()  # 提交数据库事务以保存新的会话变量
 
         return tool_variables
     
     def _convert_db_variables_to_tool_variables(self, db_variables: ToolConversationVariables) -> ToolRuntimeVariablePool:
         """
-        convert db variables to tool variables
+        将数据库变量转换为工具变量。
+
+        参数:
+        - db_variables: ToolConversationVariables 类型，包含从数据库获取的会话变量。
+
+        返回值:
+        - ToolRuntimeVariablePool 类型，是一个包含转换后工具运行时变量的池。
         """
+        # 使用关键字参数构造 ToolRuntimeVariablePool 实例
         return ToolRuntimeVariablePool(**{
-            'conversation_id': db_variables.conversation_id,
-            'user_id': db_variables.user_id,
-            'tenant_id': db_variables.tenant_id,
-            'pool': db_variables.variables
+            'conversation_id': db_variables.conversation_id,  # 会话ID
+            'user_id': db_variables.user_id,  # 用户ID
+            'tenant_id': db_variables.tenant_id,  # 租户ID
+            'pool': db_variables.variables  # 变量池
         })
 
     def _get_usage_of_all_agent_thoughts(self, model_config: ModelConfigWithCredentialsEntity,
                                          message: Message) -> LLMUsage:
         """
-        Get usage of all agent thoughts
-        :param model_config: model config
-        :param message: message
-        :return:
+        获取所有代理思考的使用情况
+        :param model_config: 模型配置，包含认证信息
+        :param message: 消息对象
+        :return: 返回模型使用情况
         """
+        # 从数据库查询与当前消息关联的所有代理思考记录
         agent_thoughts = (db.session.query(MessageAgentThought)
                           .filter(MessageAgentThought.message_id == message.id).all())
 
+        # 初始化消息令牌和答案令牌的总数
         all_message_tokens = 0
         all_answer_tokens = 0
+        # 计算所有代理思考中消息和答案的令牌总数
         for agent_thought in agent_thoughts:
             all_message_tokens += agent_thought.message_tokens
             all_answer_tokens += agent_thought.answer_tokens
 
+        # 获取模型类型实例，并强制转换为大型语言模型类型
         model_type_instance = model_config.provider_model_bundle.model_type_instance
         model_type_instance = cast(LargeLanguageModel, model_type_instance)
 
+        # 计算并返回响应的使用情况
         return model_type_instance._calc_response_usage(
             model_config.model,
             model_config.credentials,

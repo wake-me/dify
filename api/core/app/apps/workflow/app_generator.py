@@ -29,25 +29,27 @@ logger = logging.getLogger(__name__)
 
 class WorkflowAppGenerator(BaseAppGenerator):
     def generate(self, app_model: App,
-                 workflow: Workflow,
-                 user: Union[Account, EndUser],
-                 args: dict,
-                 invoke_from: InvokeFrom,
-                 stream: bool = True) \
+                workflow: Workflow,
+                user: Union[Account, EndUser],
+                args: dict,
+                invoke_from: InvokeFrom,
+                stream: bool = True) \
             -> Union[dict, Generator[dict, None, None]]:
         """
-        Generate App response.
+        生成App响应。
 
-        :param app_model: App
-        :param workflow: Workflow
-        :param user: account or end user
-        :param args: request args
-        :param invoke_from: invoke from source
-        :param stream: is stream
+        :param app_model: App模型，代表一个应用。
+        :param workflow: 工作流，定义了应用的处理流程。
+        :param user: 账户或终端用户，执行操作的用户。
+        :param args: 请求参数。
+        :param invoke_from: 调用来源。
+        :param stream: 是否流式返回结果，默认为True。
+        :return: 返回一个字典或生成器，包含应用的响应信息。
         """
+        # 解析输入参数
         inputs = args['inputs']
 
-        # parse files
+        # 解析文件参数
         files = args['files'] if 'files' in args and args['files'] else []
         message_file_parser = MessageFileParser(tenant_id=app_model.tenant_id, app_id=app_model.id)
         file_extra_config = FileUploadConfigManager.convert(workflow.features_dict, is_vision=False)
@@ -60,13 +62,13 @@ class WorkflowAppGenerator(BaseAppGenerator):
         else:
             file_objs = []
 
-        # convert to app config
+        # 转换为应用配置
         app_config = WorkflowAppConfigManager.get_app_config(
             app_model=app_model,
             workflow=workflow
         )
 
-        # init application generate entity
+        # 初始化应用生成实体
         application_generate_entity = WorkflowAppGenerateEntity(
             task_id=str(uuid.uuid4()),
             app_config=app_config,
@@ -77,7 +79,7 @@ class WorkflowAppGenerator(BaseAppGenerator):
             invoke_from=invoke_from
         )
 
-        # init queue manager
+        # 初始化队列管理器
         queue_manager = WorkflowAppQueueManager(
             task_id=application_generate_entity.task_id,
             user_id=application_generate_entity.user_id,
@@ -85,16 +87,15 @@ class WorkflowAppGenerator(BaseAppGenerator):
             app_mode=app_model.mode
         )
 
-        # new thread
+        # 在新线程中执行工作
         worker_thread = threading.Thread(target=self._generate_worker, kwargs={
             'flask_app': current_app._get_current_object(),
             'application_generate_entity': application_generate_entity,
             'queue_manager': queue_manager
         })
-
         worker_thread.start()
 
-        # return response or stream generator
+        # 处理响应或返回流式生成器
         response = self._handle_response(
             application_generate_entity=application_generate_entity,
             workflow=workflow,
@@ -103,6 +104,7 @@ class WorkflowAppGenerator(BaseAppGenerator):
             stream=stream
         )
 
+        # 转换响应格式
         return WorkflowAppGenerateResponseConverter.convert(
             response=response,
             invoke_from=invoke_from
@@ -112,69 +114,77 @@ class WorkflowAppGenerator(BaseAppGenerator):
                          application_generate_entity: WorkflowAppGenerateEntity,
                          queue_manager: AppQueueManager) -> None:
         """
-        Generate worker in a new thread.
-        :param flask_app: Flask app
-        :param application_generate_entity: application generate entity
-        :param queue_manager: queue manager
-        :return:
+        在新线程中生成worker。
+        :param flask_app: Flask应用实例，用于提供应用上下文。
+        :param application_generate_entity: 用于工作流应用生成的实体对象。
+        :param queue_manager: 队列管理器，用于任务的发布和管理。
+        :return: 无返回值。
         """
         with flask_app.app_context():
             try:
-                # workflow app
+                # 初始化工作流应用运行器并执行生成任务
                 runner = WorkflowAppRunner()
                 runner.run(
                     application_generate_entity=application_generate_entity,
                     queue_manager=queue_manager
                 )
             except GenerateTaskStoppedException:
+                # 生成任务被停止，直接跳过处理
                 pass
             except InvokeAuthorizationError:
+                # 授权错误，发布错误信息到队列
                 queue_manager.publish_error(
                     InvokeAuthorizationError('Incorrect API key provided'),
                     PublishFrom.APPLICATION_MANAGER
                 )
             except ValidationError as e:
+                # 验证错误，发布错误信息到队列
                 logger.exception("Validation Error when generating")
                 queue_manager.publish_error(e, PublishFrom.APPLICATION_MANAGER)
             except (ValueError, InvokeError) as e:
+                # 价值错误或调用错误，发布错误信息到队列
                 queue_manager.publish_error(e, PublishFrom.APPLICATION_MANAGER)
             except Exception as e:
+                # 未知错误，记录异常并发布错误信息到队列
                 logger.exception("Unknown Error when generating")
                 queue_manager.publish_error(e, PublishFrom.APPLICATION_MANAGER)
             finally:
+                # 清理数据库会话
                 db.session.remove()
 
     def _handle_response(self, application_generate_entity: WorkflowAppGenerateEntity,
-                         workflow: Workflow,
-                         queue_manager: AppQueueManager,
-                         user: Union[Account, EndUser],
-                         stream: bool = False) -> Union[
-        WorkflowAppBlockingResponse,
-        Generator[WorkflowAppStreamResponse, None, None]
-    ]:
-        """
-        Handle response.
-        :param application_generate_entity: application generate entity
-        :param workflow: workflow
-        :param queue_manager: queue manager
-        :param user: account or end user
-        :param stream: is stream
-        :return:
-        """
-        # init generate task pipeline
-        generate_task_pipeline = WorkflowAppGenerateTaskPipeline(
-            application_generate_entity=application_generate_entity,
-            workflow=workflow,
-            queue_manager=queue_manager,
-            user=user,
-            stream=stream
-        )
+                        workflow: Workflow,
+                        queue_manager: AppQueueManager,
+                        user: Union[Account, EndUser],
+                        stream: bool = False) -> Union[
+            WorkflowAppBlockingResponse,
+            Generator[WorkflowAppStreamResponse, None, None]
+        ]:
+            """
+            处理响应。
+            :param application_generate_entity: 用于工作流应用生成的实体
+            :param workflow: 工作流实例
+            :param queue_manager: 队列管理器，用于管理任务队列
+            :param user: 账户或终端用户，标识请求的发起者
+            :param stream: 是否采用流式处理，默认为False
+            :return: 根据流式处理标志返回不同的响应类型，如果stream为True，则返回一个生成器对象；否则返回一个阻塞响应对象
+            """
+            # 初始化生成任务管道
+            generate_task_pipeline = WorkflowAppGenerateTaskPipeline(
+                application_generate_entity=application_generate_entity,
+                workflow=workflow,
+                queue_manager=queue_manager,
+                user=user,
+                stream=stream
+            )
 
-        try:
-            return generate_task_pipeline.process()
-        except ValueError as e:
-            if e.args[0] == "I/O operation on closed file.":  # ignore this error
-                raise GenerateTaskStoppedException()
-            else:
-                logger.exception(e)
-                raise e
+            try:
+                # 处理生成任务，并返回响应
+                return generate_task_pipeline.process()
+            except ValueError as e:
+                # 忽略"文件被关闭"的错误，其它错误记录日志并抛出
+                if e.args[0] == "I/O operation on closed file.":  # 忽略此错误
+                    raise GenerateTaskStoppedException()
+                else:
+                    logger.exception(e)
+                    raise e

@@ -48,13 +48,13 @@ logger = logging.getLogger(__name__)
 
 class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleManage):
     """
-    WorkflowAppGenerateTaskPipeline is a class that generate stream output and state management for Application.
+    WorkflowAppGenerateTaskPipeline 是一个为应用程序生成流输出和状态管理的类。
     """
-    _workflow: Workflow
-    _user: Union[Account, EndUser]
-    _task_state: WorkflowTaskState
-    _application_generate_entity: WorkflowAppGenerateEntity
-    _workflow_system_variables: dict[SystemVariable, Any]
+    _workflow: Workflow  # 工作流实例
+    _user: Union[Account, EndUser]  # 用户账户
+    _task_state: WorkflowTaskState  # 工作流任务状态
+    _application_generate_entity: WorkflowAppGenerateEntity  # 应用生成实体
+    _workflow_system_variables: dict[SystemVariable, Any]  # 工作流系统变量
 
     def __init__(self, application_generate_entity: WorkflowAppGenerateEntity,
                  workflow: Workflow,
@@ -62,12 +62,12 @@ class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleMa
                  user: Union[Account, EndUser],
                  stream: bool) -> None:
         """
-        Initialize GenerateTaskPipeline.
-        :param application_generate_entity: application generate entity
-        :param workflow: workflow
-        :param queue_manager: queue manager
-        :param user: user
-        :param stream: is streamed
+        初始化 GenerateTaskPipeline。
+        :param application_generate_entity: 应用生成实体
+        :param workflow: 工作流
+        :param queue_manager: 队列管理器
+        :param user: 用户
+        :param stream: 是否为流式
         """
         super().__init__(application_generate_entity, queue_manager, user, stream)
 
@@ -80,28 +80,28 @@ class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleMa
 
     def process(self) -> Union[WorkflowAppBlockingResponse, Generator[WorkflowAppStreamResponse, None, None]]:
         """
-        Process generate task pipeline.
-        :return:
+        处理生成任务管道。
+        :return: 根据是否为流式返回不同的响应类型
         """
-        db.session.refresh(self._workflow)
-        db.session.refresh(self._user)
-        db.session.close()
+        db.session.refresh(self._workflow)  # 刷新工作流实例
+        db.session.refresh(self._user)  # 刷新用户实例
+        db.session.close()  # 关闭数据库会话
 
-        generator = self._process_stream_response()
+        generator = self._process_stream_response()  # 处理流响应
         if self._stream:
-            return self._to_stream_response(generator)
+            return self._to_stream_response(generator)  # 转换为流式响应
         else:
-            return self._to_blocking_response(generator)
+            return self._to_blocking_response(generator)  # 转换为阻塞式响应
 
     def _to_blocking_response(self, generator: Generator[StreamResponse, None, None]) \
             -> WorkflowAppBlockingResponse:
         """
-        To blocking response.
-        :return:
+        转换为阻塞式响应。
+        :return: 阻塞式响应实例
         """
         for stream_response in generator:
             if isinstance(stream_response, ErrorStreamResponse):
-                raise stream_response.err
+                raise stream_response.err  # 抛出错误
             elif isinstance(stream_response, WorkflowFinishStreamResponse):
                 workflow_run = db.session.query(WorkflowRun).filter(
                     WorkflowRun.id == self._task_state.workflow_run_id).first()
@@ -127,13 +127,13 @@ class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleMa
             else:
                 continue
 
-        raise Exception('Queue listening stopped unexpectedly.')
+        raise Exception('Queue listening stopped unexpectedly.')  # 异常处理
 
     def _to_stream_response(self, generator: Generator[StreamResponse, None, None]) \
             -> Generator[WorkflowAppStreamResponse, None, None]:
         """
-        To stream response.
-        :return:
+        转换为流式响应。
+        :return: 流式响应生成器
         """
         for stream_response in generator:
             yield WorkflowAppStreamResponse(
@@ -143,22 +143,24 @@ class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleMa
 
     def _process_stream_response(self) -> Generator[StreamResponse, None, None]:
         """
-        Process stream response.
-        :return:
+        处理流式响应。
+        :return: 流式响应生成器
         """
-        for message in self._queue_manager.listen():
+        for message in self._queue_manager.listen():  # 监听队列消息
             event = message.event
 
             if isinstance(event, QueueErrorEvent):
                 err = self._handle_error(event)
                 yield self._error_to_stream_response(err)
                 break
+            # 处理工作流开始事件
             elif isinstance(event, QueueWorkflowStartedEvent):
                 workflow_run = self._handle_workflow_start()
                 yield self._workflow_start_to_stream_response(
                     task_id=self._application_generate_entity.task_id,
                     workflow_run=workflow_run
                 )
+            # 处理节点开始事件
             elif isinstance(event, QueueNodeStartedEvent):
                 workflow_node_execution = self._handle_node_start(event)
                 yield self._workflow_node_start_to_stream_response(
@@ -166,22 +168,25 @@ class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleMa
                     task_id=self._application_generate_entity.task_id,
                     workflow_node_execution=workflow_node_execution
                 )
+            # 处理节点完成事件
             elif isinstance(event, QueueNodeSucceededEvent | QueueNodeFailedEvent):
                 workflow_node_execution = self._handle_node_finished(event)
                 yield self._workflow_node_finish_to_stream_response(
                     task_id=self._application_generate_entity.task_id,
                     workflow_node_execution=workflow_node_execution
                 )
+            # 处理工作流完成事件
             elif isinstance(event, QueueStopEvent | QueueWorkflowSucceededEvent | QueueWorkflowFailedEvent):
                 workflow_run = self._handle_workflow_finished(event)
 
-                # save workflow app log
+                # 保存工作流应用日志
                 self._save_workflow_app_log(workflow_run)
 
                 yield self._workflow_finish_to_stream_response(
                     task_id=self._application_generate_entity.task_id,
                     workflow_run=workflow_run
                 )
+            # 处理文本块事件
             elif isinstance(event, QueueTextChunkEvent):
                 delta_text = event.text
                 if delta_text is None:
@@ -189,8 +194,10 @@ class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleMa
 
                 self._task_state.answer += delta_text
                 yield self._text_chunk_to_stream_response(delta_text)
+            # 处理文本替换事件
             elif isinstance(event, QueueMessageReplaceEvent):
                 yield self._text_replace_to_stream_response(event.text)
+            # 处理心跳事件
             elif isinstance(event, QueuePingEvent):
                 yield self._ping_stream_response()
             else:
@@ -198,8 +205,8 @@ class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleMa
 
     def _save_workflow_app_log(self, workflow_run: WorkflowRun) -> None:
         """
-        Save workflow app log.
-        :return:
+        保存工作流应用日志。
+        :param workflow_run: 工作流运行实例
         """
         invoke_from = self._application_generate_entity.invoke_from
         if invoke_from == InvokeFrom.SERVICE_API:
@@ -209,7 +216,7 @@ class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleMa
         elif invoke_from == InvokeFrom.WEB_APP:
             created_from = WorkflowAppLogCreatedFrom.WEB_APP
         else:
-            # not save log for debugging
+            # 为调试目的不保存日志
             return
 
         workflow_app_log = WorkflowAppLog(
@@ -227,9 +234,9 @@ class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleMa
 
     def _text_chunk_to_stream_response(self, text: str) -> TextChunkStreamResponse:
         """
-        Handle completed event.
-        :param text: text
-        :return:
+        处理文本块事件。
+        :param text: 文本块
+        :return: 文本块流式响应实例
         """
         response = TextChunkStreamResponse(
             task_id=self._application_generate_entity.task_id,
@@ -240,9 +247,9 @@ class WorkflowAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCycleMa
 
     def _text_replace_to_stream_response(self, text: str) -> TextReplaceStreamResponse:
         """
-        Text replace to stream response.
-        :param text: text
-        :return:
+        文本替换到流式响应。
+        :param text: 替换后的文本
+        :return: 文本替换流式响应实例
         """
         return TextReplaceStreamResponse(
             task_id=self._application_generate_entity.task_id,

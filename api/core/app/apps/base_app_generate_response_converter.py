@@ -20,16 +20,26 @@ class AppGenerateResponseConverter(ABC):
         dict,
         Generator[str, None, None]
     ]:
+        """
+        根据调用来源转换响应格式。
+
+        :param response: 响应对象，可以是阻塞类型响应或流式响应生成器。
+        :param invoke_from: 调用来源枚举，决定响应的转换方式。
+        :return: 转换后的响应，可以是字典或生成器，具体取决于调用来源和响应类型。
+        """
         if invoke_from in [InvokeFrom.DEBUGGER, InvokeFrom.SERVICE_API]:
+            # 调用来自DEBUGGER或SERVICE_API，且响应为阻塞类型，则进行完全响应转换
             if isinstance(response, cls._blocking_response_type):
                 return cls.convert_blocking_full_response(response)
             else:
+                # 响应为流式，则生成包含数据的生成器
                 def _generate():
                     for chunk in cls.convert_stream_full_response(response):
                         yield f'data: {chunk}\n\n'
 
                 return _generate()
         else:
+            # 其他调用来源，进行简单响应转换
             if isinstance(response, cls._blocking_response_type):
                 return cls.convert_blocking_simple_response(response)
             else:
@@ -42,33 +52,58 @@ class AppGenerateResponseConverter(ABC):
     @classmethod
     @abstractmethod
     def convert_blocking_full_response(cls, blocking_response: AppBlockingResponse) -> dict:
+        """
+        转换阻塞类型的完全响应。
+
+        :param blocking_response: 阻塞类型响应对象。
+        :return: 转换后的完全响应字典。
+        """
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
     def convert_blocking_simple_response(cls, blocking_response: AppBlockingResponse) -> dict:
+        """
+        转换阻塞类型的简单响应。
+
+        :param blocking_response: 阻塞类型响应对象。
+        :return: 转换后的简单响应字典。
+        """
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
     def convert_stream_full_response(cls, stream_response: Generator[AppStreamResponse, None, None]) \
             -> Generator[str, None, None]:
+        """
+        转换流式类型的完全响应生成器。
+
+        :param stream_response: 流式响应生成器。
+        :return: 转换后的完全响应数据生成器。
+        """
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
     def convert_stream_simple_response(cls, stream_response: Generator[AppStreamResponse, None, None]) \
             -> Generator[str, None, None]:
+        """
+        转换流式类型的简单响应生成器。
+
+        :param stream_response: 流式响应生成器。
+        :return: 转换后的简单响应数据生成器。
+        """
         raise NotImplementedError
 
     @classmethod
     def _get_simple_metadata(cls, metadata: dict) -> dict:
         """
-        Get simple metadata.
-        :param metadata: metadata
-        :return:
+        提取简单的元数据。
+
+        :param metadata: 原始元数据字典。
+        :return: 简化后的元数据字典。
         """
-        # show_retrieve_source
+        # 清理和简化元数据，移除特定字段或转换格式
         if 'retriever_resources' in metadata:
             metadata['retriever_resources'] = []
             for resource in metadata['retriever_resources']:
@@ -80,11 +115,10 @@ class AppGenerateResponseConverter(ABC):
                     'content': resource['content'],
                 })
 
-        # show annotation reply
+        # 移除'annotation_reply'和'usage'字段
         if 'annotation_reply' in metadata:
             del metadata['annotation_reply']
 
-        # show usage
         if 'usage' in metadata:
             del metadata['usage']
 
@@ -93,10 +127,12 @@ class AppGenerateResponseConverter(ABC):
     @classmethod
     def _error_to_stream_response(cls, e: Exception) -> dict:
         """
-        Error to stream response.
-        :param e: exception
-        :return:
+        将异常转换为流式响应格式。
+
+        :param e: 异常对象。
+        :return: 转换后的流式响应字典。
         """
+        # 定义不同异常对应的响应数据
         error_responses = {
             ValueError: {'code': 'invalid_param', 'status': 400},
             ProviderTokenNotInitError: {'code': 'provider_not_initialize', 'status': 400},
@@ -110,7 +146,7 @@ class AppGenerateResponseConverter(ABC):
             InvokeError: {'code': 'completion_request_error', 'status': 400}
         }
 
-        # Determine the response based on the type of exception
+        # 根据异常类型匹配响应数据
         data = None
         for k, v in error_responses.items():
             if isinstance(e, k):

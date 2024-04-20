@@ -17,13 +17,29 @@ from models.workflow import Workflow
 
 
 class WorkflowEventTriggerCallback(BaseWorkflowCallback):
+    """
+    工作流事件触发回调类，用于在工作流的不同阶段触发相应的事件。
+
+    Attributes:
+        queue_manager (AppQueueManager): 队列管理器，用于发布事件。
+        workflow (Workflow): 当前工作流实例。
+    """
 
     def __init__(self, queue_manager: AppQueueManager, workflow: Workflow):
+        """
+        初始化工作流事件触发回调类实例。
+
+        Parameters:
+            queue_manager (AppQueueManager): 队列管理器，用于发布事件。
+            workflow (Workflow): 当前工作流实例。
+        """
         self._queue_manager = queue_manager
 
     def on_workflow_run_started(self) -> None:
         """
-        Workflow run started
+        工作流运行开始时触发的回调。
+
+        发布工作流开始事件。
         """
         self._queue_manager.publish(
             QueueWorkflowStartedEvent(),
@@ -32,7 +48,9 @@ class WorkflowEventTriggerCallback(BaseWorkflowCallback):
 
     def on_workflow_run_succeeded(self) -> None:
         """
-        Workflow run succeeded
+        工作流运行成功结束时触发的回调。
+
+        发布工作流成功事件。
         """
         self._queue_manager.publish(
             QueueWorkflowSucceededEvent(),
@@ -41,7 +59,12 @@ class WorkflowEventTriggerCallback(BaseWorkflowCallback):
 
     def on_workflow_run_failed(self, error: str) -> None:
         """
-        Workflow run failed
+        工作流运行失败时触发的回调。
+
+        Parameters:
+            error (str): 错误信息。
+
+        发布工作流失败事件。
         """
         self._queue_manager.publish(
             QueueWorkflowFailedEvent(
@@ -56,7 +79,16 @@ class WorkflowEventTriggerCallback(BaseWorkflowCallback):
                                          node_run_index: int = 1,
                                          predecessor_node_id: Optional[str] = None) -> None:
         """
-        Workflow node execute started
+        工作流节点执行开始时触发的回调。
+
+        Parameters:
+            node_id (str): 节点ID。
+            node_type (NodeType): 节点类型。
+            node_data (BaseNodeData): 节点数据。
+            node_run_index (int): 节点运行索引，默认为1。
+            predecessor_node_id (Optional[str]): 前驱节点ID，可选。
+
+        发布节点执行开始事件。
         """
         self._queue_manager.publish(
             QueueNodeStartedEvent(
@@ -77,7 +109,18 @@ class WorkflowEventTriggerCallback(BaseWorkflowCallback):
                                            outputs: Optional[dict] = None,
                                            execution_metadata: Optional[dict] = None) -> None:
         """
-        Workflow node execute succeeded
+        工作流节点执行成功结束时触发的回调。
+
+        Parameters:
+            node_id (str): 节点ID。
+            node_type (NodeType): 节点类型。
+            node_data (BaseNodeData): 节点数据。
+            inputs (Optional[dict]): 输入数据，默认为None。
+            process_data (Optional[dict]): 处理数据，默认为None。
+            outputs (Optional[dict]): 输出数据，默认为None。
+            execution_metadata (Optional[dict]): 执行元数据，默认为None。
+
+        发布节点执行成功事件。
         """
         self._queue_manager.publish(
             QueueNodeSucceededEvent(
@@ -100,7 +143,18 @@ class WorkflowEventTriggerCallback(BaseWorkflowCallback):
                                         outputs: Optional[dict] = None,
                                         process_data: Optional[dict] = None) -> None:
         """
-        Workflow node execute failed
+        工作流节点执行失败时触发的回调。
+
+        Parameters:
+            node_id (str): 节点ID。
+            node_type (NodeType): 节点类型。
+            node_data (BaseNodeData): 节点数据。
+            error (str): 错误信息。
+            inputs (Optional[dict]): 输入数据，默认为None。
+            outputs (Optional[dict]): 输出数据，默认为None。
+            process_data (Optional[dict]): 处理数据，默认为None。
+
+        发布节点执行失败事件。
         """
         self._queue_manager.publish(
             QueueNodeFailedEvent(
@@ -117,12 +171,20 @@ class WorkflowEventTriggerCallback(BaseWorkflowCallback):
 
     def on_node_text_chunk(self, node_id: str, text: str, metadata: Optional[dict] = None) -> None:
         """
-        Publish text chunk
+        发布文本块。
+
+        Parameters:
+            node_id (str): 节点ID。
+            text (str): 文本内容。
+            metadata (Optional[dict]): 元数据，默认为None。
         """
         pass
 
     def on_event(self, event: AppQueueEvent) -> None:
         """
-        Publish event
+        发布事件。
+
+        Parameters:
+            event (AppQueueEvent): 事件对象。
         """
         pass

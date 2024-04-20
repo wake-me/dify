@@ -23,26 +23,29 @@ class CompletionAppConfig(EasyUIBasedAppConfig):
 class CompletionAppConfigManager(BaseAppConfigManager):
     @classmethod
     def get_app_config(cls, app_model: App,
-                       app_model_config: AppModelConfig,
-                       override_config_dict: Optional[dict] = None) -> CompletionAppConfig:
+                        app_model_config: AppModelConfig,
+                        override_config_dict: Optional[dict] = None) -> CompletionAppConfig:
         """
-        Convert app model config to completion app config
-        :param app_model: app model
-        :param app_model_config: app model config
-        :param override_config_dict: app model config dict
-        :return:
+        将应用模型配置转换为完成应用配置。
+        :param app_model: 应用模型，包含应用的基本信息。
+        :param app_model_config: 应用模型配置，具体定义了应用的配置细节。
+        :param override_config_dict: 覆盖应用模型配置的字典，可选。
+        :return: 返回一个CompletionAppConfig实例，包含了转换后的应用配置。
         """
+        # 根据是否提供了覆盖配置来决定配置来源
         if override_config_dict:
             config_from = EasyUIBasedAppModelConfigFrom.ARGS
         else:
             config_from = EasyUIBasedAppModelConfigFrom.APP_LATEST_CONFIG
 
+        # 根据配置来源获取配置字典
         if config_from != EasyUIBasedAppModelConfigFrom.ARGS:
             app_model_config_dict = app_model_config.to_dict()
             config_dict = app_model_config_dict.copy()
         else:
             config_dict = override_config_dict
 
+        # 将应用模式转换为枚举类型，并初始化CompletionAppConfig实例
         app_mode = AppMode.value_of(app_model.mode)
         app_config = CompletionAppConfig(
             tenant_id=app_model.tenant_id,
@@ -66,6 +69,7 @@ class CompletionAppConfigManager(BaseAppConfigManager):
             additional_features=cls.convert_features(config_dict, app_mode)
         )
 
+        # 转换基础变量配置和外部数据变量配置
         app_config.variables, app_config.external_data_variables = BasicVariablesConfigManager.convert(
             config=config_dict
         )
@@ -75,52 +79,55 @@ class CompletionAppConfigManager(BaseAppConfigManager):
     @classmethod
     def config_validate(cls, tenant_id: str, config: dict) -> dict:
         """
-        Validate for completion app model config
+        验证完成应用模型配置的完整性
 
-        :param tenant_id: tenant id
-        :param config: app model config args
+        :param tenant_id: 租户id
+        :param config: 应用模型配置参数
+        :return: 验证后包含所有相关配置键的字典
         """
+        # 初始化应用模式为完成模式
         app_mode = AppMode.COMPLETION
 
         related_config_keys = []
 
-        # model
+        # 验证并设置模型配置的默认值
         config, current_related_config_keys = ModelConfigManager.validate_and_set_defaults(tenant_id, config)
         related_config_keys.extend(current_related_config_keys)
 
-        # user_input_form
+        # 验证并设置用户输入表单的默认值
         config, current_related_config_keys = BasicVariablesConfigManager.validate_and_set_defaults(tenant_id, config)
         related_config_keys.extend(current_related_config_keys)
 
-        # file upload validation
+        # 验证并设置文件上传配置的默认值
         config, current_related_config_keys = FileUploadConfigManager.validate_and_set_defaults(config)
         related_config_keys.extend(current_related_config_keys)
 
-        # prompt
+        # 验证并设置提示模板配置的默认值
         config, current_related_config_keys = PromptTemplateConfigManager.validate_and_set_defaults(app_mode, config)
         related_config_keys.extend(current_related_config_keys)
 
-        # dataset_query_variable
+        # 验证并设置数据集查询变量配置的默认值
         config, current_related_config_keys = DatasetConfigManager.validate_and_set_defaults(tenant_id, app_mode,
-                                                                                             config)
+                                                                                            config)
         related_config_keys.extend(current_related_config_keys)
 
-        # text_to_speech
+        # 验证并设置文本转语音配置的默认值
         config, current_related_config_keys = TextToSpeechConfigManager.validate_and_set_defaults(config)
         related_config_keys.extend(current_related_config_keys)
 
-        # more_like_this
+        # 验证并设置"更多类似"配置的默认值
         config, current_related_config_keys = MoreLikeThisConfigManager.validate_and_set_defaults(config)
         related_config_keys.extend(current_related_config_keys)
 
-        # moderation validation
+        # 验证并设置审核配置的默认值
         config, current_related_config_keys = SensitiveWordAvoidanceConfigManager.validate_and_set_defaults(tenant_id,
-                                                                                                            config)
+                                                                                                        config)
         related_config_keys.extend(current_related_config_keys)
 
+        # 去除重复的配置键
         related_config_keys = list(set(related_config_keys))
 
-        # Filter out extra parameters
+        # 过滤出相关的配置参数
         filtered_config = {key: config.get(key) for key in related_config_keys}
 
         return filtered_config

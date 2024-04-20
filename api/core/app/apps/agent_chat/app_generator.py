@@ -27,23 +27,29 @@ logger = logging.getLogger(__name__)
 
 class AgentChatAppGenerator(MessageBasedAppGenerator):
     def generate(self, app_model: App,
-                 user: Union[Account, EndUser],
-                 args: Any,
-                 invoke_from: InvokeFrom,
-                 stream: bool = True) \
+                user: Union[Account, EndUser],
+                args: Any,
+                invoke_from: InvokeFrom,
+                stream: bool = True) \
             -> Union[dict, Generator[dict, None, None]]:
         """
-        Generate App response.
+        生成App响应。
 
-        :param app_model: App
-        :param user: account or end user
-        :param args: request args
-        :param invoke_from: invoke from source
-        :param stream: is stream
+        :param app_model: App模型，代表一个应用。
+        :param user: 账户或终端用户，表示当前发起请求的用户。
+        :param args: 请求参数。
+        :param invoke_from: 调用来源。
+        :param stream: 是否流式返回结果，默认为True。
+        :return: 根据stream参数，返回字典或生成器，其中包含App的响应信息。
+
+        该方法主要负责处理App的生成响应流程，包括校验请求参数、解析文件、初始化生成实体和记录、启动工作线程，以及最终返回响应结果。
         """
+
+        # 检查非流式返回模式是否被支持
         if not stream:
             raise ValueError('Agent Chat App does not support blocking mode')
 
+        # 校验查询参数
         if not args.get('query'):
             raise ValueError('query is required')
 
@@ -54,34 +60,35 @@ class AgentChatAppGenerator(MessageBasedAppGenerator):
         query = query.replace('\x00', '')
         inputs = args['inputs']
 
+        # 准备额外参数
         extras = {
             "auto_generate_conversation_name": args['auto_generate_name'] if 'auto_generate_name' in args else True
         }
 
-        # get conversation
+        # 尝试根据会话ID获取会话
         conversation = None
         if args.get('conversation_id'):
             conversation = self._get_conversation_by_user(app_model, args.get('conversation_id'), user)
 
-        # get app model config
+        # 获取App模型配置
         app_model_config = self._get_app_model_config(
             app_model=app_model,
             conversation=conversation
         )
 
-        # validate override model config
+        # 验证并处理覆盖模型配置的参数
         override_model_config_dict = None
         if args.get('model_config'):
             if invoke_from != InvokeFrom.DEBUGGER:
                 raise ValueError('Only in App debug mode can override model config')
 
-            # validate config
+            # 验证配置
             override_model_config_dict = AgentChatAppConfigManager.config_validate(
                 tenant_id=app_model.tenant_id,
                 config=args.get('model_config')
             )
 
-        # parse files
+        # 解析文件参数
         files = args['files'] if 'files' in args and args['files'] else []
         message_file_parser = MessageFileParser(tenant_id=app_model.tenant_id, app_id=app_model.id)
         file_extra_config = FileUploadConfigManager.convert(override_model_config_dict or app_model_config.to_dict())
@@ -94,7 +101,7 @@ class AgentChatAppGenerator(MessageBasedAppGenerator):
         else:
             file_objs = []
 
-        # convert to app config
+        # 转换为应用配置
         app_config = AgentChatAppConfigManager.get_app_config(
             app_model=app_model,
             app_model_config=app_model_config,
@@ -102,7 +109,7 @@ class AgentChatAppGenerator(MessageBasedAppGenerator):
             override_config_dict=override_model_config_dict
         )
 
-        # init application generate entity
+        # 初始化应用生成实体
         application_generate_entity = AgentChatAppGenerateEntity(
             task_id=str(uuid.uuid4()),
             app_config=app_config,
@@ -117,13 +124,13 @@ class AgentChatAppGenerator(MessageBasedAppGenerator):
             extras=extras
         )
 
-        # init generate records
+        # 初始化生成记录
         (
             conversation,
             message
         ) = self._init_generate_records(application_generate_entity, conversation)
 
-        # init queue manager
+        # 初始化队列管理器
         queue_manager = MessageBasedAppQueueManager(
             task_id=application_generate_entity.task_id,
             user_id=application_generate_entity.user_id,
@@ -133,7 +140,7 @@ class AgentChatAppGenerator(MessageBasedAppGenerator):
             message_id=message.id
         )
 
-        # new thread
+        # 启动工作线程处理生成任务
         worker_thread = threading.Thread(target=self._generate_worker, kwargs={
             'flask_app': current_app._get_current_object(),
             'application_generate_entity': application_generate_entity,
@@ -141,10 +148,9 @@ class AgentChatAppGenerator(MessageBasedAppGenerator):
             'conversation_id': conversation.id,
             'message_id': message.id,
         })
-
         worker_thread.start()
 
-        # return response or stream generator
+        # 处理并返回响应
         response = self._handle_response(
             application_generate_entity=application_generate_entity,
             queue_manager=queue_manager,
@@ -154,6 +160,7 @@ class AgentChatAppGenerator(MessageBasedAppGenerator):
             stream=stream
         )
 
+        # 转换并返回最终的响应对象
         return AgentChatAppGenerateResponseConverter.convert(
             response=response,
             invoke_from=invoke_from
@@ -165,21 +172,21 @@ class AgentChatAppGenerator(MessageBasedAppGenerator):
                          conversation_id: str,
                          message_id: str) -> None:
         """
-        Generate worker in a new thread.
-        :param flask_app: Flask app
-        :param application_generate_entity: application generate entity
-        :param queue_manager: queue manager
-        :param conversation_id: conversation ID
-        :param message_id: message ID
-        :return:
+        在新线程中生成工作器。
+        :param flask_app: Flask应用实例
+        :param application_generate_entity: 应用生成实体，包含生成任务的具体信息
+        :param queue_manager: 队列管理器，用于任务的发布和管理
+        :param conversation_id: 会话ID
+        :param message_id: 消息ID
+        :return: 无返回值
         """
         with flask_app.app_context():
             try:
-                # get conversation and message
+                # 获取会话和消息
                 conversation = self._get_conversation(conversation_id)
                 message = self._get_message(message_id)
 
-                # chatbot app
+                # 实例化并运行聊天应用
                 runner = AgentChatAppRunner()
                 runner.run(
                     application_generate_entity=application_generate_entity,
@@ -188,19 +195,25 @@ class AgentChatAppGenerator(MessageBasedAppGenerator):
                     message=message
                 )
             except GenerateTaskStoppedException:
+                # 生成任务被停止，直接跳过
                 pass
             except InvokeAuthorizationError:
+                # 调用授权错误，发布错误信息
                 queue_manager.publish_error(
                     InvokeAuthorizationError('Incorrect API key provided'),
                     PublishFrom.APPLICATION_MANAGER
                 )
             except ValidationError as e:
+                # 验证错误，记录异常并发布错误信息
                 logger.exception("Validation Error when generating")
                 queue_manager.publish_error(e, PublishFrom.APPLICATION_MANAGER)
             except (ValueError, InvokeError) as e:
+                # 价值错误或调用错误，发布错误信息
                 queue_manager.publish_error(e, PublishFrom.APPLICATION_MANAGER)
             except Exception as e:
+                # 未知错误，记录异常并发布错误信息
                 logger.exception("Unknown Error when generating")
                 queue_manager.publish_error(e, PublishFrom.APPLICATION_MANAGER)
             finally:
+                # 关闭数据库会话
                 db.session.close()

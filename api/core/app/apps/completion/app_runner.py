@@ -26,12 +26,14 @@ class CompletionAppRunner(AppRunner):
             queue_manager: AppQueueManager,
             message: Message) -> None:
         """
-        Run application
-        :param application_generate_entity: application generate entity
-        :param queue_manager: application queue manager
-        :param message: message
-        :return:
+        运行应用程序。
+        
+        :param application_generate_entity: 应用生成实体，包含应用配置、输入、查询等信息。
+        :param queue_manager: 应用队列管理器，用于管理消息队列。
+        :param message: 消息对象，包含应用运行所需的消息内容。
+        :return: 无返回值。
         """
+        # 根据应用ID查询应用记录
         app_config = application_generate_entity.app_config
         app_config = cast(CompletionAppConfig, app_config)
 
@@ -43,11 +45,8 @@ class CompletionAppRunner(AppRunner):
         query = application_generate_entity.query
         files = application_generate_entity.files
 
-        # Pre-calculate the number of tokens of the prompt messages,
-        # and return the rest number of tokens by model context token size limit and max token size limit.
-        # If the rest number of tokens is not enough, raise exception.
-        # Include: prompt template, inputs, query(optional), files(optional)
-        # Not Include: memory, external data, dataset context
+        # 预计算提示消息中的令牌数量，并根据模型上下文和最大令牌数限制返回剩余令牌数。
+        # 如果剩余令牌数不足，则抛出异常。
         self.get_pre_calculate_rest_tokens(
             app_record=app_record,
             model_config=application_generate_entity.model_config,
@@ -57,8 +56,7 @@ class CompletionAppRunner(AppRunner):
             query=query
         )
 
-        # organize all inputs and template to prompt messages
-        # Include: prompt template, inputs, query(optional), files(optional)
+        # 组织所有输入和模板到提示消息中
         prompt_messages, stop = self.organize_prompt_messages(
             app_record=app_record,
             model_config=application_generate_entity.model_config,
@@ -68,9 +66,9 @@ class CompletionAppRunner(AppRunner):
             query=query
         )
 
-        # moderation
+        # 中介审核
         try:
-            # process sensitive_word_avoidance
+            # 处理敏感词规避
             _, inputs, query = self.moderation_for_inputs(
                 app_id=app_record.id,
                 tenant_id=app_config.tenant_id,
@@ -88,7 +86,7 @@ class CompletionAppRunner(AppRunner):
             )
             return
 
-        # fill in variable inputs from external data tools if exists
+        # 如果存在，从外部数据工具填充变量输入
         external_data_tools = app_config.external_data_variables
         if external_data_tools:
             inputs = self.fill_in_inputs_from_external_data_tools(
@@ -99,7 +97,7 @@ class CompletionAppRunner(AppRunner):
                 query=query
             )
 
-        # get context from datasets
+        # 从数据集获取上下文
         context = None
         if app_config.dataset and app_config.dataset.dataset_ids:
             hit_callback = DatasetIndexToolCallbackHandler(
@@ -125,9 +123,7 @@ class CompletionAppRunner(AppRunner):
                 hit_callback=hit_callback
             )
 
-        # reorganize all inputs and template to prompt messages
-        # Include: prompt template, inputs, query(optional), files(optional)
-        #          memory(optional), external data, dataset context(optional)
+        # 重新组织所有输入和模板到提示消息中，包括记忆、外部数据和数据集上下文（如果存在）
         prompt_messages, stop = self.organize_prompt_messages(
             app_record=app_record,
             model_config=application_generate_entity.model_config,
@@ -138,7 +134,7 @@ class CompletionAppRunner(AppRunner):
             context=context
         )
 
-        # check hosting moderation
+        # 检查宿主中介审核
         hosting_moderation_result = self.check_hosting_moderation(
             application_generate_entity=application_generate_entity,
             queue_manager=queue_manager,
@@ -148,13 +144,13 @@ class CompletionAppRunner(AppRunner):
         if hosting_moderation_result:
             return
 
-        # Re-calculate the max tokens if sum(prompt_token +  max_tokens) over model token limit
+        # 如果提示令牌数和最大令牌数之和超过模型令牌限制，则重新计算最大令牌数
         self.recalc_llm_max_tokens(
             model_config=application_generate_entity.model_config,
             prompt_messages=prompt_messages
         )
 
-        # Invoke model
+        # 调用模型
         model_instance = ModelInstance(
             provider_model_bundle=application_generate_entity.model_config.provider_model_bundle,
             model=application_generate_entity.model_config.model
@@ -170,7 +166,7 @@ class CompletionAppRunner(AppRunner):
             user=application_generate_entity.user_id,
         )
 
-        # handle invoke result
+        # 处理调用结果
         self._handle_invoke_result(
             invoke_result=invoke_result,
             queue_manager=queue_manager,

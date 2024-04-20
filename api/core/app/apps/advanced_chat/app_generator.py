@@ -29,22 +29,28 @@ logger = logging.getLogger(__name__)
 
 class AdvancedChatAppGenerator(MessageBasedAppGenerator):
     def generate(self, app_model: App,
-                 workflow: Workflow,
-                 user: Union[Account, EndUser],
-                 args: dict,
-                 invoke_from: InvokeFrom,
-                 stream: bool = True) \
+                workflow: Workflow,
+                user: Union[Account, EndUser],
+                args: dict,
+                invoke_from: InvokeFrom,
+                stream: bool = True) \
             -> Union[dict, Generator[dict, None, None]]:
         """
-        Generate App response.
+        生成App响应。
 
-        :param app_model: App
-        :param workflow: Workflow
-        :param user: account or end user
-        :param args: request args
-        :param invoke_from: invoke from source
-        :param stream: is stream
+        :param app_model: App模型，代表一个应用。
+        :param workflow: 工作流，定义了应用处理请求的流程。
+        :param user: 账户或终端用户，表示发起请求的用户。
+        :param args: 请求参数。
+        :param invoke_from: 调用来源。
+        :param stream: 是否流式返回结果，默认为True。
+        :return: 根据流式返回设置，可能返回字典或生成器。
+
+        该方法主要负责处理应用程序的生成流程，包括解析查询、处理文件、初始化会话和生成记录、启动工作线程，
+        以及最终返回处理结果。
         """
+
+        # 校验查询参数
         if not args.get('query'):
             raise ValueError('query is required')
 
@@ -55,16 +61,17 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
         query = query.replace('\x00', '')
         inputs = args['inputs']
 
+        # 额外参数初始化
         extras = {
             "auto_generate_conversation_name": args['auto_generate_name'] if 'auto_generate_name' in args else False
         }
 
-        # get conversation
+        # 尝试根据会话ID获取会话
         conversation = None
         if args.get('conversation_id'):
             conversation = self._get_conversation_by_user(app_model, args.get('conversation_id'), user)
 
-        # parse files
+        # 解析文件参数
         files = args['files'] if 'files' in args and args['files'] else []
         message_file_parser = MessageFileParser(tenant_id=app_model.tenant_id, app_id=app_model.id)
         file_extra_config = FileUploadConfigManager.convert(workflow.features_dict, is_vision=False)
@@ -77,13 +84,13 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
         else:
             file_objs = []
 
-        # convert to app config
+        # 转换为应用配置
         app_config = AdvancedChatAppConfigManager.get_app_config(
             app_model=app_model,
             workflow=workflow
         )
 
-        # init application generate entity
+        # 初始化应用生成实体
         application_generate_entity = AdvancedChatAppGenerateEntity(
             task_id=str(uuid.uuid4()),
             app_config=app_config,
@@ -101,19 +108,19 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
         if not conversation:
             is_first_conversation = True
 
-        # init generate records
+        # 初始化生成记录
         (
             conversation,
             message
         ) = self._init_generate_records(application_generate_entity, conversation)
 
         if is_first_conversation:
-            # update conversation features
+            # 更新会话特征
             conversation.override_model_configs = workflow.features
             db.session.commit()
             db.session.refresh(conversation)
 
-        # init queue manager
+        # 初始化队列管理器
         queue_manager = MessageBasedAppQueueManager(
             task_id=application_generate_entity.task_id,
             user_id=application_generate_entity.user_id,
@@ -123,7 +130,7 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
             message_id=message.id
         )
 
-        # new thread
+        # 启动工作线程
         worker_thread = threading.Thread(target=self._generate_worker, kwargs={
             'flask_app': current_app._get_current_object(),
             'application_generate_entity': application_generate_entity,
@@ -131,10 +138,9 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
             'conversation_id': conversation.id,
             'message_id': message.id,
         })
-
         worker_thread.start()
 
-        # return response or stream generator
+        # 处理并返回响应
         response = self._handle_advanced_chat_response(
             application_generate_entity=application_generate_entity,
             workflow=workflow,
@@ -156,21 +162,21 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
                          conversation_id: str,
                          message_id: str) -> None:
         """
-        Generate worker in a new thread.
-        :param flask_app: Flask app
-        :param application_generate_entity: application generate entity
-        :param queue_manager: queue manager
-        :param conversation_id: conversation ID
-        :param message_id: message ID
-        :return:
+        在新线程中生成工作器。
+        :param flask_app: Flask应用实例
+        :param application_generate_entity: 应用生成实体，包含生成所需数据
+        :param queue_manager: 队列管理器，用于任务调度和错误处理
+        :param conversation_id: 会话ID
+        :param message_id: 消息ID
+        :return: 无返回值
         """
         with flask_app.app_context():
             try:
-                # get conversation and message
+                # 获取会话和消息
                 conversation = self._get_conversation(conversation_id)
                 message = self._get_message(message_id)
 
-                # chatbot app
+                # 实例化并运行聊天应用
                 runner = AdvancedChatAppRunner()
                 runner.run(
                     application_generate_entity=application_generate_entity,
@@ -179,58 +185,68 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
                     message=message
                 )
             except GenerateTaskStoppedException:
+                # 生成任务被停止，直接跳过
                 pass
             except InvokeAuthorizationError:
+                # 调用授权错误，发布错误信息
                 queue_manager.publish_error(
                     InvokeAuthorizationError('Incorrect API key provided'),
                     PublishFrom.APPLICATION_MANAGER
                 )
             except ValidationError as e:
+                # 验证错误，记录异常并发布错误信息
                 logger.exception("Validation Error when generating")
                 queue_manager.publish_error(e, PublishFrom.APPLICATION_MANAGER)
             except (ValueError, InvokeError) as e:
+                # 价值错误或调用错误，发布错误信息
                 queue_manager.publish_error(e, PublishFrom.APPLICATION_MANAGER)
             except Exception as e:
+                # 未知错误，记录异常并发布错误信息
                 logger.exception("Unknown Error when generating")
                 queue_manager.publish_error(e, PublishFrom.APPLICATION_MANAGER)
             finally:
+                # 关闭数据库会话
                 db.session.close()
 
     def _handle_advanced_chat_response(self, application_generate_entity: AdvancedChatAppGenerateEntity,
-                                       workflow: Workflow,
-                                       queue_manager: AppQueueManager,
-                                       conversation: Conversation,
-                                       message: Message,
-                                       user: Union[Account, EndUser],
-                                       stream: bool = False) \
-            -> Union[ChatbotAppBlockingResponse, Generator[ChatbotAppStreamResponse, None, None]]:
-        """
-        Handle response.
-        :param application_generate_entity: application generate entity
-        :param workflow: workflow
-        :param queue_manager: queue manager
-        :param conversation: conversation
-        :param message: message
-        :param user: account or end user
-        :param stream: is stream
-        :return:
-        """
-        # init generate task pipeline
-        generate_task_pipeline = AdvancedChatAppGenerateTaskPipeline(
-            application_generate_entity=application_generate_entity,
-            workflow=workflow,
-            queue_manager=queue_manager,
-            conversation=conversation,
-            message=message,
-            user=user,
-            stream=stream
-        )
+                                        workflow: Workflow,
+                                        queue_manager: AppQueueManager,
+                                        conversation: Conversation,
+                                        message: Message,
+                                        user: Union[Account, EndUser],
+                                        stream: bool = False) \
+                -> Union[ChatbotAppBlockingResponse, Generator[ChatbotAppStreamResponse, None, None]]:
+            """
+            处理高级聊天响应。
+            
+            :param application_generate_entity: 应用生成实体，包含聊天应用的生成配置信息。
+            :param workflow: 工作流，定义了处理聊天请求的步骤序列。
+            :param queue_manager: 队列管理器，用于管理聊天请求的队列。
+            :param conversation: 对话，表示用户和聊天机器人之间的一次会话。
+            :param message: 消息，用户发送的消息或聊天机器人回复的消息。
+            :param user: 账户或终端用户，标识发起聊天请求的用户。
+            :param stream: 是否为流式响应，默认为False。如果为True，则响应将以流的形式返回。
+            :return: 返回一个聊天应用的阻塞响应或一个生成器，用于逐个返回流式响应。
+            """
+            # 初始化生成任务管道
+            generate_task_pipeline = AdvancedChatAppGenerateTaskPipeline(
+                application_generate_entity=application_generate_entity,
+                workflow=workflow,
+                queue_manager=queue_manager,
+                conversation=conversation,
+                message=message,
+                user=user,
+                stream=stream
+            )
 
-        try:
-            return generate_task_pipeline.process()
-        except ValueError as e:
-            if e.args[0] == "I/O operation on closed file.":  # ignore this error
-                raise GenerateTaskStoppedException()
-            else:
-                logger.exception(e)
-                raise e
+            try:
+                # 处理生成任务，并返回结果
+                return generate_task_pipeline.process()
+            except ValueError as e:
+                # 忽略"文件被关闭"的错误
+                if e.args[0] == "I/O operation on closed file.":  
+                    raise GenerateTaskStoppedException()
+                else:
+                    # 记录其他异常，并抛出
+                    logger.exception(e)
+                    raise e

@@ -34,29 +34,33 @@ class AdvancedChatAppRunner(AppRunner):
             conversation: Conversation,
             message: Message) -> None:
         """
-        Run application
-        :param application_generate_entity: application generate entity
-        :param queue_manager: application queue manager
-        :param conversation: conversation
-        :param message: message
-        :return:
+        运行应用程序。
+        :param application_generate_entity: 应用生成实体，包含应用配置和输入等信息。
+        :param queue_manager: 应用队列管理器，用于处理队列操作。
+        :param conversation: 会话对象，代表一个用户与应用的对话过程。
+        :param message: 消息对象，代表用户发出的消息或应用的回复。
+        :return: 无返回值。
         """
+        # 获取应用配置并转换为高级聊天应用配置类型
         app_config = application_generate_entity.app_config
         app_config = cast(AdvancedChatAppConfig, app_config)
 
+        # 从数据库中查询应用记录
         app_record = db.session.query(App).filter(App.id == app_config.app_id).first()
         if not app_record:
             raise ValueError("App not found")
 
+        # 获取工作流实例
         workflow = self.get_workflow(app_model=app_record, workflow_id=app_config.workflow_id)
         if not workflow:
             raise ValueError("Workflow not initialized")
 
+        # 准备工作流输入参数
         inputs = application_generate_entity.inputs
         query = application_generate_entity.query
         files = application_generate_entity.files
 
-        # moderation
+        # 输入内容审核
         if self.handle_input_moderation(
                 queue_manager=queue_manager,
                 app_record=app_record,
@@ -66,7 +70,7 @@ class AdvancedChatAppRunner(AppRunner):
         ):
             return
 
-        # annotation reply
+        # 处理注释回复
         if self.handle_annotation_reply(
                 app_record=app_record,
                 message=message,
@@ -76,17 +80,19 @@ class AdvancedChatAppRunner(AppRunner):
         ):
             return
 
+        # 关闭数据库会话
         db.session.close()
 
+        # 配置工作流回调
         workflow_callbacks = [WorkflowEventTriggerCallback(
             queue_manager=queue_manager,
             workflow=workflow
         )]
-
+        # 如果处于调试模式，添加日志回调
         if bool(os.environ.get("DEBUG", 'False').lower() == 'true'):
             workflow_callbacks.append(WorkflowLoggingCallback())
 
-        # RUN WORKFLOW
+        # 执行工作流
         workflow_engine_manager = WorkflowEngineManager()
         workflow_engine_manager.run_workflow(
             workflow=workflow,
@@ -123,16 +129,17 @@ class AdvancedChatAppRunner(AppRunner):
                                 inputs: dict,
                                 query: str) -> bool:
         """
-        Handle input moderation
-        :param queue_manager: application queue manager
-        :param app_record: app record
-        :param app_generate_entity: application generate entity
-        :param inputs: inputs
-        :param query: query
-        :return:
+        处理输入审核。
+        
+        :param queue_manager: 应用队列管理器，用于管理应用相关的队列操作。
+        :param app_record: 应用记录，包含应用的基本信息。
+        :param app_generate_entity: 应用生成实体，包含应用的配置和生成的相关实体。
+        :param inputs: 输入参数，待审核的用户输入。
+        :param query: 查询字符串，用户发起的查询内容。
+        :return: 审核结果，如果审核通过返回False，否则返回True。
         """
         try:
-            # process sensitive_word_avoidance
+            # 对输入进行敏感词规避处理
             _, inputs, query = self.moderation_for_inputs(
                 app_id=app_record.id,
                 tenant_id=app_generate_entity.app_config.tenant_id,
@@ -141,6 +148,7 @@ class AdvancedChatAppRunner(AppRunner):
                 query=query,
             )
         except ModerationException as e:
+            # 审核异常处理，将异常信息输出到流中，并停止处理
             self._stream_output(
                 queue_manager=queue_manager,
                 text=str(e),
@@ -157,14 +165,16 @@ class AdvancedChatAppRunner(AppRunner):
                                 queue_manager: AppQueueManager,
                                 app_generate_entity: AdvancedChatAppGenerateEntity) -> bool:
         """
-        Handle annotation reply
-        :param app_record: app record
-        :param message: message
-        :param query: query
-        :param queue_manager: application queue manager
-        :param app_generate_entity: application generate entity
+        处理注解回复。
+        
+        :param app_record: 应用记录，包含应用的相关信息。
+        :param message: 消息对象，代表需要处理的消息。
+        :param query: 查询字符串，可能代表用户的问题或指令。
+        :param queue_manager: 应用队列管理器，用于消息队列的管理和操作。
+        :param app_generate_entity: 高级聊天应用生成实体，包含应用生成的实体信息，如用户ID和调用来源。
+        :return: 布尔值，如果成功处理注解回复则返回True，否则返回False。
         """
-        # annotation reply
+        # 生成针对当前消息的注解回复
         annotation_reply = self.query_app_annotations_to_reply(
             app_record=app_record,
             message=message,
@@ -174,11 +184,13 @@ class AdvancedChatAppRunner(AppRunner):
         )
 
         if annotation_reply:
+            # 发布注解回复到队列
             queue_manager.publish(
                 QueueAnnotationReplyEvent(message_annotation_id=annotation_reply.id),
                 PublishFrom.APPLICATION_MANAGER
             )
 
+            # 向指定流输出注解回复内容
             self._stream_output(
                 queue_manager=queue_manager,
                 text=annotation_reply.content,
@@ -190,17 +202,20 @@ class AdvancedChatAppRunner(AppRunner):
         return False
 
     def _stream_output(self, queue_manager: AppQueueManager,
-                       text: str,
-                       stream: bool,
-                       stopped_by: QueueStopEvent.StopBy) -> None:
+                    text: str,
+                    stream: bool,
+                    stopped_by: QueueStopEvent.StopBy) -> None:
         """
-        Direct output
-        :param queue_manager: application queue manager
-        :param text: text
-        :param stream: stream
-        :return:
+        直接输出文本到指定流中。
+        
+        :param queue_manager: 应用程序队列管理器，用于管理消息队列的发布。
+        :param text: 要输出的文本内容，如果流为真，则会逐个单词输出。
+        :param stream: 布尔值，指示是否以流的方式输出文本。
+        :param stopped_by: 用于指示停止事件是由哪个实体触发的。
+        :return: 无返回值。
         """
         if stream:
+            # 以流的方式逐个发布文本块
             index = 0
             for token in text:
                 queue_manager.publish(
@@ -209,8 +224,9 @@ class AdvancedChatAppRunner(AppRunner):
                     ), PublishFrom.APPLICATION_MANAGER
                 )
                 index += 1
-                time.sleep(0.01)
+                time.sleep(0.01)  # 每发布一个文本块后暂停0.01秒，模拟流式传输的延迟
 
+        # 发布停止事件，通知相关实体输出已结束
         queue_manager.publish(
             QueueStopEvent(stopped_by=stopped_by),
             PublishFrom.APPLICATION_MANAGER

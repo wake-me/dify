@@ -13,14 +13,15 @@ from core.app.entities.task_entities import (
 
 
 class AdvancedChatAppGenerateResponseConverter(AppGenerateResponseConverter):
+    # 定义阻塞响应类型
     _blocking_response_type = ChatbotAppBlockingResponse
 
     @classmethod
     def convert_blocking_full_response(cls, blocking_response: ChatbotAppBlockingResponse) -> dict:
         """
-        Convert blocking full response.
-        :param blocking_response: blocking response
-        :return:
+        转换阻塞式完整响应。
+        :param blocking_response: 阻塞式响应对象
+        :return: 转换后的完整响应字典
         """
         response = {
             'event': 'message',
@@ -39,12 +40,13 @@ class AdvancedChatAppGenerateResponseConverter(AppGenerateResponseConverter):
     @classmethod
     def convert_blocking_simple_response(cls, blocking_response: ChatbotAppBlockingResponse) -> dict:
         """
-        Convert blocking simple response.
-        :param blocking_response: blocking response
-        :return:
+        转换阻塞式简单响应。
+        :param blocking_response: 阻塞式响应对象
+        :return: 转换后的简单响应字典
         """
         response = cls.convert_blocking_full_response(blocking_response)
 
+        # 从完整响应中提取简化元数据
         metadata = response.get('metadata', {})
         response['metadata'] = cls._get_simple_metadata(metadata)
 
@@ -54,14 +56,15 @@ class AdvancedChatAppGenerateResponseConverter(AppGenerateResponseConverter):
     def convert_stream_full_response(cls, stream_response: Generator[ChatbotAppStreamResponse, None, None]) \
             -> Generator[str, None, None]:
         """
-        Convert stream full response.
-        :param stream_response: stream response
-        :return:
+        转换流式完整响应。
+        :param stream_response: 流式响应生成器
+        :return: 转换后的流式响应字符串生成器
         """
         for chunk in stream_response:
             chunk = cast(ChatbotAppStreamResponse, chunk)
             sub_stream_response = chunk.stream_response
 
+            # 处理心跳包响应
             if isinstance(sub_stream_response, PingStreamResponse):
                 yield 'ping'
                 continue
@@ -73,10 +76,12 @@ class AdvancedChatAppGenerateResponseConverter(AppGenerateResponseConverter):
                 'created_at': chunk.created_at
             }
 
+            # 转换错误响应
             if isinstance(sub_stream_response, ErrorStreamResponse):
                 data = cls._error_to_stream_response(sub_stream_response.err)
                 response_chunk.update(data)
             else:
+                # 转换其他类型的流式响应
                 response_chunk.update(sub_stream_response.to_dict())
             yield json.dumps(response_chunk)
 
@@ -84,14 +89,15 @@ class AdvancedChatAppGenerateResponseConverter(AppGenerateResponseConverter):
     def convert_stream_simple_response(cls, stream_response: Generator[ChatbotAppStreamResponse, None, None]) \
             -> Generator[str, None, None]:
         """
-        Convert stream simple response.
-        :param stream_response: stream response
-        :return:
+        转换流式简单响应。
+        :param stream_response: 流式响应生成器
+        :return: 转换后的流式简单响应字符串生成器
         """
         for chunk in stream_response:
             chunk = cast(ChatbotAppStreamResponse, chunk)
             sub_stream_response = chunk.stream_response
 
+            # 处理心跳包响应
             if isinstance(sub_stream_response, PingStreamResponse):
                 yield 'ping'
                 continue
@@ -103,15 +109,18 @@ class AdvancedChatAppGenerateResponseConverter(AppGenerateResponseConverter):
                 'created_at': chunk.created_at
             }
 
+            # 对消息结束响应进行简化
             if isinstance(sub_stream_response, MessageEndStreamResponse):
                 sub_stream_response_dict = sub_stream_response.to_dict()
                 metadata = sub_stream_response_dict.get('metadata', {})
                 sub_stream_response_dict['metadata'] = cls._get_simple_metadata(metadata)
                 response_chunk.update(sub_stream_response_dict)
+            # 转换错误响应
             if isinstance(sub_stream_response, ErrorStreamResponse):
                 data = cls._error_to_stream_response(sub_stream_response.err)
                 response_chunk.update(data)
             else:
+                # 转换其他类型的流式响应
                 response_chunk.update(sub_stream_response.to_dict())
 
             yield json.dumps(response_chunk)

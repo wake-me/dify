@@ -29,29 +29,30 @@ class ChatAppRunner(AppRunner):
             conversation: Conversation,
             message: Message) -> None:
         """
-        Run application
-        :param application_generate_entity: application generate entity
-        :param queue_manager: application queue manager
-        :param conversation: conversation
-        :param message: message
-        :return:
+        运行应用程序。
+        
+        :param application_generate_entity: 应用生成实体，包含应用配置、输入、查询等信息。
+        :param queue_manager: 应用队列管理器，用于消息的发布和处理。
+        :param conversation: 会话对象，包含会话相关的信息。
+        :param message: 消息对象，包含消息内容等信息。
+        :return: 无返回值。
         """
+        # 加载应用配置
         app_config = application_generate_entity.app_config
         app_config = cast(ChatAppConfig, app_config)
 
+        # 根据应用ID查询应用记录
         app_record = db.session.query(App).filter(App.id == app_config.app_id).first()
         if not app_record:
             raise ValueError("App not found")
 
+        # 解析输入参数、查询、文件等
         inputs = application_generate_entity.inputs
         query = application_generate_entity.query
         files = application_generate_entity.files
 
-        # Pre-calculate the number of tokens of the prompt messages,
-        # and return the rest number of tokens by model context token size limit and max token size limit.
-        # If the rest number of tokens is not enough, raise exception.
-        # Include: prompt template, inputs, query(optional), files(optional)
-        # Not Include: memory, external data, dataset context
+        # 预计算提示消息的令牌数，并根据模型上下文令牌大小限制和最大令牌大小限制返回剩余令牌数。
+        # 如果剩余令牌数不足，则抛出异常。
         self.get_pre_calculate_rest_tokens(
             app_record=app_record,
             model_config=application_generate_entity.model_config,
@@ -63,7 +64,7 @@ class ChatAppRunner(AppRunner):
 
         memory = None
         if application_generate_entity.conversation_id:
-            # get memory of conversation (read-only)
+            # 获取会话内存（只读）
             model_instance = ModelInstance(
                 provider_model_bundle=application_generate_entity.model_config.provider_model_bundle,
                 model=application_generate_entity.model_config.model
@@ -74,9 +75,7 @@ class ChatAppRunner(AppRunner):
                 model_instance=model_instance
             )
 
-        # organize all inputs and template to prompt messages
-        # Include: prompt template, inputs, query(optional), files(optional)
-        #          memory(optional)
+        # 组织所有输入和模板到提示消息中
         prompt_messages, stop = self.organize_prompt_messages(
             app_record=app_record,
             model_config=application_generate_entity.model_config,
@@ -87,9 +86,9 @@ class ChatAppRunner(AppRunner):
             memory=memory
         )
 
-        # moderation
+        # 中介审核
         try:
-            # process sensitive_word_avoidance
+            # 处理敏感词规避
             _, inputs, query = self.moderation_for_inputs(
                 app_id=app_record.id,
                 tenant_id=app_config.tenant_id,
@@ -108,7 +107,7 @@ class ChatAppRunner(AppRunner):
             return
 
         if query:
-            # annotation reply
+            # 查询应用注解并回复
             annotation_reply = self.query_app_annotations_to_reply(
                 app_record=app_record,
                 message=message,
@@ -132,7 +131,7 @@ class ChatAppRunner(AppRunner):
                 )
                 return
 
-        # fill in variable inputs from external data tools if exists
+        # 如果存在，从外部数据工具填充变量输入
         external_data_tools = app_config.external_data_variables
         if external_data_tools:
             inputs = self.fill_in_inputs_from_external_data_tools(
@@ -143,7 +142,7 @@ class ChatAppRunner(AppRunner):
                 query=query
             )
 
-        # get context from datasets
+        # 从数据集获取上下文
         context = None
         if app_config.dataset and app_config.dataset.dataset_ids:
             hit_callback = DatasetIndexToolCallbackHandler(
@@ -166,9 +165,7 @@ class ChatAppRunner(AppRunner):
                 memory=memory
             )
 
-        # reorganize all inputs and template to prompt messages
-        # Include: prompt template, inputs, query(optional), files(optional)
-        #          memory(optional), external data, dataset context(optional)
+        # 重新组织所有输入和模板到提示消息中，包括外部数据和数据集上下文（如果存在）
         prompt_messages, stop = self.organize_prompt_messages(
             app_record=app_record,
             model_config=application_generate_entity.model_config,
@@ -180,7 +177,7 @@ class ChatAppRunner(AppRunner):
             memory=memory
         )
 
-        # check hosting moderation
+        # 检查托管中介
         hosting_moderation_result = self.check_hosting_moderation(
             application_generate_entity=application_generate_entity,
             queue_manager=queue_manager,
@@ -190,13 +187,13 @@ class ChatAppRunner(AppRunner):
         if hosting_moderation_result:
             return
 
-        # Re-calculate the max tokens if sum(prompt_token +  max_tokens) over model token limit
+        # 重新计算最大令牌数，如果提示令牌数加上最大令牌数超过模型令牌限制
         self.recalc_llm_max_tokens(
             model_config=application_generate_entity.model_config,
             prompt_messages=prompt_messages
         )
 
-        # Invoke model
+        # 调用模型
         model_instance = ModelInstance(
             provider_model_bundle=application_generate_entity.model_config.provider_model_bundle,
             model=application_generate_entity.model_config.model
@@ -204,6 +201,7 @@ class ChatAppRunner(AppRunner):
 
         db.session.close()
 
+        # 模型调用结果处理
         invoke_result = model_instance.invoke_llm(
             prompt_messages=prompt_messages,
             model_parameters=application_generate_entity.model_config.parameters,
@@ -212,7 +210,7 @@ class ChatAppRunner(AppRunner):
             user=application_generate_entity.user_id,
         )
 
-        # handle invoke result
+        # 处理调用结果
         self._handle_invoke_result(
             invoke_result=invoke_result,
             queue_manager=queue_manager,
