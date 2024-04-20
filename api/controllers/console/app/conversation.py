@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytz
 from flask_login import current_user
@@ -312,8 +312,7 @@ def _get_conversation(app_model, conversation_id):
         raise NotFound("Conversation Not Exists.")
 
     if not conversation.read_at:
-        # 如果对话未被标记为已读，则更新为已读状态，并记录当前用户ID
-        conversation.read_at = datetime.utcnow()
+        conversation.read_at = datetime.now(timezone.utc).replace(tzinfo=None)
         conversation.read_account_id = current_user.id
         db.session.commit()
 

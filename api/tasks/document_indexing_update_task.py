@@ -38,7 +38,7 @@ def document_indexing_update_task(dataset_id: str, document_id: str):
 
     # 更新文档的索引状态为正在解析，并记录处理开始时间
     document.indexing_status = 'parsing'
-    document.processing_started_at = datetime.datetime.utcnow()
+    document.processing_started_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     db.session.commit()
 
     # 删除文档的所有段落和索引

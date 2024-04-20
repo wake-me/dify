@@ -45,7 +45,7 @@ def handle(sender, **kwargs):
 
         # 更新文档的索引状态和处理开始时间
         document.indexing_status = 'parsing'
-        document.processing_started_at = datetime.datetime.utcnow()
+        document.processing_started_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         documents.append(document)
         db.session.add(document)  # 将更新的文档加入到会话中
     db.session.commit()  # 提交会话，保存对文档的更改

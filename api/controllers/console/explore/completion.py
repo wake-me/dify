@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask_login import current_user
 from flask_restful import reqparse
@@ -77,8 +77,7 @@ class CompletionApi(InstalledAppResource):
         streaming = args['response_mode'] == 'streaming'
         args['auto_generate_name'] = False
 
-        # 更新安装应用的最后使用时间
-        installed_app.last_used_at = datetime.utcnow()
+        installed_app.last_used_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.session.commit()
 
         try:
@@ -184,8 +183,7 @@ class ChatApi(InstalledAppResource):
 
         args['auto_generate_name'] = False
 
-        # 更新安装应用的最后使用时间
-        installed_app.last_used_at = datetime.utcnow()
+        installed_app.last_used_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.session.commit()
 
         try:

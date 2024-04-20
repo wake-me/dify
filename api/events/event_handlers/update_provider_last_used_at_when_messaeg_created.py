@@ -1,4 +1,12 @@
-from datetime import datetime
+'''
+Author: fanwenqi hi.fanwenqi@gmail.com
+Date: 2024-04-20 10:03:01
+LastEditors: fanwenqi hi.fanwenqi@gmail.com
+LastEditTime: 2024-04-20 12:42:53
+FilePath: /dify/api/events/event_handlers/update_provider_last_used_at_when_messaeg_created.py
+Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+'''
+from datetime import datetime, timezone
 
 from core.app.entities.app_invoke_entities import AgentChatAppGenerateEntity, ChatAppGenerateEntity
 from events.message_event import message_was_created
@@ -27,6 +35,5 @@ def handle(sender, **kwargs):
     db.session.query(Provider).filter(
         Provider.tenant_id == application_generate_entity.app_config.tenant_id,
         Provider.provider_name == application_generate_entity.model_config.provider
-    ).update({'last_used': datetime.utcnow()})
-    # 提交数据库事务
+    ).update({'last_used': datetime.now(timezone.utc).replace(tzinfo=None)})
     db.session.commit()

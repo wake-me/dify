@@ -2,7 +2,7 @@ import base64
 import logging
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Any, Optional
 
@@ -89,9 +89,8 @@ class AccountService:
             available_ta.current = True
             db.session.commit()  # 提交数据库更改
 
-        # 更新账号的最后活跃时间，如果超过10分钟未活跃则更新
-        if datetime.utcnow() - account.last_active_at > timedelta(minutes=10):
-            account.last_active_at = datetime.utcnow()
+        if datetime.now(timezone.utc).replace(tzinfo=None) - account.last_active_at > timedelta(minutes=10):
+            account.last_active_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
         return account
@@ -112,7 +111,7 @@ class AccountService:
         # 准备JWT负载信息，包括用户ID、令牌过期时间、发行者和主题
         payload = {
             "user_id": account.id,
-            "exp": datetime.utcnow() + timedelta(days=30),
+            "exp": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
             "iss": current_app.config['EDITION'],
             "sub": 'Console API Passport',
         }
@@ -149,7 +148,7 @@ class AccountService:
         # 如果账户状态为待激活，则将其激活
         if account.status == AccountStatus.PENDING.value:
             account.status = AccountStatus.ACTIVE.value
-            account.initialized_at = datetime.utcnow()
+            account.initialized_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
         # 验证密码，不匹配则抛出登录错误
@@ -258,8 +257,8 @@ class AccountService:
             if account_integrate:
                 # 如果存在，更新记录
                 account_integrate.open_id = open_id
-                account_integrate.encrypted_token = ""  # todo: 需要实现加密令牌的逻辑
-                account_integrate.updated_at = datetime.utcnow()
+                account_integrate.encrypted_token = ""  # todo
+                account_integrate.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             else:
                 # 如果不存在，创建新记录
                 account_integrate = AccountIntegrate(account_id=account.id, provider=provider, open_id=open_id,
@@ -301,19 +300,8 @@ class AccountService:
 
     @staticmethod
     def update_last_login(account: Account, request) -> None:
-        """
-        更新最后登录时间和IP地址
-        
-        参数:
-        account - Account类型，需要更新登录信息的账户对象
-        request - 请求对象，用于获取远程IP地址
-        
-        返回值:
-        无
-        """
-        # 更新最后登录时间为当前时间
-        account.last_login_at = datetime.utcnow()
-        # 获取并更新最后登录的IP地址
+        """Update last login time and ip"""
+        account.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
         account.last_login_ip = get_remote_ip(request)
         # 将账户对象添加到数据库会话，并提交更改
         db.session.add(account)
@@ -791,7 +779,7 @@ class RegisterService:
             )
             # 设置账户状态，优先使用传入的状态，若无则设置为激活状态
             account.status = AccountStatus.ACTIVE.value if not status else status.value
-            account.initialized_at = datetime.utcnow()
+            account.initialized_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
             # 如果有提供open_id和provider，则绑定账户的第三方身份认证
             if open_id is not None or provider is not None:

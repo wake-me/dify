@@ -657,8 +657,8 @@ class DocumentService:
         
         # 更新文档为暂停状态
         document.is_paused = True
-        document.paused_by = current_user.id  # 假设当前用户已定义且可访问
-        document.paused_at = datetime.datetime.utcnow()
+        document.paused_by = current_user.id
+        document.paused_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
 
         db.session.add(document)
         db.session.commit()  # 提交数据库事务，将暂停状态持久化
@@ -1094,7 +1094,7 @@ class DocumentService:
         document.parsing_completed_at = None
         document.cleaning_completed_at = None
         document.splitting_completed_at = None
-        document.updated_at = datetime.datetime.utcnow()
+        document.updated_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         document.created_from = created_from
         document.doc_form = document_data['doc_form']
         # 将更新后的文档对象添加到数据库并提交更改
@@ -1541,102 +1541,11 @@ class SegmentService:
                 credentials=embedding_model.credentials,
                 texts=[content]
             )
-
-        # 查询当前文档中已有段的最大位置，用于设定新段的位置
-        max_position = db.session.query(func.max(DocumentSegment.position)).filter(
-            DocumentSegment.document_id == document.id
-        ).scalar()
-        
-        # 创建文档段对象
-        segment_document = DocumentSegment(
-            tenant_id=current_user.current_tenant_id,
-            dataset_id=document.dataset_id,
-            document_id=document.id,
-            index_node_id=doc_id,
-            index_node_hash=segment_hash,
-            position=max_position + 1 if max_position else 1,
-            content=content,
-            word_count=len(content),
-            tokens=tokens,
-            status='completed',
-            indexing_at=datetime.datetime.utcnow(),
-            completed_at=datetime.datetime.utcnow(),
-            created_by=current_user.id
-        )
-        
-        # 如果文档是问答模型类型，则设置答案
-        if document.doc_form == 'qa_model':
-            segment_document.answer = args['answer']
-
-        # 添加文档段到数据库并提交事务
-        db.session.add(segment_document)
-        db.session.commit()
-
-        # 尝试保存向量索引
-        try:
-            VectorService.create_segments_vector([args['keywords']], [segment_document], dataset)
-        except Exception as e:
-            # 如果创建向量索引失败，更新文档段状态为错误，并记录错误信息
-            logging.exception("create segment index failed")
-            segment_document.enabled = False
-            segment_document.disabled_at = datetime.datetime.utcnow()
-            segment_document.status = 'error'
-            segment_document.error = str(e)
-            db.session.commit()
-
-        # 从数据库查询并返回文档段对象
-        segment = db.session.query(DocumentSegment).filter(DocumentSegment.id == segment_document.id).first()
-        return segment
-
-    @classmethod
-    def multi_create_segment(cls, segments: list, document: Document, dataset: Dataset):
-        """
-        多段创建文档段落。
-
-        参数:
-        - segments: 包含文档内容的列表，每个元素是一个字典，至少包含'content'键。
-        - document: 文档对象，指定创建文档段所属的文档。
-        - dataset: 数据集对象，指定文档和文档段所属的数据集。
-
-        返回值:
-        - segment_data_list: 创建的文档段对象列表。
-        """
-
-        # 初始化嵌入模型，根据数据集的索引技术选择是否加载
-        embedding_model = None
-        if dataset.indexing_technique == 'high_quality':
-            model_manager = ModelManager()
-            embedding_model = model_manager.get_model_instance(
-                tenant_id=current_user.current_tenant_id,
-                provider=dataset.embedding_model_provider,
-                model_type=ModelType.TEXT_EMBEDDING,
-                model=dataset.embedding_model
-            )
-
-        # 查询当前文档中已有段落的最大位置值
-        max_position = db.session.query(func.max(DocumentSegment.position)).filter(
-            DocumentSegment.document_id == document.id
-        ).scalar()
-
-        # 初始化待处理的文档段列表
-        pre_segment_data_list = []
-        segment_data_list = []
-        keywords_list = []
-        for segment_item in segments:
-            # 处理每个文档段
-            content = segment_item['content']
-            doc_id = str(uuid.uuid4())  # 生成唯一标识符
-            segment_hash = helper.generate_text_hash(content)  # 生成内容哈希值
-            tokens = 0
-            if dataset.indexing_technique == 'high_quality' and embedding_model:
-                # 如果使用高质量索引技术且已加载嵌入模型，则计算文本嵌入所需的令牌数
-                model_type_instance = cast(TextEmbeddingModel, embedding_model.model_type_instance)
-                tokens = model_type_instance.get_num_tokens(
-                    model=embedding_model.model,
-                    credentials=embedding_model.credentials,
-                    texts=[content]
-                )
-            # 创建文档段对象
+        lock_name = 'add_segment_lock_document_id_{}'.format(document.id)
+        with redis_client.lock(lock_name, timeout=600):
+            max_position = db.session.query(func.max(DocumentSegment.position)).filter(
+                DocumentSegment.document_id == document.id
+            ).scalar()
             segment_document = DocumentSegment(
                 tenant_id=current_user.current_tenant_id,
                 dataset_id=document.dataset_id,
@@ -1648,32 +1557,96 @@ class SegmentService:
                 word_count=len(content),
                 tokens=tokens,
                 status='completed',
-                indexing_at=datetime.datetime.utcnow(),
-                completed_at=datetime.datetime.utcnow(),
+                indexing_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
+                completed_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
                 created_by=current_user.id
             )
             if document.doc_form == 'qa_model':
-                # 如果文档是问答模型形式，则保存答案
-                segment_document.answer = segment_item['answer']
+                segment_document.answer = args['answer']
+
             db.session.add(segment_document)
-            segment_data_list.append(segment_document)
+            db.session.commit()
 
-            pre_segment_data_list.append(segment_document)
-            keywords_list.append(segment_item['keywords'])
-
-        try:
-            # 尝试为这些文档段创建向量索引
-            VectorService.create_segments_vector(keywords_list, pre_segment_data_list, dataset)
-        except Exception as e:
-            # 如果创建向量索引失败，则标记相关文档段为错误状态，并记录错误信息
-            logging.exception("create segment index failed")
-            for segment_document in segment_data_list:
+            # save vector index
+            try:
+                VectorService.create_segments_vector([args['keywords']], [segment_document], dataset)
+            except Exception as e:
+                logging.exception("create segment index failed")
                 segment_document.enabled = False
-                segment_document.disabled_at = datetime.datetime.utcnow()
+                segment_document.disabled_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
                 segment_document.status = 'error'
                 segment_document.error = str(e)
-        db.session.commit()  # 提交数据库事务
-        return segment_data_list
+                db.session.commit()
+            segment = db.session.query(DocumentSegment).filter(DocumentSegment.id == segment_document.id).first()
+            return segment
+
+    @classmethod
+    def multi_create_segment(cls, segments: list, document: Document, dataset: Dataset):
+        lock_name = 'multi_add_segment_lock_document_id_{}'.format(document.id)
+        with redis_client.lock(lock_name, timeout=600):
+            embedding_model = None
+            if dataset.indexing_technique == 'high_quality':
+                model_manager = ModelManager()
+                embedding_model = model_manager.get_model_instance(
+                    tenant_id=current_user.current_tenant_id,
+                    provider=dataset.embedding_model_provider,
+                    model_type=ModelType.TEXT_EMBEDDING,
+                    model=dataset.embedding_model
+                )
+            max_position = db.session.query(func.max(DocumentSegment.position)).filter(
+                DocumentSegment.document_id == document.id
+            ).scalar()
+            pre_segment_data_list = []
+            segment_data_list = []
+            keywords_list = []
+            for segment_item in segments:
+                content = segment_item['content']
+                doc_id = str(uuid.uuid4())
+                segment_hash = helper.generate_text_hash(content)
+                tokens = 0
+                if dataset.indexing_technique == 'high_quality' and embedding_model:
+                    # calc embedding use tokens
+                    model_type_instance = cast(TextEmbeddingModel, embedding_model.model_type_instance)
+                    tokens = model_type_instance.get_num_tokens(
+                        model=embedding_model.model,
+                        credentials=embedding_model.credentials,
+                        texts=[content]
+                    )
+                segment_document = DocumentSegment(
+                    tenant_id=current_user.current_tenant_id,
+                    dataset_id=document.dataset_id,
+                    document_id=document.id,
+                    index_node_id=doc_id,
+                    index_node_hash=segment_hash,
+                    position=max_position + 1 if max_position else 1,
+                    content=content,
+                    word_count=len(content),
+                    tokens=tokens,
+                    status='completed',
+                    indexing_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
+                    completed_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
+                    created_by=current_user.id
+                )
+                if document.doc_form == 'qa_model':
+                    segment_document.answer = segment_item['answer']
+                db.session.add(segment_document)
+                segment_data_list.append(segment_document)
+
+                pre_segment_data_list.append(segment_document)
+                keywords_list.append(segment_item['keywords'])
+
+            try:
+                # save vector index
+                VectorService.create_segments_vector(keywords_list, pre_segment_data_list, dataset)
+            except Exception as e:
+                logging.exception("create segment index failed")
+                for segment_document in segment_data_list:
+                    segment_document.enabled = False
+                    segment_document.disabled_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                    segment_document.status = 'error'
+                    segment_document.error = str(e)
+            db.session.commit()
+            return segment_data_list
 
     @classmethod
     def update_segment(cls, args: dict, segment: DocumentSegment, document: Document, dataset: Dataset):
@@ -1757,12 +1730,10 @@ class SegmentService:
                 segment.word_count = len(content)
                 segment.tokens = tokens
                 segment.status = 'completed'
-                segment.indexing_at = datetime.datetime.utcnow()
-                segment.completed_at = datetime.datetime.utcnow()
+                segment.indexing_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                segment.completed_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
                 segment.updated_by = current_user.id
-                segment.updated_at = datetime.datetime.utcnow()
-
-                # 如果是QA模型，则更新答案
+                segment.updated_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
                 if document.doc_form == 'qa_model':
                     segment.answer = args['answer']
 
@@ -1775,7 +1746,7 @@ class SegmentService:
             # 在更新过程中遇到异常则标记段落为错误状态并记录异常
             logging.exception("update segment index failed")
             segment.enabled = False
-            segment.disabled_at = datetime.datetime.utcnow()
+            segment.disabled_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
             segment.status = 'error'
             segment.error = str(e)
             db.session.commit()

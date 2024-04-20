@@ -1,3 +1,11 @@
+'''
+Author: fanwenqi hi.fanwenqi@gmail.com
+Date: 2024-04-20 10:03:01
+LastEditors: fanwenqi hi.fanwenqi@gmail.com
+LastEditTime: 2024-04-20 12:43:41
+FilePath: /dify/api/tasks/clean_dataset_task.py
+Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+'''
 import logging
 import time
 
@@ -51,18 +59,16 @@ def clean_dataset_task(dataset_id: str, tenant_id: str, indexing_technique: str,
         # 若未找到相关文档，则记录日志并返回
         if documents is None or len(documents) == 0:
             logging.info(click.style('No documents found for dataset: {}'.format(dataset_id), fg='green'))
-            return
+        else:
+            logging.info(click.style('Cleaning documents for dataset: {}'.format(dataset_id), fg='green'))
+            index_processor = IndexProcessorFactory(doc_form).init_index_processor()
+            index_processor.clean(dataset, None)
 
-        # 初始化索引处理器，并进行清理操作
-        index_processor = IndexProcessorFactory(doc_form).init_index_processor()
-        index_processor.clean(dataset, None)
+            for document in documents:
+                db.session.delete(document)
 
-        # 删除相关文档和片段
-        for document in documents:
-            db.session.delete(document)
-
-        for segment in segments:
-            db.session.delete(segment)
+            for segment in segments:
+                db.session.delete(segment)
 
         # 删除与数据集相关的处理规则、查询和应用数据集关联
         db.session.query(DatasetProcessRule).filter(DatasetProcessRule.dataset_id == dataset_id).delete()

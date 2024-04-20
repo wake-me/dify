@@ -12,7 +12,7 @@ from controllers.console.app.error import (
     ProviderNotInitializeError,
     ProviderQuotaExceededError,
 )
-from controllers.console.datasets.error import DatasetNotInitializedError, HighQualityDatasetOnlyError
+from controllers.console.datasets.error import DatasetNotInitializedError
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required
 from core.errors.error import (
@@ -74,11 +74,6 @@ class HitTestingApi(Resource):
         except services.errors.account.NoPermissionError as e:
             raise Forbidden(str(e))
 
-        # 确保仅能对高质量数据集进行点击测试
-        if dataset.indexing_technique != 'high_quality':
-            raise HighQualityDatasetOnlyError()
-
-        # 解析请求参数
         parser = reqparse.RequestParser()
         parser.add_argument('query', type=str, location='json')
         parser.add_argument('retrieval_model', type=dict, required=False, location='json')

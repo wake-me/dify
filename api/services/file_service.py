@@ -21,12 +21,10 @@ from services.errors.file import FileTooLargeError, UnsupportedFileTypeError
 IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg']
 IMAGE_EXTENSIONS.extend([ext.upper() for ext in IMAGE_EXTENSIONS])
 
-# 定义允许的文件扩展名列表，主要用于验证上传文件的类型。
-ALLOWED_EXTENSIONS = ['txt', 'markdown', 'md', 'pdf', 'html', 'htm', 'xlsx', 'docx', 'csv']
-# 定义不受信任的文件扩展名列表，比ALLOWED_EXTENSIONS多包含了一些可能包含潜在风险的文件类型。
-UNSTRUSTURED_ALLOWED_EXTENSIONS = ['txt', 'markdown', 'md', 'pdf', 'html', 'htm', 'xlsx',
-                                   'docx', 'csv', 'eml', 'msg', 'pptx', 'ppt', 'xml']
-# 定义预览文本的字数限制。
+ALLOWED_EXTENSIONS = ['txt', 'markdown', 'md', 'pdf', 'html', 'htm', 'xlsx', 'xls', 'docx', 'csv']
+UNSTRUSTURED_ALLOWED_EXTENSIONS = ['txt', 'markdown', 'md', 'pdf', 'html', 'htm', 'xlsx', 'xls',
+                                   'docx', 'csv', 'eml', 'msg', 'pptx', 'ppt', 'xml', 'epub']
+
 PREVIEW_WORDS_LIMIT = 3000
 
 class FileService:
@@ -106,7 +104,7 @@ class FileService:
             mime_type=file.mimetype,
             created_by_role=('account' if isinstance(user, Account) else 'end_user'),
             created_by=user.id,
-            created_at=datetime.datetime.utcnow(),
+            created_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
             used=False,
             hash=hashlib.sha3_256(file_content).hexdigest()
         )
@@ -147,10 +145,10 @@ class FileService:
             extension='txt',
             mime_type='text/plain',
             created_by=current_user.id,
-            created_at=datetime.datetime.utcnow(),
+            created_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
             used=True,
             used_by=current_user.id,
-            used_at=datetime.datetime.utcnow()
+            used_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         )
 
         # 将新文件记录添加到数据库会话并提交

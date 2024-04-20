@@ -1,20 +1,16 @@
 # 导入必要的模块和库
 import os
-from werkzeug.exceptions import Unauthorized
 
 # 如果不是在调试模式下，对一些库进行特殊配置，以提高性能
 if not os.environ.get("DEBUG") or os.environ.get("DEBUG").lower() != 'true':
     from gevent import monkey
+
     monkey.patch_all()
     # 如果使用Milvus作为向量存储，进行额外的grpc配置
     import grpc.experimental.gevent
+
     grpc.experimental.gevent.init_gevent()
 
-    # 配置langchain库，用于语言处理
-    import langchain
-    langchain.verbose = True
-
-# 导入广泛使用的模块
 import json
 import logging
 import threading
@@ -25,7 +21,7 @@ import warnings
 from flask import Flask, Response, request
 from flask_cors import CORS
 
-# 导入自定义的模块和类
+from werkzeug.exceptions import Unauthorized
 from commands import register_commands
 from config import CloudEditionConfig, Config
 from extensions import (
@@ -50,12 +46,14 @@ from services.account_service import AccountService
 from events import event_handlers
 from models import account, dataset, model, source, task, tool, tools, web
 
+# DO NOT REMOVE ABOVE
+
 # 忽略特定的资源警告
 warnings.simplefilter("ignore", ResourceWarning)
 
 # 根据操作系统设置时区
 if os.name == "nt":
-    os.system('tzutil /s "UTC"')    
+    os.system('tzutil /s "UTC"')
 else:
     os.environ['TZ'] = 'UTC'
     time.tzset()
@@ -65,8 +63,14 @@ else:
 class DifyApp(Flask):
     pass
 
-# 配置部分
-config_type = os.getenv('EDITION', default='SELF_HOSTED')  # 通过环境变量读取应用版本类型
+
+# -------------
+# Configuration
+# -------------
+
+
+config_type = os.getenv('EDITION', default='SELF_HOSTED')  # ce edition first
+
 
 # 应用工厂函数，用于创建和配置Flask应用实例
 def create_app(test_config=None) -> Flask:
@@ -193,7 +197,6 @@ def register_blueprints(app):
 app = create_app()
 celery = app.extensions["celery"]
 
-# 如果处于测试模式，输出提示信息
 if app.config['TESTING']:
     print("App is running in TESTING mode")
 

@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import requests
@@ -121,7 +121,7 @@ class OAuthCallback(Resource):
         # 如果账户状态是待处理，则将其状态更新为激活，并记录首次初始化时间
         if account.status == AccountStatus.PENDING.value:
             account.status = AccountStatus.ACTIVE.value
-            account.initialized_at = datetime.utcnow()
+            account.initialized_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
         # 如果账户是首个所有者，则创建租户

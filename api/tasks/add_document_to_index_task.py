@@ -78,7 +78,7 @@ def add_document_to_index_task(dataset_document_id: str):
         # 处理添加文档到索引过程中出现的异常，并更新文档状态
         logging.exception("add document to index failed")
         dataset_document.enabled = False
-        dataset_document.disabled_at = datetime.datetime.utcnow()
+        dataset_document.disabled_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         dataset_document.status = 'error'
         dataset_document.error = str(e)
         db.session.commit()

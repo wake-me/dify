@@ -94,9 +94,9 @@ def batch_create_segment_to_index_task(job_id: str, content: list, dataset_id: s
                 word_count=len(content),
                 tokens=tokens,
                 created_by=user_id,
-                indexing_at=datetime.datetime.utcnow(),
+                indexing_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
                 status='completed',
-                completed_at=datetime.datetime.utcnow()
+                completed_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
             )
             # 如果文档形式为问答模型，设置答案
             if dataset_document.doc_form == 'qa_model':
