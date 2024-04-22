@@ -227,14 +227,14 @@ class WorkflowCycleManage:
             inputs = WorkflowEngineManager.handle_special_values(inputs)
             outputs = WorkflowEngineManager.handle_special_values(outputs)
 
-        workflow_node_execution.status = WorkflowNodeExecutionStatus.SUCCEEDED.value
-        workflow_node_execution.elapsed_time = time.perf_counter() - start_at
-        workflow_node_execution.inputs = json.dumps(inputs) if inputs else None
-        workflow_node_execution.process_data = json.dumps(process_data) if process_data else None
-        workflow_node_execution.outputs = json.dumps(outputs) if outputs else None
-        workflow_node_execution.execution_metadata = json.dumps(jsonable_encoder(execution_metadata)) \
-            if execution_metadata else None
-        workflow_node_execution.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            workflow_node_execution.status = WorkflowNodeExecutionStatus.SUCCEEDED.value
+            workflow_node_execution.elapsed_time = time.perf_counter() - start_at
+            workflow_node_execution.inputs = json.dumps(inputs) if inputs else None
+            workflow_node_execution.process_data = json.dumps(process_data) if process_data else None
+            workflow_node_execution.outputs = json.dumps(outputs) if outputs else None
+            workflow_node_execution.execution_metadata = json.dumps(jsonable_encoder(execution_metadata)) \
+                if execution_metadata else None 
+            workflow_node_execution.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
             # 提交数据库事务并关闭数据库会话
             db.session.commit()
@@ -265,13 +265,13 @@ class WorkflowCycleManage:
             inputs = WorkflowEngineManager.handle_special_values(inputs)
             outputs = WorkflowEngineManager.handle_special_values(outputs)
 
-        workflow_node_execution.status = WorkflowNodeExecutionStatus.FAILED.value
-        workflow_node_execution.error = error
-        workflow_node_execution.elapsed_time = time.perf_counter() - start_at
-        workflow_node_execution.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
-        workflow_node_execution.inputs = json.dumps(inputs) if inputs else None
-        workflow_node_execution.process_data = json.dumps(process_data) if process_data else None
-        workflow_node_execution.outputs = json.dumps(outputs) if outputs else None
+            workflow_node_execution.status = WorkflowNodeExecutionStatus.FAILED.value
+            workflow_node_execution.error = error
+            workflow_node_execution.elapsed_time = time.perf_counter() - start_at
+            workflow_node_execution.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            workflow_node_execution.inputs = json.dumps(inputs) if inputs else None
+            workflow_node_execution.process_data = json.dumps(process_data) if process_data else None
+            workflow_node_execution.outputs = json.dumps(outputs) if outputs else None
 
             # 提交数据库事务，更新工作流节点执行信息
             db.session.commit()
