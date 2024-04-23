@@ -2,14 +2,19 @@ from abc import ABC, abstractmethod
 
 
 class TemplateTransformer(ABC):
+    """
+    模板转换器的基类，用于定义代码转换的通用接口。
+    """
+    
     @classmethod
     @abstractmethod
     def transform_caller(cls, code: str, inputs: dict) -> tuple[str, str]:
         """
-        Transform code to python runner
-        :param code: code
-        :param inputs: inputs
-        :return: runner, preload
+        将代码转换为Python运行器可以执行的形式。
+        
+        :param code: 需要转换的代码字符串。
+        :param inputs: 代码执行时所需的输入字典。
+        :return: 返回一个元组，包含运行器代码和预加载代码。
         """
         pass
     
@@ -17,8 +22,9 @@ class TemplateTransformer(ABC):
     @abstractmethod
     def transform_response(cls, response: str) -> dict:
         """
-        Transform response to dict
-        :param response: response
-        :return:
+        将响应字符串转换为字典格式。
+        
+        :param response: 从运行器接收的响应字符串。
+        :return: 返回一个基于响应字符串解析后的字典。
         """
         pass

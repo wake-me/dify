@@ -47,16 +47,16 @@ class PythonTemplateTransformer(TemplateTransformer):
     @classmethod
     def transform_caller(cls, code: str, inputs: dict) -> tuple[str, str]:
         """
-        Transform code to python runner
-        :param code: code
-        :param inputs: inputs
-        :return:
+        将代码转换为Python运行器格式。
+        :param code: 需要执行的代码。
+        :param inputs: 传递给代码的输入参数，字典格式。
+        :return: 返回一个元组，包含转换后的Python运行器代码和预加载代码。
         """
         
-        # transform inputs to json string
+        # 将输入参数转换为JSON字符串
         inputs_str = json.dumps(inputs, indent=4, ensure_ascii=False)
 
-        # replace code and inputs
+        # 替换代码中的占位符以插入代码和输入参数
         runner = PYTHON_RUNNER.replace('{{code}}', code)
         runner = runner.replace('{{inputs}}', inputs_str)
 
@@ -65,11 +65,11 @@ class PythonTemplateTransformer(TemplateTransformer):
     @classmethod
     def transform_response(cls, response: str) -> dict:
         """
-        Transform response to dict
-        :param response: response
-        :return:
+        将响应转换为字典格式。
+        :param response: 从Python运行器接收的响应。
+        :return: 返回解析后的结果，字典格式。
         """
-        # extract result
+        # 提取结果部分的JSON字符串
         result = re.search(r'<<RESULT>>(.*?)<<RESULT>>', response, re.DOTALL)
         if not result:
             raise ValueError('Failed to parse result')

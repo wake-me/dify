@@ -9,40 +9,43 @@ from core.helper.code_executor.javascript_transformer import NodeJsTemplateTrans
 from core.helper.code_executor.jina2_transformer import Jinja2TemplateTransformer
 from core.helper.code_executor.python_transformer import PythonTemplateTransformer
 
-# Code Executor
-CODE_EXECUTION_ENDPOINT = get_env('CODE_EXECUTION_ENDPOINT')
-CODE_EXECUTION_API_KEY = get_env('CODE_EXECUTION_API_KEY')
+# 代码执行器配置
+CODE_EXECUTION_ENDPOINT = get_env('CODE_EXECUTION_ENDPOINT')  # 代码执行的端点URL，从环境变量中获取
+CODE_EXECUTION_API_KEY = get_env('CODE_EXECUTION_API_KEY')  # 用于代码执行的API密钥，从环境变量中获取
 
-CODE_EXECUTION_TIMEOUT= (10, 60)
+CODE_EXECUTION_TIMEOUT= (10, 60)  # 定义代码执行的超时时间，元组中第一个值为尝试次数，第二个值为每次尝试的间隔秒数
 
 class CodeExecutionException(Exception):
-    pass
+    pass  # 定义一个自定义异常，用于处理代码执行过程中的异常
 
 class CodeExecutionResponse(BaseModel):
     class Data(BaseModel):
-        stdout: Optional[str]
-        error: Optional[str]
+        stdout: Optional[str]  # 标准输出，如果有的话
+        error: Optional[str]  # 错误信息，如果执行过程中有错误的话
 
-    code: int
-    message: str
-    data: Data
+    code: int  # HTTP状态码或错误代码
+    message: str  # 相应的消息或错误描述
+    data: Data  # 包含执行结果的数据对象
 
 
 class CodeExecutor:
     @classmethod
     def execute_code(cls, language: Literal['python3', 'javascript', 'jinja2'], preload: str, code: str) -> str:
         """
-        Execute code
-        :param language: code language
-        :param code: code
-        :return:
+        执行代码片段
+        
+        :param language: 代码语言，支持 python3、javascript、jinja2
+        :param preload: 预加载代码（如果需要）
+        :param code: 待执行的代码片段
+        :return: 执行结果的标准输出
         """
+        # 构建请求URL和头部
         url = URL(CODE_EXECUTION_ENDPOINT) / 'v1' / 'sandbox' / 'run'
-
         headers = {
             'X-Api-Key': CODE_EXECUTION_API_KEY
         }
 
+        # 根据不同的语言代码设置执行环境
         data = {
             'language': 'python3' if language == 'jinja2' else
                         'nodejs' if language == 'javascript' else
@@ -51,8 +54,10 @@ class CodeExecutor:
             'preload': preload
         }
 
+        # 发送代码执行请求
         try:
             response = post(str(url), json=data, headers=headers, timeout=CODE_EXECUTION_TIMEOUT)
+            # 处理服务不可用或其他非200状态码的情况
             if response.status_code == 503:
                 raise CodeExecutionException('Code execution service is unavailable')
             elif response.status_code != 200:
@@ -62,6 +67,7 @@ class CodeExecutor:
         except Exception as e:
             raise CodeExecutionException('Failed to execute code, this is likely a network issue, please check if the sandbox service is running')
         
+        # 解析响应结果
         try:
             response = response.json()
         except:
@@ -69,9 +75,11 @@ class CodeExecutor:
         
         response = CodeExecutionResponse(**response)
 
+        # 检查代码执行结果状态
         if response.code != 0:
             raise CodeExecutionException(response.message)
         
+        # 检查执行结果中是否有错误信息
         if response.data.error:
             raise CodeExecutionException(response.data.error)
         
@@ -80,12 +88,14 @@ class CodeExecutor:
     @classmethod
     def execute_workflow_code_template(cls, language: Literal['python3', 'javascript', 'jinja2'], code: str, inputs: dict) -> dict:
         """
-        Execute code
-        :param language: code language
-        :param code: code
-        :param inputs: inputs
-        :return:
+        执行工作流代码模板
+        
+        :param language: 代码语言，支持 python3、javascript、jinja2
+        :param code: 工作流代码模板
+        :param inputs: 输入参数
+        :return: 模板处理后的结果
         """
+        # 根据语言选择合适的模板转换器
         template_transformer = None
         if language == 'python3':
             template_transformer = PythonTemplateTransformer
@@ -96,11 +106,14 @@ class CodeExecutor:
         else:
             raise CodeExecutionException('Unsupported language')
 
+        # 转换代码和预加载信息以适应执行环境
         runner, preload = template_transformer.transform_caller(code, inputs)
 
+        # 执行转换后的代码
         try:
             response = cls.execute_code(language, preload, runner)
         except CodeExecutionException as e:
             raise e
 
+        # 将执行结果转换为预期的输出格式
         return template_transformer.transform_response(response)

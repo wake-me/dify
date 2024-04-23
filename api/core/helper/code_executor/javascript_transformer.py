@@ -24,16 +24,15 @@ class NodeJsTemplateTransformer(TemplateTransformer):
     @classmethod
     def transform_caller(cls, code: str, inputs: dict) -> tuple[str, str]:
         """
-        Transform code to python runner
-        :param code: code
-        :param inputs: inputs
-        :return:
+        将代码转换为Python运行器可以执行的形式。
+        :param code: 需要执行的JavaScript代码。
+        :param inputs: 传递给JavaScript代码的输入参数，字典形式。
+        :return: 返回一个元组，包含转换后的执行代码和预加载代码。
         """
-
-        # transform inputs to json string
+        # 将输入参数转换为JSON字符串
         inputs_str = json.dumps(inputs, indent=4, ensure_ascii=False)
 
-        # replace code and inputs
+        # 替换代码模板中的代码和输入参数部分
         runner = NODEJS_RUNNER.replace('{{code}}', code)
         runner = runner.replace('{{inputs}}', inputs_str)
 
@@ -42,11 +41,11 @@ class NodeJsTemplateTransformer(TemplateTransformer):
     @classmethod
     def transform_response(cls, response: str) -> dict:
         """
-        Transform response to dict
-        :param response: response
-        :return:
+        将响应转换为字典形式。
+        :param response: 从JavaScript代码执行中得到的原始响应。
+        :return: 转换后的结果，字典形式。
         """
-        # extract result
+        # 提取结果部分
         result = re.search(r'<<RESULT>>(.*)<<RESULT>>', response, re.DOTALL)
         if not result:
             raise ValueError('Failed to parse result')

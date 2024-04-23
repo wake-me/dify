@@ -9,23 +9,26 @@ from core.model_runtime.entities.common_entities import I18nObject
 
 class ModelType(Enum):
     """
-    Enum class for model type.
+    模型类型的枚举类。
     """
-    LLM = "llm"
-    TEXT_EMBEDDING = "text-embedding"
-    RERANK = "rerank"
-    SPEECH2TEXT = "speech2text"
-    MODERATION = "moderation"
-    TTS = "tts"
-    TEXT2IMG = "text2img"
+
+    LLM = "llm"  # 代表大语言模型
+    TEXT_EMBEDDING = "text-embedding"  # 代表文本嵌入模型
+    RERANK = "rerank"  # 代表重排序模型
+    SPEECH2TEXT = "speech2text"  # 代表语音转文本模型
+    MODERATION = "moderation"  # 代表内容审核模型
+    TTS = "tts"  # 代表文本转语音模型
+    TEXT2IMG = "text2img"  # 代表文本生成图像模型
 
     @classmethod
     def value_of(cls, origin_model_type: str) -> "ModelType":
         """
-        Get model type from origin model type.
+        根据原始模型类型获取枚举模型类型。
 
-        :return: model type
+        :param origin_model_type: 原始模型类型的字符串表示。
+        :return: 对应的模型类型枚举实例。
         """
+        # 根据传入的原始模型类型字符串，返回相应的枚举实例
         if origin_model_type == 'text-generation' or origin_model_type == cls.LLM.value:
             return cls.LLM
         elif origin_model_type == 'embeddings' or origin_model_type == cls.TEXT_EMBEDDING.value:
@@ -45,10 +48,11 @@ class ModelType(Enum):
 
     def to_origin_model_type(self) -> str:
         """
-        Get origin model type from model type.
+        将枚举模型类型转换为原始模型类型字符串。
 
-        :return: origin model type
+        :return: 对应的原始模型类型字符串。
         """
+        # 根据枚举实例返回相应的原始模型类型字符串
         if self == self.LLM:
             return 'text-generation'
         elif self == self.TEXT_EMBEDDING:
@@ -68,94 +72,107 @@ class ModelType(Enum):
 
 class FetchFrom(Enum):
     """
-    Enum class for fetch from.
+    定义获取来源的枚举类。
     """
-    PREDEFINED_MODEL = "predefined-model"
-    CUSTOMIZABLE_MODEL = "customizable-model"
+
+    PREDEFINED_MODEL = "predefined-model"  # 预定义模型
+    CUSTOMIZABLE_MODEL = "customizable-model"  # 可定制模型
 
 
 class ModelFeature(Enum):
     """
-    Enum class for llm feature.
+    定义模型功能的枚举类。
     """
-    TOOL_CALL = "tool-call"
-    MULTI_TOOL_CALL = "multi-tool-call"
-    AGENT_THOUGHT = "agent-thought"
-    VISION = "vision"
-    STREAM_TOOL_CALL = "stream-tool-call"
+
+    TOOL_CALL = "tool-call"  # 工具调用
+    MULTI_TOOL_CALL = "multi-tool-call"  # 多工具调用
+    AGENT_THOUGHT = "agent-thought"  # 代理思考
+    VISION = "vision"  # 视觉
+    STREAM_TOOL_CALL = "stream-tool-call"  # 流式工具调用
 
 
 class DefaultParameterName(Enum):
     """
-    Enum class for parameter template variable.
+    定义参数模板变量的枚举类。
     """
-    TEMPERATURE = "temperature"
-    TOP_P = "top_p"
-    PRESENCE_PENALTY = "presence_penalty"
-    FREQUENCY_PENALTY = "frequency_penalty"
-    MAX_TOKENS = "max_tokens"
-    RESPONSE_FORMAT = "response_format"
+
+    TEMPERATURE = "temperature"  # 温度
+    TOP_P = "top_p"  # Top P
+    PRESENCE_PENALTY = "presence_penalty"  # 存在惩罚
+    FREQUENCY_PENALTY = "frequency_penalty"  # 频率惩罚
+    MAX_TOKENS = "max_tokens"  # 最大令牌数
+    RESPONSE_FORMAT = "response_format"  # 响应格式
 
     @classmethod
     def value_of(cls, value: Any) -> 'DefaultParameterName':
         """
-        Get parameter name from value.
+        根据值获取参数名。
 
-        :param value: parameter value
-        :return: parameter name
+        :param value: 参数值
+        :return: 参数名
         """
         for name in cls:
             if name.value == value:
                 return name
-        raise ValueError(f'invalid parameter name {value}')
-
+        raise ValueError(f'无效的参数名 {value}')
 
 class ParameterType(Enum):
     """
-    Enum class for parameter type.
+    参数类型的枚举类。
     """
-    FLOAT = "float"
-    INT = "int"
-    STRING = "string"
-    BOOLEAN = "boolean"
+    FLOAT = "float"  # 浮点型
+    INT = "int"  # 整型
+    STRING = "string"  # 字符串型
+    BOOLEAN = "boolean"  # 布尔型
 
 
 class ModelPropertyKey(Enum):
     """
-    Enum class for model property key.
+    模型属性键的枚举类。
     """
-    MODE = "mode"
-    CONTEXT_SIZE = "context_size"
-    MAX_CHUNKS = "max_chunks"
-    FILE_UPLOAD_LIMIT = "file_upload_limit"
-    SUPPORTED_FILE_EXTENSIONS = "supported_file_extensions"
-    MAX_CHARACTERS_PER_CHUNK = "max_characters_per_chunk"
-    DEFAULT_VOICE = "default_voice"
-    VOICES = "voices"
-    WORD_LIMIT = "word_limit"
-    AUDIO_TYPE = "audio_type"
-    MAX_WORKERS = "max_workers"
+    MODE = "mode"  # 模式
+    CONTEXT_SIZE = "context_size"  # 上下文大小
+    MAX_CHUNKS = "max_chunks"  # 最大块数
+    FILE_UPLOAD_LIMIT = "file_upload_limit"  # 文件上传限制
+    SUPPORTED_FILE_EXTENSIONS = "supported_file_extensions"  # 支持的文件扩展名
+    MAX_CHARACTERS_PER_CHUNK = "max_characters_per_chunk"  # 每块最大字符数
+    DEFAULT_VOICE = "default_voice"  # 默认声音
+    VOICES = "voices"  # 可用声音列表
+    WORD_LIMIT = "word_limit"  # 字数限制
+    AUDIO_TYPE = "audio_type"  # 音频类型
+    MAX_WORKERS = "max_workers"  # 最大工作线程数
 
 
 class ProviderModel(BaseModel):
     """
-    Model class for provider model.
+    供应商模型的模型类。
     """
-    model: str
-    label: I18nObject
-    model_type: ModelType
-    features: Optional[list[ModelFeature]] = None
-    fetch_from: FetchFrom
-    model_properties: dict[ModelPropertyKey, Any]
-    deprecated: bool = False
+    model: str  # 模型标识符
+    label: I18nObject  # 模型的国际化标签
+    model_type: ModelType  # 模型类型
+    features: Optional[list[ModelFeature]] = None  # 模型特性列表
+    fetch_from: FetchFrom  # 数据获取方式
+    model_properties: dict[ModelPropertyKey, Any]  # 模型的附加属性，键为ModelPropertyKey枚举成员
+    deprecated: bool = False  # 模型是否已弃用
 
     class Config:
-        protected_namespaces = ()
-
+        protected_namespaces = ()  # 保护的命名空间列表，用于配置验证时忽略特定字段
 
 class ParameterRule(BaseModel):
     """
-    Model class for parameter rule.
+    参数规则模型类。
+    属性:
+        name (str): 参数名称。
+        use_template (Optional[str]): 是否使用模板，默认为None。
+        label (I18nObject): 参数标签，支持多语言。
+        type (ParameterType): 参数类型。
+        help (Optional[I18nObject]): 参数帮助信息，默认为None。
+        required (bool): 参数是否必填，默认为False。
+        default (Optional[Any]): 参数默认值，默认为None。
+        min (Optional[float]): 参数最小值，默认为None。
+        max (Optional[float]): 参数最大值，默认为None。
+        precision (Optional[int]): 参数精度，默认为None。
+        options (list[str]): 参数可选值列表，默认为空列表。
     """
     name: str
     use_template: Optional[str] = None
@@ -172,7 +189,12 @@ class ParameterRule(BaseModel):
 
 class PriceConfig(BaseModel):
     """
-    Model class for pricing info.
+    价格配置模型类。
+    属性:
+        input (Decimal): 输入值。
+        output (Optional[Decimal]): 输出值，默认为None。
+        unit (Decimal): 单位价格。
+        currency (str): 货币单位。
     """
     input: Decimal
     output: Optional[Decimal] = None
@@ -182,7 +204,10 @@ class PriceConfig(BaseModel):
 
 class AIModelEntity(ProviderModel):
     """
-    Model class for AI model.
+    人工智能模型实体模型类。
+    属性:
+        parameter_rules (list[ParameterRule]): 参数规则列表。
+        pricing (Optional[PriceConfig]): 价格配置信息，默认为None。
     """
     parameter_rules: list[ParameterRule] = []
     pricing: Optional[PriceConfig] = None
@@ -194,7 +219,10 @@ class ModelUsage(BaseModel):
 
 class PriceType(Enum):
     """
-    Enum class for price type.
+    价格类型枚举类。
+    值:
+        INPUT: 输入类型。
+        OUTPUT: 输出类型。
     """
     INPUT = "input"
     OUTPUT = "output"
@@ -202,7 +230,12 @@ class PriceType(Enum):
 
 class PriceInfo(BaseModel):
     """
-    Model class for price info.
+    价格信息模型类。
+    属性:
+        unit_price (Decimal): 单位价格。
+        unit (Decimal): 单位。
+        total_amount (Decimal): 总金额。
+        currency (str): 货币单位。
     """
     unit_price: Decimal
     unit: Decimal

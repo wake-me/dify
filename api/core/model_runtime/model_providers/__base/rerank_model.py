@@ -9,8 +9,9 @@ from core.model_runtime.model_providers.__base.ai_model import AIModel
 
 class RerankModel(AIModel):
     """
-    Base Model class for rerank model.
+    重排模型的基类。
     """
+
     model_type: ModelType = ModelType.RERANK
 
     def invoke(self, model: str, credentials: dict,
@@ -18,22 +19,23 @@ class RerankModel(AIModel):
                user: Optional[str] = None) \
             -> RerankResult:
         """
-        Invoke rerank model
+        调用重排模型进行文档重排。
 
-        :param model: model name
-        :param credentials: model credentials
-        :param query: search query
-        :param docs: docs for reranking
-        :param score_threshold: score threshold
-        :param top_n: top n
-        :param user: unique user id
-        :return: rerank result
+        :param model: 模型名称。
+        :param credentials: 模型认证信息。
+        :param query: 搜索查询字符串。
+        :param docs: 需要进行重排的文档列表。
+        :param score_threshold: 分数阈值，用于筛选文档。
+        :param top_n: 选取排序后前n个文档。
+        :param user: 唯一的用户ID。
+        :return: 重排结果。
         """
-        self.started_at = time.perf_counter()
+        self.started_at = time.perf_counter()  # 记录开始时间
 
         try:
             return self._invoke(model, credentials, query, docs, score_threshold, top_n, user)
         except Exception as e:
+            # 将捕获到的异常转换为统一的模型调用错误格式抛出
             raise self._transform_invoke_error(e)
 
     @abstractmethod
@@ -42,15 +44,15 @@ class RerankModel(AIModel):
                 user: Optional[str] = None) \
             -> RerankResult:
         """
-        Invoke rerank model
+        执行重排模型的具体逻辑。
 
-        :param model: model name
-        :param credentials: model credentials
-        :param query: search query
-        :param docs: docs for reranking
-        :param score_threshold: score threshold
-        :param top_n: top n
-        :param user: unique user id
-        :return: rerank result
+        :param model: 模型名称。
+        :param credentials: 模型认证信息。
+        :param query: 搜索查询字符串。
+        :param docs: 需要进行重排的文档列表。
+        :param score_threshold: 分数阈值，用于筛选文档。
+        :param top_n: 选取排序后前n个文档。
+        :param user: 唯一的用户ID。
+        :return: 重排结果。
         """
-        raise NotImplementedError
+        raise NotImplementedError  # 该方法必须在子类中实现

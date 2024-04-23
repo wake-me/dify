@@ -10,39 +10,41 @@ from core.utils.module_import_helper import get_subclasses_from_module, import_m
 
 
 class ModelProvider(ABC):
-    provider_schema: ProviderEntity = None
-    model_instance_map: dict[str, AIModel] = {}
+    # 类ModelProvider的注释：抽象基类，用于提供模型实例和验证提供者凭证。
+    
+    provider_schema: ProviderEntity = None  # 提供者模式属性，用于存储提供者的模式信息。
+    model_instance_map: dict[str, AIModel] = {}  # 模型实例映射，键是模型类型的字符串表示，值是AIModel的实例。
+
 
     @abstractmethod
     def validate_provider_credentials(self, credentials: dict) -> None:
         """
-        Validate provider credentials
-        You can choose any validate_credentials method of model type or implement validate method by yourself,
-        such as: get model list api
+        验证提供者凭证的合法性。
+        你可以选择任何模型类型的验证凭证方法或自己实现验证方法，例如：通过获取模型列表API。
 
-        if validate failed, raise exception
+        如果验证失败，则抛出异常。
 
-        :param credentials: provider credentials, credentials form defined in `provider_credential_schema`.
+        :param credentials: 提供者凭证，凭证形式定义在`provider_credential_schema`中。
         """
         raise NotImplementedError
 
     def get_provider_schema(self) -> ProviderEntity:
         """
-        Get provider schema
+        获取提供者模式。
 
-        :return: provider schema
+        :return: 返回提供者模式。
         """
         if self.provider_schema:
             return self.provider_schema
 
-        # get dirname of the current path
+        # 获取当前类所在的模块名
         provider_name = self.__class__.__module__.split('.')[-1]
 
-        # get the path of the model_provider classes
+        # 获取模型提供者类所在的路径
         base_path = os.path.abspath(__file__)
         current_path = os.path.join(os.path.dirname(os.path.dirname(base_path)), provider_name)
 
-        # read provider schema from yaml file
+        # 从yaml文件中读取提供者模式
         yaml_path = os.path.join(current_path, f'{provider_name}.yaml')
         yaml_data = {}
         if os.path.exists(yaml_path):
@@ -50,50 +52,50 @@ class ModelProvider(ABC):
                 yaml_data = yaml.safe_load(f)
 
         try:
-            # yaml_data to entity
+            # 将yaml数据转换为实体
             provider_schema = ProviderEntity(**yaml_data)
         except Exception as e:
             raise Exception(f'Invalid provider schema for {provider_name}: {str(e)}')
 
-        # cache schema
+        # 缓存模式
         self.provider_schema = provider_schema
 
         return provider_schema
 
     def models(self, model_type: ModelType) -> list[AIModelEntity]:
         """
-        Get all models for given model type
+        根据给定的模型类型获取所有模型。
 
-        :param model_type: model type defined in `ModelType`
-        :return: list of models
+        :param model_type: 模型类型，定义在`ModelType`中。
+        :return: 模型列表。
         """
         provider_schema = self.get_provider_schema()
         if model_type not in provider_schema.supported_model_types:
             return []
 
-        # get model instance of the model type
+        # 获取指定模型类型的模型实例
         model_instance = self.get_model_instance(model_type)
 
-        # get predefined models (predefined_models)
+        # 获取预定义的模型
         models = model_instance.predefined_models()
 
-        # return models
+        # 返回模型列表
         return models
 
     def get_model_instance(self, model_type: ModelType) -> AIModel:
         """
-        Get model instance
+        获取模型实例。
 
-        :param model_type: model type defined in `ModelType`
-        :return:
+        :param model_type: 模型类型，定义在`ModelType`中。
+        :return: 返回模型实例。
         """
-        # get dirname of the current path
+        # 获取当前路径的目录名
         provider_name = self.__class__.__module__.split('.')[-1]
 
         if f"{provider_name}.{model_type.value}" in self.model_instance_map:
             return self.model_instance_map[f"{provider_name}.{model_type.value}"]
 
-        # get the path of the model type classes
+        # 获取模型类型类的路径
         base_path = os.path.abspath(__file__)
         model_type_name = model_type.value.replace('-', '_')
         model_type_path = os.path.join(os.path.dirname(os.path.dirname(base_path)), provider_name, model_type_name)
@@ -102,7 +104,7 @@ class ModelProvider(ABC):
         if not os.path.isdir(model_type_path) or not os.path.exists(model_type_py_path):
             raise Exception(f'Invalid model type {model_type} for provider {provider_name}')
 
-        # Dynamic loading {model_type_name}.py file and find the subclass of AIModel
+        # 如果模型类型的路径不存在或模型的py文件不存在，则抛出异常
         parent_module = '.'.join(self.__class__.__module__.split('.')[:-1])
         mod = import_module_from_source(
             f'{parent_module}.{model_type_name}.{model_type_name}', model_type_py_path)

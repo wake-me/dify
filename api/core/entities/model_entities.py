@@ -10,29 +10,30 @@ from core.model_runtime.entities.provider_entities import ProviderEntity
 
 class ModelStatus(Enum):
     """
-    Enum class for model status.
+    模型状态枚举类。
     """
-    ACTIVE = "active"
-    NO_CONFIGURE = "no-configure"
-    QUOTA_EXCEEDED = "quota-exceeded"
-    NO_PERMISSION = "no-permission"
+    ACTIVE = "active"  # 活跃状态
+    NO_CONFIGURE = "no-configure"  # 未配置状态
+    QUOTA_EXCEEDED = "quota-exceeded"  # 配额超出状态
+    NO_PERMISSION = "no-permission"  # 无权限状态
 
 
 class SimpleModelProviderEntity(BaseModel):
     """
-    Simple provider.
+    简单模型提供者实体类。
+    用于表示模型提供者的简化的信息。
     """
-    provider: str
-    label: I18nObject
-    icon_small: Optional[I18nObject] = None
-    icon_large: Optional[I18nObject] = None
-    supported_model_types: list[ModelType]
+    provider: str  # 提供者名称
+    label: I18nObject  # 提供者标签，支持多语言
+    icon_small: Optional[I18nObject] = None  # 小图标，支持多语言
+    icon_large: Optional[I18nObject] = None  # 大图标，支持多语言
+    supported_model_types: list[ModelType]  # 支持的模型类型列表
 
     def __init__(self, provider_entity: ProviderEntity) -> None:
         """
-        Init simple provider.
+        初始化简单模型提供者实体。
 
-        :param provider_entity: provider entity
+        :param provider_entity: 模型提供者实体，包含提供者的详细信息。
         """
         super().__init__(
             provider=provider_entity.provider,
@@ -45,27 +46,30 @@ class SimpleModelProviderEntity(BaseModel):
 
 class ModelWithProviderEntity(ProviderModel):
     """
-    Model with provider entity.
+    带提供者实体的模型类。
+    用于表示一个具体模型及其相关的提供者信息。
     """
-    provider: SimpleModelProviderEntity
-    status: ModelStatus
+    provider: SimpleModelProviderEntity  # 模型提供者实体
+    status: ModelStatus  # 模型状态
 
 
 class DefaultModelProviderEntity(BaseModel):
     """
-    Default model provider entity.
+    默认模型提供者实体类。
+    用于描述默认模型提供者的详细信息。
     """
-    provider: str
-    label: I18nObject
-    icon_small: Optional[I18nObject] = None
-    icon_large: Optional[I18nObject] = None
-    supported_model_types: list[ModelType]
+    provider: str  # 提供者名称
+    label: I18nObject  # 提供者标签，支持多语言
+    icon_small: Optional[I18nObject] = None  # 小图标，支持多语言
+    icon_large: Optional[I18nObject] = None  # 大图标，支持多语言
+    supported_model_types: list[ModelType]  # 支持的模型类型列表
 
 
 class DefaultModelEntity(BaseModel):
     """
-    Default model entity.
+    默认模型实体类。
+    用于表示一个具体模型及其默认提供者的详细信息。
     """
-    model: str
-    model_type: ModelType
-    provider: DefaultModelProviderEntity
+    model: str  # 模型标识符
+    model_type: ModelType  # 模型类型
+    provider: DefaultModelProviderEntity  # 默认模型提供者实体

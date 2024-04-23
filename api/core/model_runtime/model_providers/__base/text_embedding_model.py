@@ -9,7 +9,7 @@ from core.model_runtime.model_providers.__base.ai_model import AIModel
 
 class TextEmbeddingModel(AIModel):
     """
-    Model class for text embedding model.
+    文本嵌入模型的模型类。
     """
     model_type: ModelType = ModelType.TEXT_EMBEDDING
 
@@ -17,19 +17,20 @@ class TextEmbeddingModel(AIModel):
                texts: list[str], user: Optional[str] = None) \
             -> TextEmbeddingResult:
         """
-        Invoke large language model
+        调用大型语言模型。
 
-        :param model: model name
-        :param credentials: model credentials
-        :param texts: texts to embed
-        :param user: unique user id
-        :return: embeddings result
+        :param model: 模型名称。
+        :param credentials: 模型凭证。
+        :param texts: 需要嵌入文本的列表。
+        :param user: 唯一的用户ID，可选。
+        :return: 嵌入结果。
         """
         self.started_at = time.perf_counter()
 
         try:
             return self._invoke(model, credentials, texts, user)
         except Exception as e:
+            # 转换并抛出调用过程中的错误
             raise self._transform_invoke_error(e)
 
     @abstractmethod
@@ -37,38 +38,39 @@ class TextEmbeddingModel(AIModel):
                 texts: list[str], user: Optional[str] = None) \
             -> TextEmbeddingResult:
         """
-        Invoke large language model
+        调用大型语言模型的抽象方法。
 
-        :param model: model name
-        :param credentials: model credentials
-        :param texts: texts to embed
-        :param user: unique user id
-        :return: embeddings result
+        :param model: 模型名称。
+        :param credentials: 模型凭证。
+        :param texts: 需要嵌入文本的列表。
+        :param user: 唯一的用户ID，可选。
+        :return: 嵌入结果。
         """
         raise NotImplementedError
 
     @abstractmethod
     def get_num_tokens(self, model: str, credentials: dict, texts: list[str]) -> int:
         """
-        Get number of tokens for given prompt messages
+        获取给定提示信息的令牌数量。
 
-        :param model: model name
-        :param credentials: model credentials
-        :param texts: texts to embed
-        :return:
+        :param model: 模型名称。
+        :param credentials: 模型凭证。
+        :param texts: 需要嵌入文本的列表。
+        :return: 令牌数量。
         """
         raise NotImplementedError
 
     def _get_context_size(self, model: str, credentials: dict) -> int:
         """
-        Get context size for given embedding model
+        获取给定嵌入模型的上下文大小。
 
-        :param model: model name
-        :param credentials: model credentials
-        :return: context size
+        :param model: 模型名称。
+        :param credentials: 模型凭证。
+        :return: 上下文大小。
         """
         model_schema = self.get_model_schema(model, credentials)
 
+        # 从模型架构中获取上下文大小，默认为1000
         if model_schema and ModelPropertyKey.CONTEXT_SIZE in model_schema.model_properties:
             return model_schema.model_properties[ModelPropertyKey.CONTEXT_SIZE]
 
@@ -76,14 +78,15 @@ class TextEmbeddingModel(AIModel):
 
     def _get_max_chunks(self, model: str, credentials: dict) -> int:
         """
-        Get max chunks for given embedding model
+        获取给定嵌入模型的最大块数。
 
-        :param model: model name
-        :param credentials: model credentials
-        :return: max chunks
+        :param model: 模型名称。
+        :param credentials: 模型凭证。
+        :return: 最大块数。
         """
         model_schema = self.get_model_schema(model, credentials)
 
+        # 从模型架构中获取最大块数，默认为1
         if model_schema and ModelPropertyKey.MAX_CHUNKS in model_schema.model_properties:
             return model_schema.model_properties[ModelPropertyKey.MAX_CHUNKS]
 

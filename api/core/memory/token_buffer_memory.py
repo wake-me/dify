@@ -17,19 +17,25 @@ from models.model import AppMode, Conversation, Message
 
 class TokenBufferMemory:
     def __init__(self, conversation: Conversation, model_instance: ModelInstance) -> None:
+        """
+        初始化TokenBufferMemory类的实例。
+        :param conversation: 对话对象，用于获取对话相关数据。
+        :param model_instance: 模型实例，用于与特定的模型交互。
+        """
         self.conversation = conversation
         self.model_instance = model_instance
 
     def get_history_prompt_messages(self, max_token_limit: int = 2000,
                                     message_limit: int = 10) -> list[PromptMessage]:
         """
-        Get history prompt messages.
-        :param max_token_limit: max token limit
-        :param message_limit: message limit
+        获取历史提示消息。
+        :param max_token_limit: 最大令牌限制，用于控制消息数量以避免超出模型处理能力。
+        :param message_limit: 消息限制，用于控制获取的历史消息数量。
+        :return: 返回过滤和处理后的提示消息列表。
         """
         app_record = self.conversation.app
 
-        # fetch limited messages, and return reversed
+        # 从数据库查询限定数量的非空消息，并按创建时间倒序处理
         messages = db.session.query(Message).filter(
             Message.conversation_id == self.conversation.id,
             Message.answer != ''
@@ -44,6 +50,7 @@ class TokenBufferMemory:
         prompt_messages = []
         for message in messages:
             files = message.message_files
+            # 根据对话模式处理文件配置
             if files:
                 if self.conversation.mode not in [AppMode.ADVANCED_CHAT.value, AppMode.WORKFLOW.value]:
                     file_extra_config = FileUploadConfigManager.convert(message.app_model_config.to_dict())
@@ -53,6 +60,7 @@ class TokenBufferMemory:
                         is_vision=False
                     )
 
+                # 文件处理与消息构建
                 if file_extra_config:
                     file_objs = message_file_parser.transform_message_files(
                         files,
@@ -72,12 +80,13 @@ class TokenBufferMemory:
             else:
                 prompt_messages.append(UserPromptMessage(content=message.query))
 
+            # 添加助手回复消息
             prompt_messages.append(AssistantPromptMessage(content=message.answer))
 
         if not prompt_messages:
             return []
 
-        # prune the chat message if it exceeds the max token limit
+        # 如果消息总令牌数超过最大令牌限制，则进行消息修剪
         provider_instance = model_provider_factory.get_provider_instance(self.model_instance.provider)
         model_type_instance = provider_instance.get_model_instance(ModelType.LLM)
 
@@ -89,6 +98,7 @@ class TokenBufferMemory:
 
         if curr_message_tokens > max_token_limit:
             pruned_memory = []
+            # 从消息列表前端开始删除，直到令牌数符合限制或消息列表为空
             while curr_message_tokens > max_token_limit and prompt_messages:
                 pruned_memory.append(prompt_messages.pop(0))
                 curr_message_tokens = model_type_instance.get_num_tokens(
@@ -104,13 +114,14 @@ class TokenBufferMemory:
                                 max_token_limit: int = 2000,
                                 message_limit: int = 10) -> str:
         """
-        Get history prompt text.
-        :param human_prefix: human prefix
-        :param ai_prefix: ai prefix
-        :param max_token_limit: max token limit
-        :param message_limit: message limit
-        :return:
+        获取历史对话提示文本。
+        :param human_prefix: 人类前缀，默认为 "Human"
+        :param ai_prefix: AI前缀，默认为 "Assistant"
+        :param max_token_limit: 最大令牌限制，默认为 2000
+        :param message_limit: 消息限制，默认为 10
+        :return: 返回格式化后的对话历史文本字符串
         """
+        # 获取历史对话消息
         prompt_messages = self.get_history_prompt_messages(
             max_token_limit=max_token_limit,
             message_limit=message_limit
@@ -118,13 +129,15 @@ class TokenBufferMemory:
 
         string_messages = []
         for m in prompt_messages:
+            # 根据消息角色分配前缀
             if m.role == PromptMessageRole.USER:
                 role = human_prefix
             elif m.role == PromptMessageRole.ASSISTANT:
                 role = ai_prefix
             else:
-                continue
+                continue  # 跳过非用户和AI的消息
 
+            # 处理消息内容，支持文本和图片类型
             if isinstance(m.content, list):
                 inner_msg = ""
                 for content in m.content:

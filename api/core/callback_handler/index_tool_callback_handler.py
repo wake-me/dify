@@ -9,13 +9,22 @@ from models.model import DatasetRetrieverResource
 
 
 class DatasetIndexToolCallbackHandler:
-    """Callback handler for dataset tool."""
+    """数据集工具的回调处理器类。"""
 
     def __init__(self, queue_manager: AppQueueManager,
                  app_id: str,
                  message_id: str,
                  user_id: str,
                  invoke_from: InvokeFrom) -> None:
+        """
+        初始化数据集工具回调处理器。
+
+        :param queue_manager: 应用队列管理器，用于处理队列消息。
+        :param app_id: 应用的ID。
+        :param message_id: 消息的ID。
+        :param user_id: 用户的ID。
+        :param invoke_from: 调用来源，标识是来自探索、调试器还是其他。
+        """
         self._queue_manager = queue_manager
         self._app_id = app_id
         self._message_id = message_id
@@ -24,8 +33,12 @@ class DatasetIndexToolCallbackHandler:
 
     def on_query(self, query: str, dataset_id: str) -> None:
         """
-        Handle query.
+        处理查询请求。
+
+        :param query: 查询内容。
+        :param dataset_id: 数据集ID。
         """
+        # 创建一个数据集查询对象并保存到数据库
         dataset_query = DatasetQuery(
             dataset_id=dataset_id,
             content=query,
@@ -40,17 +53,20 @@ class DatasetIndexToolCallbackHandler:
         db.session.commit()
 
     def on_tool_end(self, documents: list[Document]) -> None:
-        """Handle tool end."""
+        """
+        处理工具结束时的逻辑。
+
+        :param documents: 结果文档列表。
+        """
         for document in documents:
+            # 更新文档段的命中计数
             query = db.session.query(DocumentSegment).filter(
                 DocumentSegment.index_node_id == document.metadata['doc_id']
             )
 
-            # if 'dataset_id' in document.metadata:
             if 'dataset_id' in document.metadata:
                 query = query.filter(DocumentSegment.dataset_id == document.metadata['dataset_id'])
 
-            # add hit count to document segment
             query.update(
                 {DocumentSegment.hit_count: DocumentSegment.hit_count + 1},
                 synchronize_session=False
@@ -59,7 +75,12 @@ class DatasetIndexToolCallbackHandler:
             db.session.commit()
 
     def return_retriever_resource_info(self, resource: list):
-        """Handle return_retriever_resource_info."""
+        """
+        处理返回检索资源信息的逻辑。
+
+        :param resource: 检索到的资源列表。
+        """
+        # 如果资源列表非空，则遍历资源，创建数据集检索资源对象并保存到数据库
         if resource and len(resource) > 0:
             for item in resource:
                 dataset_retriever_resource = DatasetRetrieverResource(
@@ -83,6 +104,7 @@ class DatasetIndexToolCallbackHandler:
                 db.session.add(dataset_retriever_resource)
                 db.session.commit()
 
+        # 向队列发布检索资源事件
         self._queue_manager.publish(
             QueueRetrieverResourcesEvent(retriever_resources=resource),
             PublishFrom.APPLICATION_MANAGER
