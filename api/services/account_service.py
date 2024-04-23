@@ -8,7 +8,7 @@ from typing import Any, Optional
 
 from flask import current_app
 from sqlalchemy import func
-from werkzeug.exceptions import Forbidden
+from werkzeug.exceptions import Unauthorized
 
 from constants.languages import language_timezone_mapping, languages
 from events.tenant_event import tenant_was_created
@@ -72,7 +72,7 @@ class AccountService:
 
         # 检查账号状态是否为禁用或关闭
         if account.status in [AccountStatus.BANNED.value, AccountStatus.CLOSED.value]:
-            raise Forbidden('Account is banned or closed.')
+            raise Unauthorized("Account is banned or closed.")
 
         # 查询当前有效的租户关联，如果存在则更新账号的当前租户ID
         current_tenant = TenantAccountJoin.query.filter_by(account_id=account.id, current=True).first()
@@ -425,7 +425,7 @@ class TenantService:
         """
         return db.session.query(Tenant).join(
             TenantAccountJoin, Tenant.id == TenantAccountJoin.tenant_id
-        ).filter(TenantAccountJoin.account_id == account.id).all()
+        ).filter(TenantAccountJoin.account_id == account.id, Tenant.status == TenantStatus.NORMAL).all()
 
     @staticmethod
     def get_current_tenant_by_account(account: Account):
@@ -470,8 +470,12 @@ class TenantService:
         if tenant_id is None:
             raise ValueError("Tenant ID must be provided.")
 
-        # 查询账户是否已与指定的租户关联
-        tenant_account_join = TenantAccountJoin.query.filter_by(account_id=account.id, tenant_id=tenant_id).first()
+        tenant_account_join = db.session.query(TenantAccountJoin).join(Tenant, TenantAccountJoin.tenant_id == Tenant.id).filter(
+            TenantAccountJoin.account_id == account.id,
+            TenantAccountJoin.tenant_id == tenant_id,
+            Tenant.status == TenantStatus.NORMAL,
+        ).first()
+
         if not tenant_account_join:
             # 如果未找到关联或账户不是租户的成员，则抛出异常
             raise AccountNotLinkTenantError("Tenant not found or account is not a member of the tenant.")

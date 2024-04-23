@@ -208,6 +208,12 @@ class Account(UserMixin, db.Model):
         """
         return self._current_tenant.current_role in ['admin', 'owner']
 
+
+class TenantStatus(str, enum.Enum):
+    NORMAL = 'normal'
+    ARCHIVE = 'archive'
+
+
 class Tenant(db.Model):
     """
     租户模型，用于表示一个租户信息

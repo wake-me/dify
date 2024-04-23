@@ -6,6 +6,7 @@ from werkzeug.exceptions import Forbidden
 from controllers.web import api
 from controllers.web.wraps import WebApiResource
 from extensions.ext_database import db
+from models.account import TenantStatus
 from models.model import Site
 from services.feature_service import FeatureService
 
@@ -64,7 +65,9 @@ class AppSiteApi(WebApiResource):
         if not site:
             raise Forbidden()  # 如果查询不到站点信息，抛出权限异常
 
-        # 获取是否允许替换标志的特性
+        if app_model.tenant.status == TenantStatus.ARCHIVE:
+            raise Forbidden()
+
         can_replace_logo = FeatureService.get_features(app_model.tenant_id).can_replace_logo
 
         # 返回应用站点信息实例

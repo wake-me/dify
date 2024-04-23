@@ -41,6 +41,9 @@ DEFAULTS = {
     'QDRANT_CLIENT_TIMEOUT': 20,
     'CELERY_BACKEND': 'database',
     'LOG_LEVEL': 'INFO',
+    'LOG_FILE': '',
+    'LOG_FORMAT': '%(asctime)s.%(msecs)03d %(levelname)s [%(threadName)s] [%(filename)s:%(lineno)d] - %(message)s',
+    'LOG_DATEFORMAT': '%Y-%m-%d %H:%M:%S',
     'HOSTED_OPENAI_QUOTA_LIMIT': 200,
     'HOSTED_OPENAI_TRIAL_ENABLED': 'False',
     'HOSTED_OPENAI_TRIAL_MODELS': 'gpt-3.5-turbo,gpt-3.5-turbo-1106,gpt-3.5-turbo-instruct,gpt-3.5-turbo-16k,gpt-3.5-turbo-16k-0613,gpt-3.5-turbo-0613,gpt-3.5-turbo-0125,text-davinci-003',
@@ -72,6 +75,8 @@ DEFAULTS = {
     'TOOL_ICON_CACHE_MAX_AGE': 3600,
     'MILVUS_DATABASE': 'default',
     'KEYWORD_DATA_SOURCE_TYPE': 'database',
+    'INNER_API': 'False',
+    'ENTERPRISE_ENABLED': 'False',
 }
 
 
@@ -132,12 +137,15 @@ class Config:
         # ------------------------
         # General Configurations.
         # ------------------------
-        self.CURRENT_VERSION = "0.6.3"
+        self.CURRENT_VERSION = "0.6.4"
         self.COMMIT_SHA = get_env('COMMIT_SHA')
         self.EDITION = "SELF_HOSTED"
         self.DEPLOY_ENV = get_env('DEPLOY_ENV')
         self.TESTING = False
         self.LOG_LEVEL = get_env('LOG_LEVEL')
+        self.LOG_FILE = get_env('LOG_FILE')
+        self.LOG_FORMAT = get_env('LOG_FORMAT')
+        self.LOG_DATEFORMAT = get_env('LOG_DATEFORMAT')
 
         # The backend URL prefix of the console API.
         # used to concatenate the login authorization callback or notion integration callback.
@@ -158,7 +166,12 @@ class Config:
         # 初始化应用的密钥，用于会话cookie的安全签名
         self.SECRET_KEY = get_env('SECRET_KEY')
 
-        # 初始化CORS允许的来源
+        # Enable or disable the inner API.
+        self.INNER_API = get_bool_env('INNER_API')
+        # The inner API key is used to authenticate the inner API.
+        self.INNER_API_KEY = get_env('INNER_API_KEY')
+
+        # cors settings
         self.CONSOLE_CORS_ALLOW_ORIGINS = get_cors_allow_origins(
             'CONSOLE_CORS_ALLOW_ORIGINS', self.CONSOLE_WEB_URL)
         self.WEB_API_CORS_ALLOW_ORIGINS = get_cors_allow_origins(
@@ -315,6 +328,8 @@ class Config:
         self.API_COMPRESSION_ENABLED = get_bool_env('API_COMPRESSION_ENABLED')
         self.TOOL_ICON_CACHE_MAX_AGE = get_env('TOOL_ICON_CACHE_MAX_AGE')
         self.KEYWORD_DATA_SOURCE_TYPE = get_env('KEYWORD_DATA_SOURCE_TYPE')
+        self.ENTERPRISE_ENABLED = get_bool_env('ENTERPRISE_ENABLED')
+
 
 class CloudEditionConfig(Config):
     """

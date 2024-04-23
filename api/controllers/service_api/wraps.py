@@ -12,7 +12,7 @@ from werkzeug.exceptions import Forbidden, NotFound, Unauthorized
 
 from extensions.ext_database import db
 from libs.login import _get_user
-from models.account import Account, Tenant, TenantAccountJoin
+from models.account import Account, Tenant, TenantAccountJoin, TenantStatus
 from models.model import ApiToken, App, EndUser
 from services.feature_service import FeatureService
 
@@ -74,7 +74,10 @@ def validate_app_token(view: Optional[Callable] = None, *, fetch_user_arg: Optio
             if not app_model.enable_api:
                 raise NotFound()
 
-            # 将应用程序模型添加到视图的参数中
+            tenant = db.session.query(Tenant).filter(Tenant.id == app_model.tenant_id).first()
+            if tenant.status == TenantStatus.ARCHIVE:
+                raise NotFound()
+
             kwargs['app_model'] = app_model
 
             # 如果需要，则尝试从请求中获取最终用户ID
@@ -234,7 +237,8 @@ def validate_dataset_token(view=None):
                 .filter(Tenant.id == api_token.tenant_id) \
                 .filter(TenantAccountJoin.tenant_id == Tenant.id) \
                 .filter(TenantAccountJoin.role.in_(['owner'])) \
-                .one_or_none()  # 查询租户及其拥有者账户，确保角色为owner
+                .filter(Tenant.status == TenantStatus.NORMAL) \
+                .one_or_none() # TODO: only owner information is required, so only one is returned.
             if tenant_account_join:
                 tenant, ta = tenant_account_join
                 # 查询并登录拥有者账户

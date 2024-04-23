@@ -232,7 +232,7 @@ class DocumentAddByFileApi(DatasetApiResource):
         # 数据集存在性检查和索引技术验证
         if not dataset:
             raise ValueError('Dataset is not exist.')
-        if not dataset.indexing_technique and not args['indexing_technique']:
+        if not dataset.indexing_technique and not args.get('indexing_technique'):
             raise ValueError('indexing_technique is required.')
 
         # 处理文件上传

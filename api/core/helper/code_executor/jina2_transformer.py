@@ -1,10 +1,13 @@
 import json
 import re
+from base64 import b64encode
 
 from core.helper.code_executor.template_transformer import TemplateTransformer
 
 PYTHON_RUNNER = """
 import jinja2
+from json import loads
+from base64 import b64decode
 
 # 初始化Jinja2模板
 template = jinja2.Template('''{{code}}''')
@@ -14,8 +17,9 @@ def main(**inputs):
     # 根据输入渲染模板
     return template.render(**inputs)
 
-# 执行main函数，并返回结果
-output = main(**{{inputs}})
+# execute main function, and return the result
+inputs = b64decode('{{inputs}}').decode('utf-8')
+output = main(**loads(inputs))
 
 # 将结果封装在特定格式中，便于提取
 result = f'''<<RESULT>>{output}<<RESULT>>'''
@@ -43,6 +47,7 @@ JINJA2_PRELOAD_TEMPLATE = """{% set fruits = ['Apple'] %}
 
 JINJA2_PRELOAD = f"""
 import jinja2
+from base64 import b64decode
 
 def _jinja2_preload_():
     # 预加载Jinja2环境，提前加载并渲染模板以避免沙箱问题
@@ -64,9 +69,11 @@ class Jinja2TemplateTransformer(TemplateTransformer):
         :return: 转换后的Python执行代码和Jinja2预加载代码
         """
 
-        # 将Jinja2模板转换为Python代码
+        inputs_str = b64encode(json.dumps(inputs, ensure_ascii=False).encode()).decode('utf-8')
+
+        # transform jinja2 template to python code
         runner = PYTHON_RUNNER.replace('{{code}}', code)
-        runner = runner.replace('{{inputs}}', json.dumps(inputs, indent=4, ensure_ascii=False))
+        runner = runner.replace('{{inputs}}', inputs_str)
 
         return runner, JINJA2_PRELOAD
 

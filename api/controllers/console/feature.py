@@ -1,6 +1,7 @@
 from flask_login import current_user
 from flask_restful import Resource
 
+from services.enterprise.enterprise_feature_service import EnterpriseFeatureService
 from services.feature_service import FeatureService
 
 from . import api
@@ -27,4 +28,11 @@ class FeatureApi(Resource):
         # 获取当前租户的特性信息并将其转换为字典格式返回
         return FeatureService.get_features(current_user.current_tenant_id).dict()
 
+
+class EnterpriseFeatureApi(Resource):
+    def get(self):
+        return EnterpriseFeatureService.get_enterprise_features().dict()
+
+
 api.add_resource(FeatureApi, '/features')
+api.add_resource(EnterpriseFeatureApi, '/enterprise-features')
