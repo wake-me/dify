@@ -6,15 +6,17 @@ from pydantic import BaseModel, Field
 
 
 class Document(BaseModel):
-    """Class for storing a piece of text and associated metadata."""
-
+    """
+    用于存储文本片段及其相关元数据的类。
+    
+    属性:
+        page_content (str): 页面内容。
+        metadata (Optional[dict]): 关于页面内容的任意元数据（例如：来源、与其他文档的关系等）。默认为一个空字典。
+    """
     page_content: str
 
-    """Arbitrary metadata about the page content (e.g., source, relationships to other
-        documents, etc.).
-    """
+    # 用于存储关于页面内容的任意元数据，可以包括来源、与其他文档的关系等
     metadata: Optional[dict] = Field(default_factory=dict)
-
 
 class BaseDocumentTransformer(ABC):
     """Abstract base class for document transformation systems.
@@ -56,24 +58,28 @@ class BaseDocumentTransformer(ABC):
     def transform_documents(
         self, documents: Sequence[Document], **kwargs: Any
     ) -> Sequence[Document]:
-        """Transform a list of documents.
+        """
+        转换一系列文档对象。
 
-        Args:
-            documents: A sequence of Documents to be transformed.
+        此方法接收一个文档对象的序列，并对其进行转换操作，返回转换后的文档对象序列。
 
-        Returns:
-            A list of transformed Documents.
+        参数:
+            documents: 要转换的文档对象序列。每个文档对象都应符合Document类型。
+
+        返回值:
+            转换后的文档对象序列。
         """
 
     @abstractmethod
     async def atransform_documents(
         self, documents: Sequence[Document], **kwargs: Any
     ) -> Sequence[Document]:
-        """Asynchronously transform a list of documents.
+        """
+        异步地转换一系列文档对象。
 
-        Args:
-            documents: A sequence of Documents to be transformed.
+        参数:
+            documents: 要被转换的文档对象序列。
 
-        Returns:
-            A list of transformed Documents.
+        返回值:
+            转换后的文档对象序列。
         """

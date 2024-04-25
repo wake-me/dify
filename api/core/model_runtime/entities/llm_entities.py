@@ -11,6 +11,9 @@ from core.model_runtime.entities.model_entities import ModelUsage, PriceInfo
 class LLMMode(Enum):
     """
     大语言模型模式的枚举类。
+    
+    COMPLETION - 提供完成或生成文本的模式
+    CHAT - 提供聊天或对话的模式
     """
 
     COMPLETION = "completion"  # 提供完成或生成文本的模式
@@ -34,6 +37,17 @@ class LLMUsage(ModelUsage):
     """
     LLMUsage 类用于定义 llm（可能指 Large Language Model）的使用情况。
     继承自 ModelUsage 类。
+    
+    prompt_tokens - 提示词令牌数
+    prompt_unit_price - 提示词单位价格
+    prompt_price_unit - 提示词价格单位
+    completion_tokens - 生成式令牌数
+    completion_unit_price - 生成式单位价格
+    completion_price_unit - 生成式价格单位
+    total_tokens - 总令牌数
+    total_price - 总价格
+    currency - 货币单位
+    latency - 延迟时间
     """
     
     # 定义类属性，包括提示令牌数、提示单位价格、提示价格单位、提示价格、完成令牌数、完成单位价格、完成价格单位、完成价格、总令牌数、总价格、货币单位和延迟。

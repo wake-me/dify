@@ -6,20 +6,27 @@ from typing import NamedTuple, Union
 
 @dataclass
 class ReactAction:
-    """A full description of an action for an ReactAction to execute."""
+    """
+    描述一个ReactAction执行的动作的完整信息。
+
+    属性:
+        tool (str): 执行的工具名称。
+        tool_input (Union[str, dict]): 传递给工具的输入。
+        log (str): 关于动作的附加日志信息。
+    """
 
     tool: str
-    """The name of the Tool to execute."""
     tool_input: Union[str, dict]
-    """The input to pass in to the Tool."""
     log: str
-    """Additional information to log about the action."""
-
 
 class ReactFinish(NamedTuple):
-    """The final return value of an ReactFinish."""
+    """
+    ReactFinish动作最终的返回值。
+
+    属性:
+        return_values (dict): 返回值字典。
+        log (str): 关于返回值的附加日志信息。
+    """
 
     return_values: dict
-    """Dictionary of return values."""
     log: str
-    """Additional information to log about the return value"""

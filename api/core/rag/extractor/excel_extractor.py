@@ -9,11 +9,10 @@ from core.rag.models.document import Document
 
 
 class ExcelExtractor(BaseExtractor):
-    """Load Excel files.
-
+    """加载Excel文件。
 
     Args:
-        file_path: Path to the file to load.
+        file_path: 要加载文件的路径。
     """
 
     def __init__(
@@ -22,22 +21,38 @@ class ExcelExtractor(BaseExtractor):
             encoding: Optional[str] = None,
             autodetect_encoding: bool = False
     ):
-        """Initialize with file path."""
+        """初始化，传入文件路径。
+
+        Args:
+            file_path: 待加载Excel文件的路径。
+            encoding: 文件编码。若未指定，默认为None。
+            autodetect_encoding: 是否自动检测文件编码。
+        """
         self._file_path = file_path
         self._encoding = encoding
         self._autodetect_encoding = autodetect_encoding
 
     def extract(self) -> list[Document]:
-        """ parse excel file"""
+        """解析Excel文件并返回Document对象列表。
+
+        Returns:
+            从Excel文件解析得到的Document对象列表。
+        """
+        # 根据文件扩展名确定文件类型，并调用相应的提取方法
         if self._file_path.endswith('.xls'):
             return self._extract4xls()
         elif self._file_path.endswith('.xlsx'):
             return self._extract4xlsx()
 
     def _extract4xls(self) -> list[Document]:
+        """从.xls文件中提取数据并返回Document对象列表。
+
+        Returns:
+            包含从.xls文件中提取数据的Document对象列表。
+        """
         wb = xlrd.open_workbook(filename=self._file_path)
         documents = []
-        # loop over all sheets
+        # 遍历工作簿中的所有表单
         for sheet in wb.sheets():
             for row_index, row in enumerate(sheet.get_rows(), start=1):
                 row_header = None
@@ -46,6 +61,7 @@ class ExcelExtractor(BaseExtractor):
                 if row_header is None:
                     row_header = row
                     continue
+                # 从每一行中提取数据并创建Document对象
                 item_arr = []
                 for index, cell in enumerate(row):
                     txt_value = str(cell.value)
@@ -56,17 +72,21 @@ class ExcelExtractor(BaseExtractor):
         return documents
 
     def _extract4xlsx(self) -> list[Document]:
-        """Load from file path using Pandas."""
+        """从.xlsx文件中提取数据并返回Document对象列表。
+
+        Returns:
+            包含从.xlsx文件中提取数据的Document对象列表。
+        """
         data = []
-        # Read each worksheet of an Excel file using Pandas
+        # 使用Pandas读取Excel文件中的每个工作表
         xls = pd.ExcelFile(self._file_path)
         for sheet_name in xls.sheet_names:
             df = pd.read_excel(xls, sheet_name=sheet_name)
 
-            # filter out rows with all NaN values
+            # 移除全为空值的行
             df.dropna(how='all', inplace=True)
 
-            # transform each row into a Document
+            # 为每行数据创建一个Document对象
             for _, row in df.iterrows():
                 item = ';'.join(f'{k}:{v}' for k, v in row.items() if pd.notna(v))
                 document = Document(page_content=item, metadata={'source': self._file_path})
@@ -76,12 +96,15 @@ class ExcelExtractor(BaseExtractor):
     @staticmethod
     def is_blank_row(row):
         """
+        判断给定行是否为空行。
 
-        Determine whether the specified line is a blank line.
-        :param row: row object。
-        :return: Returns True if the row is blank, False otherwise.
+        Args:
+            row: 待检查的行。
+
+        Returns:
+            若行为空则返回True，否则返回False。
         """
-        # Iterates through the cells and returns False if a non-empty cell is found
+        # 检查行中是否有非空值的单元格
         for cell in row:
             if cell.value is not None and cell.value != '':
                 return False

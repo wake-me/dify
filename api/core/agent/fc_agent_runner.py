@@ -28,10 +28,18 @@ class FunctionCallAgentRunner(BaseAgentRunner):
             message: Message, query: str, **kwargs: Any
     ) -> Generator[LLMResultChunk, None, None]:
         """
-        Run FunctionCall agent application
-        """
-        app_generate_entity = self.application_generate_entity
+        运行 FunctionCall 类的应用程序
 
+        参数:
+        - message: Message 类型，代表消息对象
+        - query: 字符串，用户查询内容
+        - **kwargs: 任意关键字参数，用于扩展
+
+        返回值:
+        - Generator[LLMResultChunk, None, None]: 生成器，逐块返回LLM结果
+        """
+        # 初始化函数运行时所需的各种属性和配置
+        app_generate_entity = self.application_generate_entity
         app_config = self.app_config
 
         prompt_template = app_config.prompt_template.simple_prompt_template or ''
@@ -39,13 +47,13 @@ class FunctionCallAgentRunner(BaseAgentRunner):
         prompt_messages = self._init_system_message(prompt_template, prompt_messages)
         prompt_messages = self._organize_user_query(query, prompt_messages)
 
-        # convert tools into ModelRuntime Tool format
+        # 初始化工具实例和与之相关的prompt消息
         tool_instances, prompt_messages_tools = self._init_prompt_tools()
 
         iteration_step = 1
         max_iteration_steps = min(app_config.agent.max_iteration, 5) + 1
 
-        # continue to run until there is not any tool call
+        # 根据工具调用状态持续运行，直到没有工具调用或达到最大迭代次数
         function_call_state = True
         llm_usage = {
             'usage': None
@@ -53,6 +61,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
         final_answer = ''
 
         def increase_usage(final_llm_usage_dict: dict[str, LLMUsage], usage: LLMUsage):
+            # 更新LLM使用情况
             if not final_llm_usage_dict['usage']:
                 final_llm_usage_dict['usage'] = usage
             else:
@@ -68,7 +77,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
             function_call_state = False
 
             if iteration_step == max_iteration_steps:
-                # the last iteration, remove all tools
+                # 最后一次迭代，移除所有工具
                 prompt_messages_tools = []
 
             message_file_ids = []
@@ -80,9 +89,9 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                 messages_ids=message_file_ids
             )
 
-            # recalc llm max tokens
+            # 重新计算LLM最大token数
             self.recalc_llm_max_tokens(self.model_config, prompt_messages)
-            # invoke model
+            # 调用模型
             chunks: Union[Generator[LLMResultChunk, None, None], LLMResult] = model_instance.invoke_llm(
                 prompt_messages=prompt_messages,
                 model_parameters=app_generate_entity.model_config.parameters,
@@ -95,10 +104,10 @@ class FunctionCallAgentRunner(BaseAgentRunner):
 
             tool_calls: list[tuple[str, str, dict[str, Any]]] = []
 
-            # save full response
+            # 保存完整响应
             response = ''
 
-            # save tool call names and inputs
+            # 保存工具调用名称和输入
             tool_call_names = ''
             tool_call_inputs = ''
 
@@ -112,7 +121,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                             agent_thought_id=agent_thought.id
                         ), PublishFrom.APPLICATION_MANAGER)
                         is_first_chunk = False
-                    # check if there is any tool call
+                    # 检查是否有工具调用
                     if self.check_tool_calls(chunk):
                         function_call_state = True
                         tool_calls.extend(self.extract_tool_calls(chunk))
@@ -122,7 +131,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                                 tool_call[1]: tool_call[2] for tool_call in tool_calls
                             }, ensure_ascii=False)
                         except json.JSONDecodeError as e:
-                            # ensure ascii to avoid encoding error
+                            # 确保ascii避免编码错误
                             tool_call_inputs = json.dumps({
                                 tool_call[1]: tool_call[2] for tool_call in tool_calls
                             })
@@ -141,7 +150,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                     yield chunk
             else:
                 result: LLMResult = chunks
-                # check if there is any tool call
+                # 检查是否有阻塞式工具调用
                 if self.check_blocking_tool_calls(result):
                     function_call_state = True
                     tool_calls.extend(self.extract_blocking_tool_calls(result))
@@ -151,7 +160,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                             tool_call[1]: tool_call[2] for tool_call in tool_calls
                         }, ensure_ascii=False)
                     except json.JSONDecodeError as e:
-                        # ensure ascii to avoid encoding error
+                        # 确保ascii避免编码错误
                         tool_call_inputs = json.dumps({
                             tool_call[1]: tool_call[2] for tool_call in tool_calls
                         })
@@ -202,10 +211,10 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                 ]
             else:
                 assistant_message.content = response
-            
+                
             prompt_messages.append(assistant_message)
 
-            # save thought
+            # 保存思考记录
             self.save_agent_thought(
                 agent_thought=agent_thought, 
                 tool_name=tool_call_names,
@@ -223,7 +232,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
             
             final_answer += response + '\n'
 
-            # call tools
+            # 调用工具
             tool_responses = []
             for tool_call_id, tool_call_name, tool_call_args in tool_calls:
                 tool_instance = tool_instances.get(tool_call_name)
@@ -235,7 +244,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                         "meta": ToolInvokeMeta.error_instance(f"there is not a tool named {tool_call_name}").to_dict()
                     }
                 else:
-                    # invoke tool
+                    # 调用工具
                     tool_invoke_response, message_files, tool_invoke_meta = ToolEngine.agent_invoke(
                         tool=tool_instance,
                         tool_parameters=tool_call_args,
@@ -245,16 +254,16 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                         invoke_from=self.application_generate_entity.invoke_from,
                         agent_tool_callback=self.agent_callback,
                     )
-                    # publish files
+                    # 发布文件
                     for message_file, save_as in message_files:
                         if save_as:
                             self.variables_pool.set_file(tool_name=tool_call_name, value=message_file.id, name=save_as)
 
-                        # publish message file
+                        # 发布消息文件
                         self.queue_manager.publish(QueueMessageFileEvent(
                             message_file_id=message_file.id
                         ), PublishFrom.APPLICATION_MANAGER)
-                        # add message file ids
+                        # 添加消息文件ids
                         message_file_ids.append(message_file.id)
                     
                     tool_response = {
@@ -273,7 +282,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                 )
 
             if len(tool_responses) > 0:
-                # save agent thought
+                # 保存代理思考
                 self.save_agent_thought(
                     agent_thought=agent_thought, 
                     tool_name=None,
@@ -294,7 +303,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                     agent_thought_id=agent_thought.id
                 ), PublishFrom.APPLICATION_MANAGER)
 
-            # update prompt tool
+            # 更新prompt工具信息
             for prompt_tool in prompt_messages_tools:
                 self.update_prompt_message_tool(tool_instances[prompt_tool.name], prompt_tool)
 
@@ -303,7 +312,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
             prompt_messages = self._clear_user_prompt_image_messages(prompt_messages)
 
         self.update_db_variables(self.variables_pool, self.db_variables_pool)
-        # publish end event
+        # 发布结束事件
         self.queue_manager.publish(QueueMessageEndEvent(llm_result=LLMResult(
             model=model_instance.model,
             prompt_messages=prompt_messages,
@@ -316,28 +325,47 @@ class FunctionCallAgentRunner(BaseAgentRunner):
 
     def check_tool_calls(self, llm_result_chunk: LLMResultChunk) -> bool:
         """
-        Check if there is any tool call in llm result chunk
+        检查 llm 结果块中是否存在工具调用
+        
+        参数:
+        - llm_result_chunk: LLMResultChunk 类型，表示一个 llm 结果块，包含着可能的工具调用信息。
+        
+        返回值:
+        - bool 类型，如果结果块中存在工具调用，则返回 True，否则返回 False。
         """
+        # 检查 llm_result_chunk 中的 delta 消息是否存在 tool_calls
         if llm_result_chunk.delta.message.tool_calls:
             return True
         return False
     
     def check_blocking_tool_calls(self, llm_result: LLMResult) -> bool:
         """
-        Check if there is any blocking tool call in llm result
+        检查 llm 结果中是否存在阻塞工具调用
+        
+        参数:
+        - llm_result: LLMResult 类型，包含 llm 的执行结果数据
+        
+        返回值:
+        - bool 类型，如果存在阻塞工具调用则返回 True，否则返回 False
         """
+        # 检查 llm_result 中是否存在 tool_calls
         if llm_result.message.tool_calls:
             return True
         return False
 
     def extract_tool_calls(self, llm_result_chunk: LLMResultChunk) -> Union[None, list[tuple[str, str, dict[str, Any]]]]:
         """
-        Extract tool calls from llm result chunk
-
-        Returns:
-            List[Tuple[str, str, Dict[str, Any]]]: [(tool_call_id, tool_call_name, tool_call_args)]
+        从llm结果块中提取工具调用信息
+        
+        参数:
+            llm_result_chunk (LLMResultChunk): 包含工具调用信息的结果块
+            
+        返回值:
+            List[Tuple[str, str, Dict[str, Any]]]: [(工具调用ID, 工具调用名称, 工具调用参数)]的列表
         """
-        tool_calls = []
+        tool_calls = []  # 初始化存储工具调用信息的列表
+
+        # 遍历结果块中的每个工具调用消息，将每个调用的ID、名称和参数解析并添加到列表中
         for prompt_message in llm_result_chunk.delta.message.tool_calls:
             tool_calls.append((
                 prompt_message.id,
@@ -345,50 +373,74 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                 json.loads(prompt_message.function.arguments),
             ))
 
-        return tool_calls
+        return tool_calls  # 返回包含所有工具调用信息的列表
     
     def extract_blocking_tool_calls(self, llm_result: LLMResult) -> Union[None, list[tuple[str, str, dict[str, Any]]]]:
         """
-        Extract blocking tool calls from llm result
-
-        Returns:
-            List[Tuple[str, str, Dict[str, Any]]]: [(tool_call_id, tool_call_name, tool_call_args)]
+        从llm结果中提取阻塞工具调用
+        
+        参数:
+            llm_result (LLMResult): 包含工具调用信息的LLM结果对象
+            
+        返回值:
+            List[Tuple[str, str, Dict[str, Any]]]: [(工具调用ID, 工具调用名称, 工具调用参数)]的列表
         """
-        tool_calls = []
+        tool_calls = []  # 初始化存储工具调用信息的列表
+        # 遍历llm_result中的每个工具调用消息
         for prompt_message in llm_result.message.tool_calls:
+            # 将每个工具调用的ID、名称和参数（以JSON字符串形式）加载到列表中
             tool_calls.append((
                 prompt_message.id,
                 prompt_message.function.name,
                 json.loads(prompt_message.function.arguments),
             ))
 
-        return tool_calls
+        return tool_calls  # 返回包含工具调用信息的列表
 
     def _init_system_message(self, prompt_template: str, prompt_messages: list[PromptMessage] = None) -> list[PromptMessage]:
         """
-        Initialize system message
+        初始化系统消息
+        
+        :param prompt_template: 提示信息模板，字符串类型
+        :param prompt_messages: 提示消息列表，列表类型，每个元素是PromptMessage类型，可选
+        :return: 返回提示消息列表，列表类型，每个元素是PromptMessage类型
+
+        如果prompt_messages为空且prompt_template不为空，则返回包含单个元素（使用prompt_template创建的SystemPromptMessage对象）的列表。
+        如果prompt_messages不为空，且第一个元素不是SystemPromptMessage类型，且prompt_template不为空，则在列表开头插入一个使用prompt_template创建的SystemPromptMessage对象。
+        否则，直接返回传入的prompt_messages。
         """
         if not prompt_messages and prompt_template:
+            # 如果prompt_messages为空，但提供了prompt_template，则返回包含单个SystemPromptMessage对象的列表
             return [
                 SystemPromptMessage(content=prompt_template),
             ]
         
         if prompt_messages and not isinstance(prompt_messages[0], SystemPromptMessage) and prompt_template:
+            # 如果prompt_messages不为空，但第一个元素不是SystemPromptMessage，且提供了prompt_template，则在列表开头插入一个SystemPromptMessage对象
             prompt_messages.insert(0, SystemPromptMessage(content=prompt_template))
 
         return prompt_messages
 
     def _organize_user_query(self, query,  prompt_messages: list[PromptMessage] = None) -> list[PromptMessage]:
         """
-        Organize user query
+        组织用户查询
+
+        :param query: 用户的查询内容
+        :param prompt_messages: 提示消息列表，默认为None，用于存储整理后的提示消息
+        :type prompt_messages: list[PromptMessage]
+        :return: 整理后的提示消息列表
+        :rtype: list[PromptMessage]
         """
         if self.files:
+            # 如果存在文件对象，将查询内容和每个文件对象的提示消息内容组织成一个列表
             prompt_message_contents = [TextPromptMessageContent(data=query)]
             for file_obj in self.files:
                 prompt_message_contents.append(file_obj.prompt_message_content)
 
+            # 将上述内容作为一个用户提示消息添加到提示消息列表中
             prompt_messages.append(UserPromptMessage(content=prompt_message_contents))
         else:
+            # 如果不存在文件对象，直接将查询内容作为一个用户提示消息添加到提示消息列表中
             prompt_messages.append(UserPromptMessage(content=query))
 
         return prompt_messages
@@ -396,10 +448,24 @@ class FunctionCallAgentRunner(BaseAgentRunner):
     def _organize_assistant_message(self, tool_call_id: str = None, tool_call_name: str = None, tool_response: str = None, 
                                     prompt_messages: list[PromptMessage] = None) -> list[PromptMessage]:
         """
-        Organize assistant message
+        组织助手消息
+        
+        此函数用于组织和添加工具的响应消息到一个消息列表中。
+        
+        参数:
+        - tool_call_id (str): 工具调用的唯一标识符，默认为 None。
+        - tool_call_name (str): 工具调用的名称，默认为 None。
+        - tool_response (str): 工具的响应消息，默认为 None。
+        - prompt_messages (list[PromptMessage]): 提示消息列表，包含之前的对话消息，默认为 None。
+        
+        返回值:
+        - list[PromptMessage]: 更新后的提示消息列表，包含新的工具响应消息。
         """
+        
+        # 深拷贝传入的提示消息列表，以避免修改原始列表
         prompt_messages = deepcopy(prompt_messages)
 
+        # 如果存在工具响应消息，则将其添加到提示消息列表中
         if tool_response is not None:
             prompt_messages.append(
                 ToolPromptMessage(
@@ -413,14 +479,22 @@ class FunctionCallAgentRunner(BaseAgentRunner):
     
     def _clear_user_prompt_image_messages(self, prompt_messages: list[PromptMessage]) -> list[PromptMessage]:
         """
-        As for now, gpt supports both fc and vision at the first iteration.
-        We need to remove the image messages from the prompt messages at the first iteration.
+        清除用户提示消息中的图片消息。
+        
+        由于目前GPT在第一轮迭代中同时支持fc和vision，我们需要在第一轮迭代中从提示消息中移除图片消息。
+        
+        参数:
+        - prompt_messages: 提示消息列表，类型为`list[PromptMessage]`，其中包含了用户交互中的各种消息。
+        
+        返回值:
+        - 清理后的提示消息列表，图片消息将被替换为'[image]'字符串。
         """
-        prompt_messages = deepcopy(prompt_messages)
+        prompt_messages = deepcopy(prompt_messages)  # 深拷贝提示消息列表，以避免修改原始列表
 
         for prompt_message in prompt_messages:
-            if isinstance(prompt_message, UserPromptMessage):
-                if isinstance(prompt_message.content, list):
+            if isinstance(prompt_message, UserPromptMessage):  # 判断是否为用户发出的提示消息
+                if isinstance(prompt_message.content, list):  # 确认消息内容为列表形式
+                    # 将列表中的每条消息内容处理后合并为字符串，图片消息会被替换为'[image]'字符串
                     prompt_message.content = '\n'.join([
                         content.data if content.type == PromptMessageContentType.TEXT else 
                         '[image]' if content.type == PromptMessageContentType.IMAGE else
@@ -428,4 +502,4 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                         for content in prompt_message.content 
                     ])
 
-        return prompt_messages
+        return prompt_messages  # 返回处理后的提示消息列表

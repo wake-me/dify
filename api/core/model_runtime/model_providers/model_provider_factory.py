@@ -16,73 +16,90 @@ logger = logging.getLogger(__name__)
 
 
 class ModelProviderExtension(BaseModel):
+    """
+    一个扩展模型提供者类，用于增强模型提供者的功能。
+
+    属性:
+        provider_instance (ModelProvider): 一个模型提供者实例，用于提供具体的模型。
+        name (str): 扩展的名称，用于标识不同的扩展。
+        position (Optional[int]): 扩展的位置，可以是整数，也可以是None。用于指定扩展的排序位置。
+    """
+
     provider_instance: ModelProvider
     name: str
     position: Optional[int] = None
 
     class Config:
-        """Configuration for this pydantic object."""
+        """此 pydantic 对象的配置。
 
+        属性:
+            arbitrary_types_allowed (bool): 允许任意类型的配置项。这是为了支持自定义类型而设置的。
+        """
+        
         arbitrary_types_allowed = True
 
 
 class ModelProviderFactory:
+    # 类ModelProviderFactory的构造器和方法用于获取和管理模型提供者。
     model_provider_extensions: dict[str, ModelProviderExtension] = None
 
     def __init__(self) -> None:
-        # for cache in memory
+        """
+        类的构造器，初始化时获取所有模型提供者。
+        """
         self.get_providers()
 
     def get_providers(self) -> list[ProviderEntity]:
         """
-        Get all providers
-        :return: list of providers
+        获取所有模型提供者的信息。
+        
+        :return: 提供者信息列表，每个元素为一个ProviderEntity实例。
         """
-        # scan all providers
+        # 扫描并获取所有模型提供者的扩展信息
         model_provider_extensions = self._get_model_provider_map()
 
-        # traverse all model_provider_extensions
+        # 遍历所有模型提供者扩展信息
         providers = []
         for name, model_provider_extension in model_provider_extensions.items():
-            # get model_provider instance
+            # 获取模型提供者的实例
             model_provider_instance = model_provider_extension.provider_instance
 
-            # get provider schema
+            # 获取提供者的架构信息
             provider_schema = model_provider_instance.get_provider_schema()
 
+            # 遍历支持的模型类型，获取并添加预定义的模型
             for model_type in provider_schema.supported_model_types:
-                # get predefined models for given model type
                 models = model_provider_instance.models(model_type)
                 if models:
                     provider_schema.models.extend(models)
 
             providers.append(provider_schema)
 
-        # return providers
+        # 返回所有收集到的提供者信息
         return providers
 
     def provider_credentials_validate(self, provider: str, credentials: dict) -> dict:
         """
-        Validate provider credentials
+        验证供应商凭证
 
-        :param provider: provider name
-        :param credentials: provider credentials, credentials form defined in `provider_credential_schema`.
-        :return:
+        :param provider: 供应商名称
+        :param credentials: 供应商凭证，凭证形式遵循`provider_credential_schema`定义。
+        :return: 验证通过后的凭证信息
         """
-        # get the provider instance
+        # 获取供应商实例
         model_provider_instance = self.get_provider_instance(provider)
 
-        # get provider schema
+        # 获取供应商方案
         provider_schema = model_provider_instance.get_provider_schema()
 
-        # get provider_credential_schema and validate credentials according to the rules
+        # 获取provider_credential_schema，并根据规则验证凭证
         provider_credential_schema = provider_schema.provider_credential_schema
 
-        # validate provider credential schema
+        # 验证供应商凭证方案
         validator = ProviderCredentialSchemaValidator(provider_credential_schema)
         filtered_credentials = validator.validate_and_filter(credentials)
 
-        # validate the credentials, raise exception if validation failed
+        # 验证凭证信息，如果验证失败则抛出异常
         model_provider_instance.validate_provider_credentials(filtered_credentials)
 
         return filtered_credentials
@@ -90,79 +107,81 @@ class ModelProviderFactory:
     def model_credentials_validate(self, provider: str, model_type: ModelType,
                                    model: str, credentials: dict) -> dict:
         """
-        Validate model credentials
+        验证模型凭证
 
-        :param provider: provider name
-        :param model_type: model type
-        :param model: model name
-        :param credentials: model credentials, credentials form defined in `model_credential_schema`.
-        :return:
+        :param provider: 提供者名称
+        :param model_type: 模型类型
+        :param model: 模型名称
+        :param credentials: 模型凭证，凭证形式定义在`model_credential_schema`中。
+        :return: 验证过滤后的凭证
         """
-        # get the provider instance
+        # 获取提供者实例
         model_provider_instance = self.get_provider_instance(provider)
 
-        # get provider schema
+        # 获取提供者方案
         provider_schema = model_provider_instance.get_provider_schema()
 
-        # get model_credential_schema and validate credentials according to the rules
+        # 获取 model_credential_schema 并根据规则验证凭证
         model_credential_schema = provider_schema.model_credential_schema
 
-        # validate model credential schema
+        # 验证模型凭证方案
         validator = ModelCredentialSchemaValidator(model_type, model_credential_schema)
         filtered_credentials = validator.validate_and_filter(credentials)
 
-        # get model instance of the model type
+        # 获取模型类型对应的模型实例
         model_instance = model_provider_instance.get_model_instance(model_type)
 
-        # call validate_credentials method of model type to validate credentials, raise exception if validation failed
+        # 调用模型类型的 validate_credentials 方法验证凭证，验证失败则抛出异常
         model_instance.validate_credentials(model, filtered_credentials)
 
         return filtered_credentials
 
     def get_models(self,
-                   provider: Optional[str] = None,
-                   model_type: Optional[ModelType] = None,
-                   provider_configs: Optional[list[ProviderConfig]] = None) \
+                provider: Optional[str] = None,
+                model_type: Optional[ModelType] = None,
+                provider_configs: Optional[list[ProviderConfig]] = None) \
             -> list[SimpleProviderEntity]:
         """
-        Get all models for given model type
+        根据给定的模型类型获取所有模型
 
-        :param provider: provider name
-        :param model_type: model type
-        :param provider_configs: list of provider configs
-        :return: list of models
+        :param provider: 提供者名称
+        :param model_type: 模型类型
+        :param provider_configs: 提供者配置列表
+        :return: 模型列表
         """
-        # scan all providers
+        # 扫描所有提供者
         model_provider_extensions = self._get_model_provider_map()
 
-        # convert provider_configs to dict
+        # 将提供者配置转换为字典
         provider_credentials_dict = {}
         for provider_config in provider_configs:
             provider_credentials_dict[provider_config.provider] = provider_config.credentials
 
-        # traverse all model_provider_extensions
+        # 遍历所有model_provider_extensions
         providers = []
         for name, model_provider_extension in model_provider_extensions.items():
-            # filter by provider if provider is present
+            # 如果指定了提供者且当前提供者不匹配，则跳过
             if provider and name != provider:
                 continue
 
-            # get model_provider instance
+            # 获取model_provider实例
             model_provider_instance = model_provider_extension.provider_instance
 
-            # get provider schema
+            # 获取提供者架构
             provider_schema = model_provider_instance.get_provider_schema()
 
             model_types = provider_schema.supported_model_types
             if model_type:
+                # 如果指定了模型类型且不匹配，则跳过
                 if model_type not in model_types:
                     continue
 
+                # 将模型类型缩小为指定的模型类型
                 model_types = [model_type]
 
             all_model_type_models = []
             for model_type in model_types:
-                # get predefined models for given model type
+                # 根据给定的模型类型获取预定义的模型
                 models = model_provider_instance.models(
                     model_type=model_type,
                 )
@@ -178,78 +197,93 @@ class ModelProviderFactory:
 
     def get_provider_instance(self, provider: str) -> ModelProvider:
         """
-        Get provider instance by provider name
-        :param provider: provider name
-        :return: provider instance
+        通过提供者名称获取提供者实例
+        :param provider: 提供者名称
+        :return: 提供者实例
         """
-        # scan all providers
+        # 扫描所有提供者
         model_provider_extensions = self._get_model_provider_map()
 
-        # get the provider extension
+        # 获取指定提供的扩展
         model_provider_extension = model_provider_extensions.get(provider)
         if not model_provider_extension:
-            raise Exception(f'Invalid provider: {provider}')
+            raise Exception(f'无效的提供者: {provider}')
 
-        # get the provider instance
+        # 获取提供者实例
         model_provider_instance = model_provider_extension.provider_instance
 
         return model_provider_instance
 
     def _get_model_provider_map(self) -> dict[str, ModelProviderExtension]:
+        """
+        获取模型提供者映射表。
+        
+        该方法首先检查是否存在已加载的模型提供者扩展，如果存在，则直接返回这些扩展。
+        如果不存在，它将从文件系统中动态加载模型提供者，并创建一个映射表，其中包含模型提供者的名称、
+        实例和它们在配置文件中的位置信息。
+        
+        返回:
+            dict[str, ModelProviderExtension]: 模型提供者映射表，键为模型提供者名称，值为ModelProviderExtension实例。
+        """
+        # 如果已有模型提供者扩展，则直接返回
         if self.model_provider_extensions:
             return self.model_provider_extensions
 
-
-        # get the path of current classes
+        # 获取当前类的文件路径，并确定模型提供者的目录路径
         current_path = os.path.abspath(__file__)
         model_providers_path = os.path.dirname(current_path)
 
-        # get all folders path under model_providers_path that do not start with __
+        # 确定模型提供者目录下所有不以'__'开头的子目录路径
         model_provider_dir_paths = [
             os.path.join(model_providers_path, model_provider_dir)
             for model_provider_dir in os.listdir(model_providers_path)
             if not model_provider_dir.startswith('__')
-               and os.path.isdir(os.path.join(model_providers_path, model_provider_dir))
+            and os.path.isdir(os.path.join(model_providers_path, model_provider_dir))
         ]
 
-        # get _position.yaml file path
+        # 获取_position.yaml文件中的位置映射信息
         position_map = get_position_map(model_providers_path)
 
-        # traverse all model_provider_dir_paths
+        # 遍历所有模型提供者目录路径
         model_providers: list[ModelProviderExtension] = []
         for model_provider_dir_path in model_provider_dir_paths:
-            # get model_provider dir name
+            # 获取模型提供者目录的名称
             model_provider_name = os.path.basename(model_provider_dir_path)
 
             file_names = os.listdir(model_provider_dir_path)
 
+            # 如果缺少.py文件，则记录警告并跳过该目录
             if (model_provider_name + '.py') not in file_names:
                 logger.warning(f"Missing {model_provider_name}.py file in {model_provider_dir_path}, Skip.")
                 continue
 
-            # Dynamic loading {model_provider_name}.py file and find the subclass of ModelProvider
+            # 动态加载.py文件并寻找ModelProvider的子类
             py_path = os.path.join(model_provider_dir_path, model_provider_name + '.py')
             model_provider_class = load_single_subclass_from_source(
                 module_name=f'core.model_runtime.model_providers.{model_provider_name}.{model_provider_name}',
                 script_path=py_path,
                 parent_type=ModelProvider)
 
+            # 如果找不到子类，则记录警告并跳过
             if not model_provider_class:
                 logger.warning(f"Missing Model Provider Class that extends ModelProvider in {py_path}, Skip.")
                 continue
 
+            # 如果缺少.yaml配置文件，则记录警告并跳过
             if f'{model_provider_name}.yaml' not in file_names:
                 logger.warning(f"Missing {model_provider_name}.yaml file in {model_provider_dir_path}, Skip.")
                 continue
 
+            # 将模型提供者信息添加到列表中
             model_providers.append(ModelProviderExtension(
                 name=model_provider_name,
                 provider_instance=model_provider_class(),
                 position=position_map.get(model_provider_name)
             ))
 
+        # 根据位置映射信息对模型提供者进行排序，并存储为字典
         sorted_extensions = sort_to_dict_by_position_map(position_map, model_providers, lambda x: x.name)
 
+        # 更新并返回排序后的模型提供者扩展
         self.model_provider_extensions = sorted_extensions
-
         return sorted_extensions

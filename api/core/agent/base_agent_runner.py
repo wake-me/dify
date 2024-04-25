@@ -62,18 +62,24 @@ class BaseAgentRunner(AppRunner):
                  model_instance: ModelInstance = None
                  ) -> None:
         """
-        Agent runner
-        :param tenant_id: tenant id
-        :param app_config: app generate entity
-        :param model_config: model config
-        :param config: dataset config
-        :param queue_manager: queue manager
-        :param message: message
-        :param user_id: user id
-        :param agent_llm_callback: agent llm callback
-        :param callback: callback
-        :param memory: memory
+        初始化BaseAgentRunner，负责管理对话代理的运行环境和状态。
+
+        :param tenant_id: 租户ID。
+        :param application_generate_entity: 代理聊天应用生成实体，用于应用相关的配置和数据处理。
+        :param conversation: 对话实例，包含对话的历史和状态。
+        :param app_config: 代理聊天应用配置，包含应用的设置和数据。
+        :param model_config: 模型配置，包含模型的详细设置和认证信息。
+        :param config: 数据集配置，用于指定数据集的相关设置。
+        :param queue_manager: 队列管理器，用于消息和任务的队列管理。
+        :param message: 当前消息实例，包含消息内容和相关元数据。
+        :param user_id: 用户ID，标识发起对话的用户。
+        :param memory: 令牌缓冲区记忆，用于存储对话过程中的临时状态和数据（可选）。
+        :param prompt_messages: 提示消息列表，用于对话中的各种提示信息（可选）。
+        :param variables_pool: 工具运行时变量池，用于存储和管理变量（可选）。
+        :param db_variables: 工具对话变量，用于存储对话过程中的持久化变量（可选）。
+        :param model_instance: 模型实例，包含模型的具体实现和认证信息（可选）。
         """
+        # 初始化各种属性，包括消息、用户ID、配置等
         self.tenant_id = tenant_id
         self.application_generate_entity = application_generate_entity
         self.conversation = conversation
@@ -91,9 +97,9 @@ class BaseAgentRunner(AppRunner):
         self.db_variables_pool = db_variables
         self.model_instance = model_instance
 
-        # init callback
+        # 初始化回调处理
         self.agent_callback = DifyAgentCallbackHandler()
-        # init dataset tools
+        # 初始化数据集工具
         hit_callback = DatasetIndexToolCallbackHandler(
             queue_manager=queue_manager,
             app_id=self.app_config.app_id,
@@ -109,13 +115,13 @@ class BaseAgentRunner(AppRunner):
             invoke_from=application_generate_entity.invoke_from,
             hit_callback=hit_callback
         )
-        # get how many agent thoughts have been created
+        # 计算已经创建的代理思考数量
         self.agent_thought_count = db.session.query(MessageAgentThought).filter(
             MessageAgentThought.message_id == self.message.id,
         ).count()
         db.session.close()
 
-        # check if model supports stream tool call
+        # 检查模型是否支持流式工具调用
         llm_model = cast(LargeLanguageModel, model_instance.model_type_instance)
         model_schema = llm_model.get_model_schema(model_instance.model, model_instance.credentials)
         if model_schema and ModelFeature.STREAM_TOOL_CALL in (model_schema.features or []):
@@ -123,7 +129,7 @@ class BaseAgentRunner(AppRunner):
         else:
             self.stream_tool_call = False
 
-        # check if model supports vision
+        # 检查模型是否支持视觉处理
         if model_schema and ModelFeature.VISION in (model_schema.features or []):
             self.files = application_generate_entity.files
         else:
@@ -132,8 +138,15 @@ class BaseAgentRunner(AppRunner):
     def _repack_app_generate_entity(self, app_generate_entity: AgentChatAppGenerateEntity) \
             -> AgentChatAppGenerateEntity:
         """
-        Repack app generate entity
+        重新打包应用生成实体
+        
+        参数:
+        app_generate_entity: AgentChatAppGenerateEntity - 输入的应用生成实体对象
+        
+        返回值:
+        AgentChatAppGenerateEntity - 处理后的应用生成实体对象
         """
+        # 确保app_config.prompt_template.simple_prompt_template不为None，若为None则设置为空字符串
         if app_generate_entity.app_config.prompt_template.simple_prompt_template is None:
             app_generate_entity.app_config.prompt_template.simple_prompt_template = ''
 
@@ -141,32 +154,50 @@ class BaseAgentRunner(AppRunner):
 
     def _convert_tool_response_to_str(self, tool_response: list[ToolInvokeMessage]) -> str:
         """
-        Handle tool response
+        处理工具响应并将之转换为字符串格式。
+        
+        参数:
+        - tool_response: 工具响应列表，每个元素是 ToolInvokeMessage 类型，包含不同类型的响应信息（文本、链接、图片等）。
+        
+        返回值:
+        - result: 转换后的字符串，包含所有响应信息的文本表示。
         """
         result = ''
         for response in tool_response:
+            # 根据响应类型处理不同的响应信息
             if response.type == ToolInvokeMessage.MessageType.TEXT:
                 result += response.message
             elif response.type == ToolInvokeMessage.MessageType.LINK:
+                # 对链接响应添加特定提示信息
                 result += f"result link: {response.message}. please tell user to check it."
             elif response.type == ToolInvokeMessage.MessageType.IMAGE_LINK or \
-                 response.type == ToolInvokeMessage.MessageType.IMAGE:
+                response.type == ToolInvokeMessage.MessageType.IMAGE:
+                # 对图片响应添加统一的处理信息，表明图片已发送给用户
                 result += "image has been created and sent to user already, you do not need to create it, just tell the user to check it now."
             else:
+                # 对于未处理的其他类型响应，添加通用处理信息
                 result += f"tool response: {response.message}."
 
         return result
     
     def _convert_tool_to_prompt_message_tool(self, tool: AgentToolEntity) -> tuple[PromptMessageTool, Tool]:
         """
-            convert tool to prompt message tool
+            将工具转换为提示消息工具。
+
+            参数:
+            tool: AgentToolEntity - 需要转换的工具实体对象。
+
+            返回值:
+            返回一个元组，包含转换后的PromptMessageTool对象和Tool对象。
         """
+        # 获取工具的运行时实体，并加载变量池中的变量
         tool_entity = ToolManager.get_agent_tool_runtime(
             tenant_id=self.tenant_id,
             agent_tool=tool,
         )
         tool_entity.load_variables(self.variables_pool)
 
+        # 初始化PromptMessageTool对象，设置名称、描述和参数
         message_tool = PromptMessageTool(
             name=tool.tool_name,
             description=tool_entity.description.llm,
@@ -177,11 +208,13 @@ class BaseAgentRunner(AppRunner):
             }
         )
 
+        # 遍历工具的所有运行时参数，配置PromptMessageTool的参数
         parameters = tool_entity.get_all_runtime_parameters()
         for parameter in parameters:
             if parameter.form != ToolParameter.ToolParameterForm.LLM:
                 continue
 
+            # 根据参数类型配置参数的细节
             parameter_type = 'string'
             enum = []
             if parameter.type == ToolParameter.ToolParameterType.STRING:
@@ -197,14 +230,17 @@ class BaseAgentRunner(AppRunner):
             else:
                 raise ValueError(f"parameter type {parameter.type} is not supported")
             
+            # 更新PromptMessageTool的参数配置
             message_tool.parameters['properties'][parameter.name] = {
                 "type": parameter_type,
                 "description": parameter.llm_description or '',
             }
 
+            # 如果参数有枚举值，添加到配置中
             if len(enum) > 0:
                 message_tool.parameters['properties'][parameter.name]['enum'] = enum
 
+            # 如果参数是必需的，则添加到必需参数列表中
             if parameter.required:
                 message_tool.parameters['required'].append(parameter.name)
 
@@ -212,8 +248,15 @@ class BaseAgentRunner(AppRunner):
     
     def _convert_dataset_retriever_tool_to_prompt_message_tool(self, tool: DatasetRetrieverTool) -> PromptMessageTool:
         """
-        convert dataset retriever tool to prompt message tool
+        将数据集检索工具转换为提示消息工具
+        
+        参数:
+        tool: DatasetRetrieverTool - 需要转换的数据集检索工具实例
+        
+        返回值:
+        PromptMessageTool - 转换后的提示消息工具实例
         """
+        # 初始化提示消息工具，设置名称和描述
         prompt_tool = PromptMessageTool(
             name=tool.identity.name,
             description=tool.description.llm,
@@ -224,14 +267,17 @@ class BaseAgentRunner(AppRunner):
             }
         )
 
+        # 遍历检索工具的运行时参数，设置提示消息工具的参数
         for parameter in tool.get_runtime_parameters():
-            parameter_type = 'string'
+            parameter_type = 'string'  # 默认参数类型为字符串
         
+            # 为参数添加类型和描述到提示消息工具的参数配置中
             prompt_tool.parameters['properties'][parameter.name] = {
                 "type": parameter_type,
                 "description": parameter.llm_description or '',
             }
 
+            # 如果参数是必需的，则将其添加到必需参数列表中
             if parameter.required:
                 if parameter.name not in prompt_tool.parameters['required']:
                     prompt_tool.parameters['required'].append(parameter.name)
@@ -240,45 +286,57 @@ class BaseAgentRunner(AppRunner):
     
     def _init_prompt_tools(self) -> tuple[dict[str, Tool], list[PromptMessageTool]]:
         """
-        Init tools
+        初始化工具及其消息提示工具。
+
+        本函数负责根据应用配置和数据集工具配置，初始化并构建工具实体及其相关的消息提示工具实例。
+        其中，会尝试将应用配置中的工具和数据集工具转换为消息提示工具，并收集所有工具实体。
+
+        返回值:
+            - tool_instances: 字典，键为工具名称，值为工具实体。
+            - prompt_messages_tools: 列表，包含所有消息提示工具实例。
         """
         tool_instances = {}
         prompt_messages_tools = []
 
+        # 遍历应用配置中的工具，尝试将其转换为消息提示工具
         for tool in self.app_config.agent.tools if self.app_config.agent else []:
             try:
                 prompt_tool, tool_entity = self._convert_tool_to_prompt_message_tool(tool)
             except Exception:
-                # api tool may be deleted
+                # 如果转换过程中出现异常，则跳过当前工具，可能是API工具已被删除
                 continue
-            # save tool entity
+            # 保存工具实体和消息提示工具
             tool_instances[tool.tool_name] = tool_entity
-            # save prompt tool
             prompt_messages_tools.append(prompt_tool)
 
-        # convert dataset tools into ModelRuntime Tool format
+        # 将数据集工具转换为消息提示工具，并保存
         for dataset_tool in self.dataset_tools:
             prompt_tool = self._convert_dataset_retriever_tool_to_prompt_message_tool(dataset_tool)
-            # save prompt tool
+            # 保存消息提示工具和工具实体
             prompt_messages_tools.append(prompt_tool)
-            # save tool entity
             tool_instances[dataset_tool.identity.name] = dataset_tool
 
         return tool_instances, prompt_messages_tools
 
     def update_prompt_message_tool(self, tool: Tool, prompt_tool: PromptMessageTool) -> PromptMessageTool:
         """
-        update prompt message tool
+        更新提示消息工具的信息。
+
+        :param tool: 工具对象，提供运行时参数。
+        :param prompt_tool: 提示消息工具对象，用于收集和展示参数信息。
+        :return: 返回更新后的提示消息工具对象。
         """
-        # try to get tool runtime parameters
+        # 尝试获取工具的运行时参数
         tool_runtime_parameters = tool.get_runtime_parameters() or []
 
         for parameter in tool_runtime_parameters:
+            # 如果参数形式不是 LLM，跳过处理
             if parameter.form != ToolParameter.ToolParameterForm.LLM:
                 continue
 
             parameter_type = 'string'
             enum = []
+            # 根据参数类型设置对应的参数信息
             if parameter.type == ToolParameter.ToolParameterType.STRING:
                 parameter_type = 'string'
             elif parameter.type == ToolParameter.ToolParameterType.BOOLEAN:
@@ -290,16 +348,20 @@ class BaseAgentRunner(AppRunner):
                     enum.append(option.value)
                 parameter_type = 'string'
             else:
+                # 如果遇到不支持的参数类型，抛出异常
                 raise ValueError(f"parameter type {parameter.type} is not supported")
         
+            # 更新提示工具的参数信息
             prompt_tool.parameters['properties'][parameter.name] = {
                 "type": parameter_type,
                 "description": parameter.llm_description or '',
             }
 
+            # 如果参数为选择类型，添加枚举信息
             if len(enum) > 0:
                 prompt_tool.parameters['properties'][parameter.name]['enum'] = enum
 
+            # 如果参数为必需的，则将其添加到必需参数列表中
             if parameter.required:
                 if parameter.name not in prompt_tool.parameters['required']:
                     prompt_tool.parameters['required'].append(parameter.name)
@@ -307,11 +369,22 @@ class BaseAgentRunner(AppRunner):
         return prompt_tool
         
     def create_agent_thought(self, message_id: str, message: str, 
-                             tool_name: str, tool_input: str, messages_ids: list[str]
-                             ) -> MessageAgentThought:
+                            tool_name: str, tool_input: str, messages_ids: list[str]
+                            ) -> MessageAgentThought:
         """
-        Create agent thought
+        创建代理思考记录。
+
+        参数:
+        - message_id: 消息的唯一标识符。
+        - message: 消息的内容。
+        - tool_name: 使用的工具的名称。
+        - tool_input: 提供给工具的输入。
+        - messages_ids: 关联的消息ID列表。
+        
+        返回值:
+        - MessageAgentThought对象，代表创建的思考记录。
         """
+        # 初始化MessageAgentThought对象
         thought = MessageAgentThought(
             message_id=message_id,
             message_chain_id=None,
@@ -339,32 +412,50 @@ class BaseAgentRunner(AppRunner):
             created_by=self.user_id,
         )
 
+        # 将思考记录添加到数据库并提交更改
         db.session.add(thought)
         db.session.commit()
-        db.session.refresh(thought)
-        db.session.close()
+        db.session.refresh(thought)  # 刷新对象以获取最新的数据库状态
+        db.session.close()  # 关闭数据库会话
 
-        self.agent_thought_count += 1
+        self.agent_thought_count += 1  # 更新代理思考计数
 
-        return thought
+        return thought  # 返回创建的思考记录对象
 
     def save_agent_thought(self, 
-                           agent_thought: MessageAgentThought, 
-                           tool_name: str,
-                           tool_input: Union[str, dict],
-                           thought: str, 
-                           observation: Union[str, dict], 
-                           tool_invoke_meta: Union[str, dict],
-                           answer: str,
-                           messages_ids: list[str],
-                           llm_usage: LLMUsage = None) -> MessageAgentThought:
+                        agent_thought: MessageAgentThought, 
+                        tool_name: str,
+                        tool_input: Union[str, dict],
+                        thought: str, 
+                        observation: Union[str, dict], 
+                        tool_invoke_meta: Union[str, dict],
+                        answer: str,
+                        messages_ids: list[str],
+                        llm_usage: LLMUsage = None) -> MessageAgentThought:
         """
-        Save agent thought
+        保存代理思考结果到数据库。
+        
+        参数:
+        - agent_thought: MessageAgentThought对象，代表一个代理的思考记录。
+        - tool_name: 字符串，表示使用的工具名称。
+        - tool_input: 字符串或字典，表示工具的输入信息。
+        - thought: 字符串，表示代理的思考内容。
+        - observation: 字符串或字典，表示代理观察到的结果。
+        - tool_invoke_meta: 字符串或字典，包含调用工具的元数据。
+        - answer: 字符串，表示代理给出的答案。
+        - messages_ids: 字符串列表，表示与消息相关的文件ID。
+        - llm_usage: LLMUsage对象，包含关于大语言模型使用情况的详细信息。
+        
+        返回:
+        - 更新后的MessageAgentThought对象。
         """
+        
+        # 从数据库获取对应的agent_thought对象
         agent_thought = db.session.query(MessageAgentThought).filter(
             MessageAgentThought.id == agent_thought.id
         ).first()
 
+        # 更新思考结果、工具名称、工具输入、观察结果、答案和消息文件ID
         if thought is not None:
             agent_thought.thought = thought
 
@@ -396,6 +487,7 @@ class BaseAgentRunner(AppRunner):
             agent_thought.message_files = json.dumps(messages_ids)
         
         if llm_usage:
+            # 更新与大语言模型使用相关的数据
             agent_thought.message_token = llm_usage.prompt_tokens
             agent_thought.message_price_unit = llm_usage.prompt_price_unit
             agent_thought.message_unit_price = llm_usage.prompt_unit_price
@@ -405,7 +497,7 @@ class BaseAgentRunner(AppRunner):
             agent_thought.tokens = llm_usage.total_tokens
             agent_thought.total_price = llm_usage.total_price
 
-        # check if tool labels is not empty
+        # 更新工具标签
         labels = agent_thought.tool_labels or {}
         tools = agent_thought.tool.split(';') if agent_thought.tool else []
         for tool in tools:
@@ -421,6 +513,7 @@ class BaseAgentRunner(AppRunner):
         agent_thought.tool_labels_str = json.dumps(labels)
 
         if tool_invoke_meta is not None:
+            # 更新工具调用元数据
             if isinstance(tool_invoke_meta, dict):
                 try:
                     tool_invoke_meta = json.dumps(tool_invoke_meta, ensure_ascii=False)
@@ -429,32 +522,48 @@ class BaseAgentRunner(AppRunner):
 
             agent_thought.tool_meta_str = tool_invoke_meta
 
+        # 提交数据库事务并关闭数据库会话
         db.session.commit()
         db.session.close()
     
     def update_db_variables(self, tool_variables: ToolRuntimeVariablePool, db_variables: ToolConversationVariables):
         """
-        convert tool variables to db variables
+        将工具变量更新到数据库变量中。
+
+        :param tool_variables: ToolRuntimeVariablePool 类型，表示当前工具运行时的变量池。
+        :param db_variables: ToolConversationVariables 类型，表示数据库中与当前对话相关的变量存储。
+        :return: 无返回值。
         """
+        # 从数据库中查询当前对话对应的变量存储对象
         db_variables = db.session.query(ToolConversationVariables).filter(
             ToolConversationVariables.conversation_id == self.message.conversation_id,
         ).first()
 
+        # 更新数据库变量的最后更新时间和变量值
         db_variables.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db_variables.variables_str = json.dumps(jsonable_encoder(tool_variables.pool))
+
+        # 提交数据库事务并关闭数据库会话
         db.session.commit()
         db.session.close()
 
     def organize_agent_history(self, prompt_messages: list[PromptMessage]) -> list[PromptMessage]:
         """
-        Organize agent history
+        组织代理历史记录
+        
+        参数:
+        - prompt_messages: 一个 PromptMessage 对象的列表，代表对话中的消息历史
+        
+        返回值:
+        - 一个 PromptMessage 对象的列表，按照时间顺序组织好的代理对话历史
         """
         result = []
-        # check if there is a system message in the beginning of the conversation
+        # 检查对话开始是否有系统消息
         for prompt_message in prompt_messages:
             if isinstance(prompt_message, SystemPromptMessage):
                 result.append(prompt_message)
 
+        # 从数据库中查询消息记录，并按照创建时间升序排序
         messages: list[Message] = db.session.query(Message).filter(
             Message.conversation_id == self.message.conversation_id,
         ).order_by(Message.created_at.asc()).all()
@@ -462,8 +571,11 @@ class BaseAgentRunner(AppRunner):
         for message in messages:
             if message.id == self.message.id:
                 continue
-            
+                
+            # 组织代理和用户之间的消息
             result.append(self.organize_agent_user_prompt(message))
+            
+            # 处理消息中的代理思考内容
             agent_thoughts: list[MessageAgentThought] = message.agent_thoughts
             if agent_thoughts:
                 for agent_thought in agent_thoughts:
@@ -482,7 +594,7 @@ class BaseAgentRunner(AppRunner):
                             tool_responses = { tool: agent_thought.observation for tool in tools }
 
                         for tool in tools:
-                            # generate a uuid for tool call
+                            # 为工具调用生成一个唯一标识符
                             tool_call_id = str(uuid.uuid4())
                             tool_calls.append(AssistantPromptMessage.ToolCall(
                                 id=tool_call_id,
@@ -498,6 +610,7 @@ class BaseAgentRunner(AppRunner):
                                 tool_call_id=tool_call_id,
                             ))
 
+                        # 将工具调用和响应消息添加到结果列表中
                         result.extend([
                             AssistantPromptMessage(
                                 content=agent_thought.thought,
@@ -508,6 +621,7 @@ class BaseAgentRunner(AppRunner):
                     if not tools:
                         result.append(AssistantPromptMessage(content=agent_thought.thought))
             else:
+                # 如果是用户的回答，则直接添加到结果中
                 if message.answer:
                     result.append(AssistantPromptMessage(content=message.answer))
 
@@ -516,6 +630,20 @@ class BaseAgentRunner(AppRunner):
         return result
 
     def organize_agent_user_prompt(self, message: Message) -> UserPromptMessage:
+        """
+        组织代理用户提示信息。
+        
+        根据传入的消息对象，解析其中的文件信息，并根据文件额外配置（如存在），生成相应的用户提示消息。
+        如果消息中包含文件且有额外配置，则将查询内容和文件信息一并返回；若无文件或无额外配置，则仅返回查询内容。
+        
+        参数:
+        - message: Message 类型，包含用户查询和可能附带的文件信息的消息对象。
+        
+        返回值:
+        - UserPromptMessage 类型，包含组织后的用户提示信息，可能是纯文本查询内容，或查询内容加上文件信息。
+        """
+        
+        # 初始化消息文件解析器
         message_file_parser = MessageFileParser(
             tenant_id=self.tenant_id,
             app_id=self.app_config.app_id,
@@ -523,23 +651,29 @@ class BaseAgentRunner(AppRunner):
 
         files = message.message_files
         if files:
+            # 尝试从消息应用模型配置中转换出文件上传的额外配置
             file_extra_config = FileUploadConfigManager.convert(message.app_model_config.to_dict())
 
             if file_extra_config:
+                # 如果存在文件上传额外配置，就解析消息中的文件
                 file_objs = message_file_parser.transform_message_files(
                     files,
                     file_extra_config
                 )
             else:
+                # 无额外配置时，文件对象列表为空
                 file_objs = []
 
             if not file_objs:
+                # 如果没有解析出文件对象，则只返回查询内容
                 return UserPromptMessage(content=message.query)
             else:
+                # 如果有解析出文件对象，将查询内容和每个文件对象的提示信息组织成一个列表后返回
                 prompt_message_contents = [TextPromptMessageContent(data=message.query)]
                 for file_obj in file_objs:
                     prompt_message_contents.append(file_obj.prompt_message_content)
 
                 return UserPromptMessage(content=prompt_message_contents)
         else:
+            # 消息中无文件时，直接返回查询内容
             return UserPromptMessage(content=message.query)

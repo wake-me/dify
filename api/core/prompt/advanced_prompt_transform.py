@@ -19,9 +19,16 @@ from core.prompt.utils.prompt_template_parser import PromptTemplateParser
 
 class AdvancedPromptTransform(PromptTransform):
     """
-    Advanced Prompt Transform for Workflow LLM Node.
+    用于工作流LLM节点的高级提示转换。
     """
+
     def __init__(self, with_variable_tmpl: bool = False) -> None:
+        """
+        初始化AdvancedPromptTransform对象。
+
+        参数:
+        with_variable_tmpl (bool): 是否使用变量模板，默认为False。
+        """
         self.with_variable_tmpl = with_variable_tmpl
 
     def get_prompt(self, prompt_template: Union[list[ChatModelMessage], CompletionModelPromptTemplate],
@@ -32,10 +39,27 @@ class AdvancedPromptTransform(PromptTransform):
                    memory_config: Optional[MemoryConfig],
                    memory: Optional[TokenBufferMemory],
                    model_config: ModelConfigWithCredentialsEntity) -> list[PromptMessage]:
+        """
+        根据模型模式获取相应的提示消息。
+
+        参数:
+        prompt_template: 提示模板，可以是聊天模型消息列表或完成模型提示模板。
+        inputs: 输入参数字典。
+        query: 查询字符串。
+        files: 文件变量列表。
+        context: 上下文字符串，可选。
+        memory_config: 内存配置，可选。
+        memory: 令牌缓冲区内存，可选。
+        model_config: 带有凭证实体的模型配置。
+
+        返回值:
+        list[PromptMessage]: 提示消息列表。
+        """
         prompt_messages = []
 
         model_mode = ModelMode.value_of(model_config.mode)
         if model_mode == ModelMode.COMPLETION:
+            # 处理完成模型的提示消息
             prompt_messages = self._get_completion_model_prompt_messages(
                 prompt_template=prompt_template,
                 inputs=inputs,
@@ -47,6 +71,7 @@ class AdvancedPromptTransform(PromptTransform):
                 model_config=model_config
             )
         elif model_mode == ModelMode.CHAT:
+            # 处理聊天模型的提示消息
             prompt_messages = self._get_chat_model_prompt_messages(
                 prompt_template=prompt_template,
                 inputs=inputs,
@@ -61,26 +86,45 @@ class AdvancedPromptTransform(PromptTransform):
         return prompt_messages
 
     def _get_completion_model_prompt_messages(self,
-                                              prompt_template: CompletionModelPromptTemplate,
-                                              inputs: dict,
-                                              query: Optional[str],
-                                              files: list[FileVar],
-                                              context: Optional[str],
-                                              memory_config: Optional[MemoryConfig],
-                                              memory: Optional[TokenBufferMemory],
-                                              model_config: ModelConfigWithCredentialsEntity) -> list[PromptMessage]:
+                                            prompt_template: CompletionModelPromptTemplate,
+                                            inputs: dict,
+                                            query: Optional[str],
+                                            files: list[FileVar],
+                                            context: Optional[str],
+                                            memory_config: Optional[MemoryConfig],
+                                            memory: Optional[TokenBufferMemory],
+                                            model_config: ModelConfigWithCredentialsEntity) -> list[PromptMessage]:
         """
-        Get completion model prompt messages.
+        获取完成模型的提示消息。
+        
+        参数:
+        - prompt_template: CompletionModelPromptTemplate，提示模板对象，包含模板文本。
+        - inputs: dict，输入字典，包含模板中需要的变量键值对。
+        - query: Optional[str]，查询字符串，如果提供，则将其纳入提示信息中。
+        - files: list[FileVar]，文件变量列表，如果有文件需要包含在提示中，则提供。
+        - context: Optional[str]，上下文字符串，用于设置模板中的上下文变量。
+        - memory_config: Optional[MemoryConfig]，内存配置对象，用于配置记忆功能。
+        - memory: Optional[TokenBufferMemory]，令牌缓冲区内存对象，用于存储和检索历史输入。
+        - model_config: ModelConfigWithCredentialsEntity，模型配置对象，包含模型的配置信息和认证信息。
+        
+        返回值:
+        - list[PromptMessage]，提示消息列表，每个消息可以包含文本和文件内容。
         """
+        
+        # 初始化原始提示文本
         raw_prompt = prompt_template.text
 
         prompt_messages = []
 
+        # 解析提示模板，处理其中的变量
         prompt_template = PromptTemplateParser(template=raw_prompt, with_variable_tmpl=self.with_variable_tmpl)
+        # 筛选出模板中需要的变量，并从输入中获取其值
         prompt_inputs = {k: inputs[k] for k in prompt_template.variable_keys if k in inputs}
 
+        # 设置上下文变量
         prompt_inputs = self._set_context_variable(context, prompt_template, prompt_inputs)
 
+        # 如果启用了记忆功能，设置记忆变量
         if memory and memory_config:
             role_prefix = memory_config.role_prefix
             prompt_inputs = self._set_histories_variable(
@@ -93,13 +137,16 @@ class AdvancedPromptTransform(PromptTransform):
                 model_config=model_config
             )
 
+        # 如果提供了查询字符串，设置查询变量
         if query:
             prompt_inputs = self._set_query_variable(query, prompt_template, prompt_inputs)
 
+        # 格式化模板，生成最终提示信息
         prompt = prompt_template.format(
             prompt_inputs
         )
 
+        # 如果有文件，将文件内容和提示信息一起封装成消息
         if files:
             prompt_message_contents = [TextPromptMessageContent(data=prompt)]
             for file in files:
@@ -107,6 +154,7 @@ class AdvancedPromptTransform(PromptTransform):
 
             prompt_messages.append(UserPromptMessage(content=prompt_message_contents))
         else:
+            # 如果没有文件，直接将提示信息封装成消息
             prompt_messages.append(UserPromptMessage(content=prompt))
 
         return prompt_messages
@@ -121,24 +169,42 @@ class AdvancedPromptTransform(PromptTransform):
                                         memory: Optional[TokenBufferMemory],
                                         model_config: ModelConfigWithCredentialsEntity) -> list[PromptMessage]:
         """
-        Get chat model prompt messages.
+        获取聊天模型的提示消息。
+        
+        参数:
+        - prompt_template: 提示模板列表，每个模板包含要发出的消息文本。
+        - inputs: 输入字典，包含用于填充模板的变量。
+        - query: 查询字符串，可能为空，用于提供用户查询。
+        - files: 文件列表，可能为空，表示要附加的文件。
+        - context: 上下文字符串，可能为空，用于提供对话上下文。
+        - memory_config: 内存配置，用于管理对话状态。
+        - memory: 令牌缓冲区内存，用于存储对话历史等信息。
+        - model_config: 模型配置，包含模型的认证信息和配置。
+        
+        返回值:
+        - 提示消息列表，每个消息可以是用户、系统或助手角色。
         """
+        
+        # 初始化原始提示列表和处理后的提示消息列表
         raw_prompt_list = prompt_template
-
         prompt_messages = []
 
+        # 遍历原始提示列表，生成具体的提示消息
         for prompt_item in raw_prompt_list:
             raw_prompt = prompt_item.text
 
             prompt_template = PromptTemplateParser(template=raw_prompt, with_variable_tmpl=self.with_variable_tmpl)
             prompt_inputs = {k: inputs[k] for k in prompt_template.variable_keys if k in inputs}
 
+            # 设置上下文变量
             prompt_inputs = self._set_context_variable(context, prompt_template, prompt_inputs)
 
+            # 格式化提示消息
             prompt = prompt_template.format(
                 prompt_inputs
             )
 
+            # 根据角色生成具体的提示消息对象
             if prompt_item.role == PromptMessageRole.USER:
                 prompt_messages.append(UserPromptMessage(content=prompt))
             elif prompt_item.role == PromptMessageRole.SYSTEM and prompt:
@@ -146,9 +212,11 @@ class AdvancedPromptTransform(PromptTransform):
             elif prompt_item.role == PromptMessageRole.ASSISTANT:
                 prompt_messages.append(AssistantPromptMessage(content=prompt))
 
+        # 如果存在记忆配置和内存，追加对话历史
         if memory and memory_config:
             prompt_messages = self._append_chat_histories(memory, memory_config, prompt_messages, model_config)
 
+            # 处理附加文件的情况
             if files:
                 prompt_message_contents = [TextPromptMessageContent(data=query)]
                 for file in files:
@@ -158,35 +226,46 @@ class AdvancedPromptTransform(PromptTransform):
             else:
                 prompt_messages.append(UserPromptMessage(content=query))
         elif files:
+            # 处理只有文件而没有查询字符串的情况
             if not query:
-                # get last message
+                # 获取最后一条消息并添加文件
                 last_message = prompt_messages[-1] if prompt_messages else None
                 if last_message and last_message.role == PromptMessageRole.USER:
-                    # get last user message content and add files
                     prompt_message_contents = [TextPromptMessageContent(data=last_message.content)]
                     for file in files:
                         prompt_message_contents.append(file.prompt_message_content)
 
                     last_message.content = prompt_message_contents
                 else:
-                    prompt_message_contents = [TextPromptMessageContent(data='')]  # not for query
+                    prompt_message_contents = [TextPromptMessageContent(data='')]  # 为空的查询字符串
                     for file in files:
                         prompt_message_contents.append(file.prompt_message_content)
 
                     prompt_messages.append(UserPromptMessage(content=prompt_message_contents))
             else:
+                # 为查询字符串添加文件
                 prompt_message_contents = [TextPromptMessageContent(data=query)]
                 for file in files:
                     prompt_message_contents.append(file.prompt_message_content)
 
                 prompt_messages.append(UserPromptMessage(content=prompt_message_contents))
         elif query:
+            # 如果只有查询字符串而没有文件，添加到消息列表
             prompt_messages.append(UserPromptMessage(content=query))
 
         return prompt_messages
 
     def _set_context_variable(self, context: str, prompt_template: PromptTemplateParser, prompt_inputs: dict) -> dict:
+        """
+        设置上下文变量。
+        
+        :param context: 上下文字符串。
+        :param prompt_template: 提示模板解析器实例。
+        :param prompt_inputs: 包含提示输入的字典。
+        :return: 更新后的提示输入字典。
+        """
         if '#context#' in prompt_template.variable_keys:
+            # 如果模板中包含#context#变量，根据context是否有值设置相应的值
             if context:
                 prompt_inputs['#context#'] = context
             else:
@@ -195,7 +274,16 @@ class AdvancedPromptTransform(PromptTransform):
         return prompt_inputs
 
     def _set_query_variable(self, query: str, prompt_template: PromptTemplateParser, prompt_inputs: dict) -> dict:
+        """
+        设置查询变量。
+        
+        :param query: 查询字符串。
+        :param prompt_template: 提示模板解析器实例。
+        :param prompt_inputs: 包含提示输入的字典。
+        :return: 更新后的提示输入字典。
+        """
         if '#query#' in prompt_template.variable_keys:
+            # 如果模板中包含#query#变量，根据query是否有值设置相应的值
             if query:
                 prompt_inputs['#query#'] = query
             else:
@@ -210,17 +298,33 @@ class AdvancedPromptTransform(PromptTransform):
                                 prompt_template: PromptTemplateParser,
                                 prompt_inputs: dict,
                                 model_config: ModelConfigWithCredentialsEntity) -> dict:
+        """
+        设置历史记录变量。
+        
+        :param memory: 用于存储对话历史的TokenBufferMemory实例。
+        :param memory_config: 内存配置。
+        :param raw_prompt: 原始提示字符串。
+        :param role_prefix: 角色前缀配置。
+        :param prompt_template: 提示模板解析器实例。
+        :param prompt_inputs: 包含提示输入的字典。
+        :param model_config: 模型配置，包含认证信息。
+        :return: 更新后的提示输入字典。
+        """
         if '#histories#' in prompt_template.variable_keys:
+            # 如果模板中包含#histories#变量，根据memory是否有值设置历史记录
             if memory:
                 inputs = {'#histories#': '', **prompt_inputs}
+                # 重新解析模板，更新prompt_inputs
                 prompt_template = PromptTemplateParser(template=raw_prompt, with_variable_tmpl=self.with_variable_tmpl)
                 prompt_inputs = {k: inputs[k] for k in prompt_template.variable_keys if k in inputs}
+                # 计算剩余token数量
                 tmp_human_message = UserPromptMessage(
                     content=prompt_template.format(prompt_inputs)
                 )
 
                 rest_tokens = self._calculate_rest_token([tmp_human_message], model_config)
 
+                # 从内存中获取历史消息
                 histories = self._get_history_messages_from_memory(
                     memory=memory,
                     memory_config=memory_config,

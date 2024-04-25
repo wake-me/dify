@@ -9,16 +9,25 @@ from core.model_runtime.entities.common_entities import I18nObject
 
 class ModelType(Enum):
     """
-    模型类型的枚举类。
+    模型类型的枚举类，用于定义和区分不同类型的模型。
+
+    属性:
+    - LLM: 代表大语言模型
+    - TEXT_EMBEDDING: 代表文本嵌入模型
+    - RERANK: 代表重排序模型
+    - SPEECH2TEXT: 代表语音转文本模型
+    - MODERATION: 代表内容审核模型
+    - TTS: 代表文本转语音模型
+    - TEXT2IMG: 代表文本生成图像模型
     """
 
-    LLM = "llm"  # 代表大语言模型
-    TEXT_EMBEDDING = "text-embedding"  # 代表文本嵌入模型
-    RERANK = "rerank"  # 代表重排序模型
-    SPEECH2TEXT = "speech2text"  # 代表语音转文本模型
-    MODERATION = "moderation"  # 代表内容审核模型
-    TTS = "tts"  # 代表文本转语音模型
-    TEXT2IMG = "text2img"  # 代表文本生成图像模型
+    LLM = "llm"  # 大语言模型
+    TEXT_EMBEDDING = "text-embedding"  # 文本嵌入模型
+    RERANK = "rerank"  # 重排序模型
+    SPEECH2TEXT = "speech2text"  # 语音转文本模型
+    MODERATION = "moderation"  # 内容审核模型
+    TTS = "tts"  # 文本转语音模型
+    TEXT2IMG = "text2img"  # 文本生成图像模型
 
     @classmethod
     def value_of(cls, origin_model_type: str) -> "ModelType":
@@ -73,6 +82,9 @@ class ModelType(Enum):
 class FetchFrom(Enum):
     """
     定义获取来源的枚举类。
+    
+    PREDEFINED_MODEL - 预定义模型
+    CUSTOMIZABLE_MODEL - 可定制模型
     """
 
     PREDEFINED_MODEL = "predefined-model"  # 预定义模型
@@ -82,6 +94,12 @@ class FetchFrom(Enum):
 class ModelFeature(Enum):
     """
     定义模型功能的枚举类。
+    
+    TOOL_CALL - 工具调用
+    MULTI_TOOL_CALL - 多工具调用
+    AGENT_THOUGHT - 代理思考
+    VISION - 视觉
+    STREAM_TOOL_CALL    - 流式工具调用
     """
 
     TOOL_CALL = "tool-call"  # 工具调用
@@ -94,6 +112,13 @@ class ModelFeature(Enum):
 class DefaultParameterName(Enum):
     """
     定义参数模板变量的枚举类。
+    
+    TEMPERATURE - 温度
+    TOP_P - Top P
+    PRESENCE_PENALTY - 存在惩罚
+    FREQUENCY_PENALTY - 频率惩罚
+    MAX_TOKENS - 最大令牌数
+    RESPONSE_FORMAT - 响应格式
     """
 
     TEMPERATURE = "temperature"  # 温度
@@ -119,6 +144,11 @@ class DefaultParameterName(Enum):
 class ParameterType(Enum):
     """
     参数类型的枚举类。
+    
+    FLOAT    - 浮点型
+    INT      - 整型
+    STRING   - 字符串型
+    BOOLEAN - 布尔型
     """
     FLOAT = "float"  # 浮点型
     INT = "int"  # 整型
@@ -129,6 +159,18 @@ class ParameterType(Enum):
 class ModelPropertyKey(Enum):
     """
     模型属性键的枚举类。
+    
+    MODE    - 模式
+    CONTEXT_SIZE - 上下文大小
+    MAX_CHUNKS - 最大块数
+    FILE_UPLOAD_LIMIT - 文件上传限制
+    SUPPORTED_FILE_EXTENSIONS - 支持的文件扩展名
+    MAX_CHARACTERS_PER_CHUNK - 每块最大字符数
+    DEFAULT_VOICE - 默认声音
+    VOICES - 可用声音列表
+    WORD_LIMIT - 字数限制
+    AUDIO_TYPE - 音频类型
+    MAX_WORKERS - 最大工作线程数
     """
     MODE = "mode"  # 模式
     CONTEXT_SIZE = "context_size"  # 上下文大小
@@ -146,6 +188,14 @@ class ModelPropertyKey(Enum):
 class ProviderModel(BaseModel):
     """
     供应商模型的模型类。
+    
+    model - 模型标识符
+    label - 模型的国际化标签
+    model_type - 模型类型
+    features - 模型特性列表
+    fetch_from - 数据获取方式
+    model_properties - 模型的附加属性，键为ModelPropertyKey枚举成员 
+    deprecated - 模型是否已弃用
     """
     model: str  # 模型标识符
     label: I18nObject  # 模型的国际化标签

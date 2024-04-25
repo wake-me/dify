@@ -14,9 +14,21 @@ from core.model_runtime.entities.model_entities import (
     PriceConfig,
 )
 
+# 定义使用的Azure OpenAI API的版本
 AZURE_OPENAI_API_VERSION = '2024-02-15-preview'
 
 def _get_max_tokens(default: int, min_val: int, max_val: int) -> ParameterRule:
+    """
+    获取最大令牌数的参数规则。
+    
+    参数:
+    default: int - 参数的默认值。
+    min_val: int - 参数允许的最小值。
+    max_val: int - 参数允许的最大值。
+    
+    返回:
+    ParameterRule - 设定好的参数规则对象。
+    """
     rule = ParameterRule(
         name='max_tokens',
         **PARAMETER_RULE_TEMPLATE[DefaultParameterName.MAX_TOKENS],
@@ -26,8 +38,14 @@ def _get_max_tokens(default: int, min_val: int, max_val: int) -> ParameterRule:
     rule.max = max_val
     return rule
 
-
 class AzureBaseModel(BaseModel):
+    """
+    Azure基础模型类，用于定义与Azure AI服务交互的基本模型结构。
+    
+    属性:
+    base_model_name: str - 基础模型的名称。
+    entity: AIModelEntity - 表示AI模型的实体对象。
+    """
     base_model_name: str
     entity: AIModelEntity
 
