@@ -104,7 +104,7 @@ class AppGenerateEntity(BaseModel):
     # app config
     app_config: AppConfig
 
-    inputs: dict[str, str]
+    inputs: dict[str, Any]
     files: list[FileVar] = []
     user_id: str
 

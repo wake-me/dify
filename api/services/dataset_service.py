@@ -38,44 +38,39 @@ from services.errors.dataset import DatasetNameDuplicateError
 from services.errors.document import DocumentIndexingError
 from services.errors.file import FileNotExistsError
 from services.feature_service import FeatureModel, FeatureService
+from services.tag_service import TagService
 from services.vector_service import VectorService
 from tasks.clean_notion_document_task import clean_notion_document_task
 from tasks.deal_dataset_vector_index_task import deal_dataset_vector_index_task
 from tasks.delete_segment_from_index_task import delete_segment_from_index_task
 from tasks.document_indexing_task import document_indexing_task
 from tasks.document_indexing_update_task import document_indexing_update_task
+from tasks.duplicate_document_indexing_task import duplicate_document_indexing_task
 from tasks.recover_document_indexing_task import recover_document_indexing_task
+from tasks.retry_document_indexing_task import retry_document_indexing_task
 
 
 class DatasetService:
 
     @staticmethod
-    def get_datasets(page, per_page, provider="vendor", tenant_id=None, user=None):
-        """
-        获取指定条件下的数据集列表。
-
-        参数:
-        - page: 请求的页码
-        - per_page: 每页显示的数量
-        - provider: 数据集提供者，默认为"vendor"
-        - tenant_id: 租户ID，可选
-        - user: 用户对象，如果提供，将根据用户权限过滤数据集
-
-        返回值:
-        - items: 符合条件的数据集列表
-        - total: 符合条件的数据集总数
-        """
-        # 根据是否提供user参数来设置数据集的权限过滤条件
+    def get_datasets(page, per_page, provider="vendor", tenant_id=None, user=None, search=None, tag_ids=None):
         if user:
             permission_filter = db.or_(Dataset.created_by == user.id,
                                     Dataset.permission == 'all_team_members')
         else:
             permission_filter = Dataset.permission == 'all_team_members'
-        # 执行数据库查询，过滤出符合条件的数据集，并进行分页
-        datasets = Dataset.query.filter(
+        query = Dataset.query.filter(
             db.and_(Dataset.provider == provider, Dataset.tenant_id == tenant_id, permission_filter)) \
-            .order_by(Dataset.created_at.desc()) \
-            .paginate(
+            .order_by(Dataset.created_at.desc())
+        if search:
+            query = query.filter(db.and_(Dataset.name.ilike(f'%{search}%')))
+        if tag_ids:
+            target_ids = TagService.get_target_ids_by_tag_ids('knowledge', tenant_id, tag_ids)
+            if target_ids:
+                query = query.filter(db.and_(Dataset.id.in_(target_ids)))
+            else:
+                return [], 0
+        datasets = query.paginate(
             page=page,
             per_page=per_page,
             max_per_page=100,
@@ -265,9 +260,11 @@ class DatasetService:
                 # 为高质量索引技术设置嵌入模型和绑定信息
                 try:
                     model_manager = ModelManager()
-                    embedding_model = model_manager.get_default_model_instance(
+                    embedding_model = model_manager.get_model_instance(
                         tenant_id=current_user.current_tenant_id,
-                        model_type=ModelType.TEXT_EMBEDDING
+                        provider=data['embedding_model_provider'],
+                        model_type=ModelType.TEXT_EMBEDDING,
+                        model=data['embedding_model']
                     )
                     filtered_data['embedding_model'] = embedding_model.model
                     filtered_data['embedding_model_provider'] = embedding_model.provider
@@ -277,15 +274,37 @@ class DatasetService:
                     )
                     filtered_data['collection_binding_id'] = dataset_collection_binding.id
                 except LLMBadRequestError:
-                    # 处理没有可用嵌入模型的错误
                     raise ValueError(
                         "No Embedding Model available. Please configure a valid provider "
                         "in the Settings -> Model Provider.")
                 except ProviderTokenNotInitError as ex:
-                    # 处理提供商令牌未初始化的错误
+                    raise ValueError(ex.description)
+        else:
+            if data['embedding_model_provider'] != dataset.embedding_model_provider or \
+                    data['embedding_model'] != dataset.embedding_model:
+                action = 'update'
+                try:
+                    model_manager = ModelManager()
+                    embedding_model = model_manager.get_model_instance(
+                        tenant_id=current_user.current_tenant_id,
+                        provider=data['embedding_model_provider'],
+                        model_type=ModelType.TEXT_EMBEDDING,
+                        model=data['embedding_model']
+                    )
+                    filtered_data['embedding_model'] = embedding_model.model
+                    filtered_data['embedding_model_provider'] = embedding_model.provider
+                    dataset_collection_binding = DatasetCollectionBindingService.get_dataset_collection_binding(
+                        embedding_model.provider,
+                        embedding_model.model
+                    )
+                    filtered_data['collection_binding_id'] = dataset_collection_binding.id
+                except LLMBadRequestError:
+                    raise ValueError(
+                        "No Embedding Model available. Please configure a valid provider "
+                        "in the Settings -> Model Provider.")
+                except ProviderTokenNotInitError as ex:
                     raise ValueError(ex.description)
 
-        # 更新基本信息和检索模型
         filtered_data['updated_by'] = user.id
         filtered_data['updated_at'] = datetime.datetime.now()
         filtered_data['retrieval_model'] = data['retrieval_model']
@@ -563,6 +582,15 @@ class DocumentService:
         return documents
 
     @staticmethod
+    def get_error_documents_by_dataset_id(dataset_id: str) -> list[Document]:
+        documents = db.session.query(Document).filter(
+            Document.dataset_id == dataset_id,
+            Document.indexing_status == 'error' or Document.indexing_status == 'paused'
+        ).all()
+
+        return documents
+
+    @staticmethod
     def get_batch_documents(dataset_id: str, batch: str) -> list[Document]:
         """
         从数据库中获取指定批次和数据集ID的文档列表。
@@ -697,6 +725,20 @@ class DocumentService:
         recover_document_indexing_task.delay(document.dataset_id, document.id)
 
     @staticmethod
+    def retry_document(dataset_id: str, documents: list[Document]):
+        for document in documents:
+            # retry document indexing
+            document.indexing_status = 'waiting'
+            db.session.add(document)
+            db.session.commit()
+            # add retry flag
+            retry_indexing_cache_key = 'document_{}_is_retried'.format(document.id)
+            redis_client.setex(retry_indexing_cache_key, 600, 1)
+        # trigger async task
+        document_ids = [document.id for document in documents]
+        retry_document_indexing_task.delay(dataset_id, document_ids)
+
+    @staticmethod
     def get_documents_position(dataset_id):
         """
         获取给定数据集ID的第一个文档的位置。
@@ -825,6 +867,7 @@ class DocumentService:
             # 根据数据源类型保存文档
             position = DocumentService.get_documents_position(dataset.id)
             document_ids = []
+            duplicate_document_ids = []
             if document_data["data_source"]["type"] == "upload_file":
                 upload_file_list = document_data["data_source"]["info_list"]['file_info_list']['file_ids']
                 for file_id in upload_file_list:
@@ -841,6 +884,28 @@ class DocumentService:
                     data_source_info = {
                         "upload_file_id": file_id,
                     }
+                    # check duplicate
+                    if document_data.get('duplicate', False):
+                        document = Document.query.filter_by(
+                            dataset_id=dataset.id,
+                            tenant_id=current_user.current_tenant_id,
+                            data_source_type='upload_file',
+                            enabled=True,
+                            name=file_name
+                        ).first()
+                        if document:
+                            document.dataset_process_rule_id = dataset_process_rule.id
+                            document.updated_at = datetime.datetime.utcnow()
+                            document.created_from = created_from
+                            document.doc_form = document_data['doc_form']
+                            document.doc_language = document_data['doc_language']
+                            document.data_source_info = json.dumps(data_source_info)
+                            document.batch = batch
+                            document.indexing_status = 'waiting'
+                            db.session.add(document)
+                            documents.append(document)
+                            duplicate_document_ids.append(document.id)
+                            continue
                     document = DocumentService.build_document(dataset, dataset_process_rule.id,
                                                             document_data["data_source"]["type"],
                                                             document_data["doc_form"],
@@ -907,8 +972,11 @@ class DocumentService:
                         clean_notion_document_task.delay(list(exist_document.values()), dataset.id)
                 db.session.commit()
 
-            # 触发异步任务，进行文档索引
-            document_indexing_task.delay(dataset.id, document_ids)
+            # trigger async task
+            if document_ids:
+                document_indexing_task.delay(dataset.id, document_ids)
+            if duplicate_document_ids:
+                duplicate_document_indexing_task.delay(dataset.id, duplicate_document_ids)
 
         return documents, batch
 
@@ -928,7 +996,8 @@ class DocumentService:
         can_upload_size = features.documents_upload_quota.limit - features.documents_upload_quota.size
         # 如果尝试上传的文档数量超过剩余配额，抛出异常
         if count > can_upload_size:
-            raise ValueError(f'You have reached the limit of your subscription. Only {can_upload_size} documents can be uploaded.')
+            raise ValueError(
+                f'You have reached the limit of your subscription. Only {can_upload_size} documents can be uploaded.')
 
     @staticmethod
     def build_document(dataset: Dataset, process_rule_id: str, data_source_type: str, document_form: str,
@@ -1107,10 +1176,8 @@ class DocumentService:
         }
         DocumentSegment.query.filter_by(document_id=document.id).update(update_params)
         db.session.commit()
-        
-        # 触发异步任务，更新文档索引
+        # trigger async task
         document_indexing_update_task.delay(document.dataset_id, document.id)
-
         return document
 
     @staticmethod

@@ -193,6 +193,7 @@ class BaseAgentRunner(AppRunner):
         # 获取工具的运行时实体，并加载变量池中的变量
         tool_entity = ToolManager.get_agent_tool_runtime(
             tenant_id=self.tenant_id,
+            app_id=self.app_config.app_id,
             agent_tool=tool,
         )
         tool_entity.load_variables(self.variables_pool)

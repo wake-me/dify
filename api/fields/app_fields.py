@@ -64,8 +64,14 @@ prompt_config_fields = {
 
 # 定义部分模型配置的字段结构，用于更新等操作
 model_config_partial_fields = {
-    'model': fields.Raw(attribute='model_dict'),  # 模型配置
-    'pre_prompt': fields.String,  # 提示信息
+    'model': fields.Raw(attribute='model_dict'),
+    'pre_prompt': fields.String,
+}
+
+tag_fields = {
+    'id': fields.String,
+    'name': fields.String,
+    'type': fields.String
 }
 
 # 定义与应用程序相关的部分字段及其类型
@@ -77,10 +83,11 @@ app_partial_fields = {
     'icon': fields.String,
     'icon_background': fields.String,
     'model_config': fields.Nested(model_config_partial_fields, attribute='app_model_config', allow_null=True),
-    'created_at': TimestampField
+    'created_at': TimestampField,
+    'tags': fields.List(fields.Nested(tag_fields))
 }
 
-# 定义分页查询时的应用程序字段
+
 app_pagination_fields = {
     'page': fields.Integer,  # 当前页码
     'limit': fields.Integer(attribute='per_page'),  # 每页记录数

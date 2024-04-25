@@ -39,22 +39,8 @@ class AdvancedPromptTransform(PromptTransform):
                    memory_config: Optional[MemoryConfig],
                    memory: Optional[TokenBufferMemory],
                    model_config: ModelConfigWithCredentialsEntity) -> list[PromptMessage]:
-        """
-        根据模型模式获取相应的提示消息。
+        inputs = {key: str(value) for key, value in inputs.items()}
 
-        参数:
-        prompt_template: 提示模板，可以是聊天模型消息列表或完成模型提示模板。
-        inputs: 输入参数字典。
-        query: 查询字符串。
-        files: 文件变量列表。
-        context: 上下文字符串，可选。
-        memory_config: 内存配置，可选。
-        memory: 令牌缓冲区内存，可选。
-        model_config: 带有凭证实体的模型配置。
-
-        返回值:
-        list[PromptMessage]: 提示消息列表。
-        """
         prompt_messages = []
 
         model_mode = ModelMode.value_of(model_config.mode)

@@ -38,22 +38,28 @@ class BaseAppGenerator:
 
             # 验证字段值是否为字符串类型
             if value:
-                if not isinstance(value, str):
+                if variable_config.type != VariableEntity.Type.NUMBER and not isinstance(value, str):
                     raise ValueError(f"{variable} in input form must be a string")
+                elif variable_config.type == VariableEntity.Type.NUMBER and isinstance(value, str):
+                    if '.' in value:
+                        value = float(value)
+                    else:
+                        value = int(value)
 
             # 处理选择类型字段的选项验证
             if variable_config.type == VariableEntity.Type.SELECT:
                 options = variable_config.options if variable_config.options is not None else []
                 if value not in options:
                     raise ValueError(f"{variable} in input form must be one of the following: {options}")
-            else:
-                # 验证字段值长度是否符合最大长度限制
+            elif variable_config.type in [VariableEntity.Type.TEXT_INPUT, VariableEntity.Type.PARAGRAPH]:
                 if variable_config.max_length is not None:
                     max_length = variable_config.max_length
                     if len(value) > max_length:
                         raise ValueError(f'{variable} in input form must be less than {max_length} characters')
 
-            # 移除字符串中的空字符，并将空字符串置为None
-            filtered_inputs[variable] = value.replace('\x00', '') if value else None
+            if value and isinstance(value, str):
+                filtered_inputs[variable] = value.replace('\x00', '')
+            else:
+                filtered_inputs[variable] = value if value else None
 
         return filtered_inputs

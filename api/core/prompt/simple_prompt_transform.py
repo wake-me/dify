@@ -58,19 +58,8 @@ class SimplePromptTransform(PromptTransform):
                    memory: Optional[TokenBufferMemory],
                    model_config: ModelConfigWithCredentialsEntity) -> \
             tuple[list[PromptMessage], Optional[list[str]]]:
-        """
-        根据应用模式、模型配置和输入获取提示消息。
+        inputs = {key: str(value) for key, value in inputs.items()}
 
-        :param app_mode: 应用模式。
-        :param prompt_template_entity: 提示模板实体，包含简单提示模板。
-        :param inputs: 输入参数字典。
-        :param query: 查询字符串。
-        :param files: 文件列表。
-        :param context: 上下文字符串。
-        :param memory: 令牌缓冲区内存，用于存储会话历史等。
-        :param model_config: 带有凭证的模型配置实体。
-        :return: 提示消息列表和停止标志列表的元组。
-        """
         model_mode = ModelMode.value_of(model_config.mode)
         if model_mode == ModelMode.CHAT:
             # 如果是聊天模式，获取聊天模型的提示消息

@@ -12,20 +12,13 @@ class ToolParameterCacheType(Enum):
 
 class ToolParameterCache:
     def __init__(self, 
-                 tenant_id: str,  # 租户ID
-                 provider: str,  # 提供者名称
-                 tool_name: str,  # 工具名称
-                 cache_type: ToolParameterCacheType  # 缓存类型
+            tenant_id: str, 
+            provider: str, 
+            tool_name: str, 
+            cache_type: ToolParameterCacheType,
+            identity_id: str
         ):
-        """
-        初始化工具参数缓存对象。
-
-        :param tenant_id: 租户ID，字符串类型。
-        :param provider: 提供者名称，字符串类型。
-        :param tool_name: 工具名称，字符串类型。
-        :param cache_type: 工具参数缓存类型，ToolParameterCacheType枚举类型。
-        """
-        self.cache_key = f"{cache_type.value}_secret:tenant_id:{tenant_id}:provider:{provider}:tool_name:{tool_name}"
+        self.cache_key = f"{cache_type.value}_secret:tenant_id:{tenant_id}:provider:{provider}:tool_name:{tool_name}:identity_id:{identity_id}"
 
     def get(self) -> Optional[dict]:
         """
