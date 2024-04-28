@@ -38,7 +38,8 @@ class AdvancedPromptTransform(PromptTransform):
                    context: Optional[str],
                    memory_config: Optional[MemoryConfig],
                    memory: Optional[TokenBufferMemory],
-                   model_config: ModelConfigWithCredentialsEntity) -> list[PromptMessage]:
+                   model_config: ModelConfigWithCredentialsEntity,
+                   query_prompt_template: Optional[str] = None) -> list[PromptMessage]:
         inputs = {key: str(value) for key, value in inputs.items()}
 
         prompt_messages = []
@@ -62,6 +63,7 @@ class AdvancedPromptTransform(PromptTransform):
                 prompt_template=prompt_template,
                 inputs=inputs,
                 query=query,
+                query_prompt_template=query_prompt_template,
                 files=files,
                 context=context,
                 memory_config=memory_config,
@@ -153,7 +155,8 @@ class AdvancedPromptTransform(PromptTransform):
                                         context: Optional[str],
                                         memory_config: Optional[MemoryConfig],
                                         memory: Optional[TokenBufferMemory],
-                                        model_config: ModelConfigWithCredentialsEntity) -> list[PromptMessage]:
+                                        model_config: ModelConfigWithCredentialsEntity,
+                                        query_prompt_template: Optional[str] = None) -> list[PromptMessage]:
         """
         获取聊天模型的提示消息。
         
@@ -198,7 +201,20 @@ class AdvancedPromptTransform(PromptTransform):
             elif prompt_item.role == PromptMessageRole.ASSISTANT:
                 prompt_messages.append(AssistantPromptMessage(content=prompt))
 
-        # 如果存在记忆配置和内存，追加对话历史
+        if query and query_prompt_template:
+            prompt_template = PromptTemplateParser(
+                template=query_prompt_template,
+                with_variable_tmpl=self.with_variable_tmpl
+            )
+            prompt_inputs = {k: inputs[k] for k in prompt_template.variable_keys if k in inputs}
+            prompt_inputs['#sys.query#'] = query
+
+            prompt_inputs = self._set_context_variable(context, prompt_template, prompt_inputs)
+
+            query = prompt_template.format(
+                prompt_inputs
+            )
+
         if memory and memory_config:
             prompt_messages = self._append_chat_histories(memory, memory_config, prompt_messages, model_config)
 

@@ -749,8 +749,7 @@ class DatasetRetrievalSettingApi(Resource):
             dict: 包含一个名为'retrieval_method'的列表键，列表中包含支持的检索方法。
         """
         vector_type = current_app.config['VECTOR_STORE']
-        # 根据不同的向量存储类型，返回不同的检索方法配置
-        if vector_type == 'milvus':
+        if vector_type == 'milvus' or vector_type == 'relyt':
             return {
                 'retrieval_method': [
                     'semantic_search'
@@ -785,19 +784,8 @@ class DatasetRetrievalSettingMockApi(Resource):
     @login_required
     @account_initialization_required
     def get(self, vector_type):
-        """
-        根据提供的向量数据库类型，返回相应的检索方法配置。
-        
-        参数:
-        - vector_type: 字符串，指定的向量数据库类型。
-        
-        返回值:
-        - 一个字典，包含支持的检索方法列表。
-        - 如果提供的向量数据库类型不支持，则抛出ValueError异常。
-        """
-        
-        # 根据不同的向量数据库类型返回不同的检索方法配置
-        if vector_type == 'milvus':
+
+        if vector_type == 'milvus' or vector_type == 'relyt':
             return {
                 'retrieval_method': [
                     'semantic_search'

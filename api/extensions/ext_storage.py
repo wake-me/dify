@@ -1,3 +1,4 @@
+import base64
 import os
 import shutil
 from collections.abc import Generator
@@ -6,10 +7,12 @@ from datetime import datetime, timedelta, timezone
 from typing import Union
 
 import boto3
+import oss2 as aliyun_s3
 from azure.storage.blob import AccountSasPermissions, BlobServiceClient, ResourceTypes, generate_account_sas
 from botocore.client import Config
 from botocore.exceptions import ClientError
 from flask import Flask
+from google.cloud import storage as GoogleStorage
 
 
 class Storage:
@@ -54,7 +57,18 @@ class Storage:
             )
             self.client = BlobServiceClient(account_url=app.config.get('AZURE_BLOB_ACCOUNT_URL'),
                                             credential=sas_token)
-
+        elif self.storage_type == 'aliyun-oss':
+            self.bucket_name = app.config.get('ALIYUN_OSS_BUCKET_NAME')
+            self.client = aliyun_s3.Bucket(
+                aliyun_s3.Auth(app.config.get('ALIYUN_OSS_ACCESS_KEY'), app.config.get('ALIYUN_OSS_SECRET_KEY')),
+                app.config.get('ALIYUN_OSS_ENDPOINT'),
+                self.bucket_name,
+                connect_timeout=30
+            )
+        elif self.storage_type == 'google-storage':
+            self.bucket_name = app.config.get('GOOGLE_STORAGE_BUCKET_NAME')
+            service_account_json = base64.b64decode(app.config.get('GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64')).decode('utf-8')
+            self.client = GoogleStorage.Client().from_service_account_json(service_account_json)
         else:
             # 配置本地文件存储
             self.folder = app.config.get('STORAGE_LOCAL_PATH')
@@ -80,6 +94,12 @@ class Storage:
             # 如果存储类型为Azure Blob，则使用Azure客户端将数据上传到指定的容器中。
             blob_container = self.client.get_container_client(container=self.bucket_name)
             blob_container.upload_blob(filename, data)
+        elif self.storage_type == 'aliyun-oss':
+            self.client.put_object(filename, data)
+        elif self.storage_type == 'google-storage':
+            bucket = self.client.get_bucket(self.bucket_name)
+            blob = bucket.blob(filename)
+            blob.upload_from_file(data)
         else:
             # 如果存储类型既不是S3也不是Azure Blob，则将数据保存到本地文件系统。
             if not self.folder or self.folder.endswith('/'):
@@ -143,6 +163,13 @@ class Storage:
             blob = self.client.get_container_client(container=self.bucket_name)
             blob = blob.get_blob_client(blob=filename)
             data = blob.download_blob().readall()
+        elif self.storage_type == 'aliyun-oss':
+            with closing(self.client.get_object(filename)) as obj:
+                data = obj.read()
+        elif self.storage_type == 'google-storage':
+            bucket = self.client.get_bucket(self.bucket_name)
+            blob = bucket.get_blob(filename)
+            data = blob.download_as_bytes()
         else:
             # 从本地文件系统中读取文件内容
             if not self.folder or self.folder.endswith('/'):
@@ -190,6 +217,16 @@ class Storage:
                 with closing(blob.download_blob()) as blob_stream:
                     while chunk := blob_stream.readall(4096):
                         yield chunk
+            elif self.storage_type == 'aliyun-oss':
+                with closing(self.client.get_object(filename)) as obj:
+                    while chunk := obj.read(4096):
+                        yield chunk
+            elif self.storage_type == 'google-storage':
+                bucket = self.client.get_bucket(self.bucket_name)
+                blob = bucket.get_blob(filename)
+                with closing(blob.open(mode='rb')) as blob_stream:
+                    while chunk := blob_stream.read(4096):
+                        yield chunk
             else:
                 # 从本地文件系统加载文件
                 if not self.folder or self.folder.endswith('/'):
@@ -223,6 +260,14 @@ class Storage:
         elif self.storage_type == 'azure-blob':
             # 使用Azure Blob存储下载文件
             blob = self.client.get_blob_client(container=self.bucket_name, blob=filename)
+            with open(target_filepath, "wb") as my_blob:
+                blob_data = blob.download_blob()
+                blob_data.readinto(my_blob)
+        elif self.storage_type == 'aliyun-oss':
+            self.client.get_object_to_file(filename, target_filepath)
+        elif self.storage_type == 'google-storage':
+            bucket = self.client.get_bucket(self.bucket_name)
+            blob = bucket.get_blob(filename)
             with open(target_filepath, "wb") as my_blob:
                 blob_data = blob.download_blob()
                 blob_data.readinto(my_blob)
@@ -262,6 +307,12 @@ class Storage:
             # 对于azure-blob存储，直接调用exists方法检查文件是否存在
             blob = self.client.get_blob_client(container=self.bucket_name, blob=filename)
             return blob.exists()
+        elif self.storage_type == 'aliyun-oss':
+            return self.client.object_exists(filename)
+        elif self.storage_type == 'google-storage':
+            bucket = self.client.get_bucket(self.bucket_name)
+            blob = bucket.blob(filename)
+            return blob.exists()
         else:
             # 对于本地文件系统，拼接文件路径并使用os.path.exists检查文件是否存在
             if not self.folder or self.folder.endswith('/'):
@@ -292,6 +343,11 @@ class Storage:
             # 获取blob容器客户端并删除指定的blob
             blob_container = self.client.get_container_client(container=self.bucket_name)
             blob_container.delete_blob(filename)
+        elif self.storage_type == 'aliyun-oss':
+            self.client.delete_object(filename)
+        elif self.storage_type == 'google-storage':
+            bucket = self.client.get_bucket(self.bucket_name)
+            bucket.delete_blob(filename)
         else:
             # 处理本地文件系统的文件删除
             if not self.folder or self.folder.endswith('/'):

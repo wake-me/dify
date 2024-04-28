@@ -8,6 +8,7 @@ dotenv.load_dotenv()
 
 # 默认配置字典，包含数据库、Redis、OAuth、Console和文件存储等服务的配置项
 DEFAULTS = {
+    'EDITION': 'SELF_HOSTED',
     'DB_USERNAME': 'postgres',
     'DB_PASSWORD': '',
     'DB_HOST': 'localhost',
@@ -137,9 +138,9 @@ class Config:
         # ------------------------
         # General Configurations.
         # ------------------------
-        self.CURRENT_VERSION = "0.6.4"
+        self.CURRENT_VERSION = "0.6.5"
         self.COMMIT_SHA = get_env('COMMIT_SHA')
-        self.EDITION = "SELF_HOSTED"
+        self.EDITION = get_env('EDITION')
         self.DEPLOY_ENV = get_env('DEPLOY_ENV')
         self.TESTING = False
         self.LOG_LEVEL = get_env('LOG_LEVEL')
@@ -222,6 +223,12 @@ class Config:
         self.AZURE_BLOB_ACCOUNT_KEY = get_env('AZURE_BLOB_ACCOUNT_KEY')
         self.AZURE_BLOB_CONTAINER_NAME = get_env('AZURE_BLOB_CONTAINER_NAME')
         self.AZURE_BLOB_ACCOUNT_URL = get_env('AZURE_BLOB_ACCOUNT_URL')
+        self.ALIYUN_OSS_BUCKET_NAME=get_env('ALIYUN_OSS_BUCKET_NAME')
+        self.ALIYUN_OSS_ACCESS_KEY=get_env('ALIYUN_OSS_ACCESS_KEY')
+        self.ALIYUN_OSS_SECRET_KEY=get_env('ALIYUN_OSS_SECRET_KEY')
+        self.ALIYUN_OSS_ENDPOINT=get_env('ALIYUN_OSS_ENDPOINT')
+        self.GOOGLE_STORAGE_BUCKET_NAME = get_env('GOOGLE_STORAGE_BUCKET_NAME')
+        self.GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64 = get_env('GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64')
 
         # ------------------------
         # Vector Store Configurations.
@@ -264,8 +271,10 @@ class Config:
         self.SMTP_USERNAME = get_env('SMTP_USERNAME')
         self.SMTP_PASSWORD = get_env('SMTP_PASSWORD')
         self.SMTP_USE_TLS = get_bool_env('SMTP_USE_TLS')
-
-        # 初始化工作区配置
+        
+        # ------------------------
+        # Workspace Configurations.
+        # ------------------------
         self.INVITE_EXPIRY_HOURS = int(get_env('INVITE_EXPIRY_HOURS'))
 
         # 初始化Sentry配置
@@ -288,7 +297,15 @@ class Config:
         self.NOTION_INTERNAL_SECRET = get_env('NOTION_INTERNAL_SECRET')
         self.NOTION_INTEGRATION_TOKEN = get_env('NOTION_INTEGRATION_TOKEN')
 
-        # 初始化平台配置
+        # ------------------------
+        # Platform Configurations.
+        # ------------------------
+        self.GITHUB_CLIENT_ID = get_env('GITHUB_CLIENT_ID')
+        self.GITHUB_CLIENT_SECRET = get_env('GITHUB_CLIENT_SECRET')
+        self.GOOGLE_CLIENT_ID = get_env('GOOGLE_CLIENT_ID')
+        self.GOOGLE_CLIENT_SECRET = get_env('GOOGLE_CLIENT_SECRET')
+        self.OAUTH_REDIRECT_PATH = get_env('OAUTH_REDIRECT_PATH')
+
         self.HOSTED_OPENAI_API_KEY = get_env('HOSTED_OPENAI_API_KEY')
         self.HOSTED_OPENAI_API_BASE = get_env('HOSTED_OPENAI_API_BASE')
         self.HOSTED_OPENAI_API_ORGANIZATION = get_env('HOSTED_OPENAI_API_ORGANIZATION')
@@ -329,23 +346,3 @@ class Config:
         self.TOOL_ICON_CACHE_MAX_AGE = get_env('TOOL_ICON_CACHE_MAX_AGE')
         self.KEYWORD_DATA_SOURCE_TYPE = get_env('KEYWORD_DATA_SOURCE_TYPE')
         self.ENTERPRISE_ENABLED = get_bool_env('ENTERPRISE_ENABLED')
-
-
-class CloudEditionConfig(Config):
-    """
-    云版本配置类，继承自Config类。用于设置和管理云版本相关的配置信息。
-    """
-    def __init__(self):
-        """
-        初始化CloudEditionConfig类的实例。
-        """
-        super().__init__()  # 调用父类的构造函数进行初始化
-
-        self.EDITION = "CLOUD"  # 设置版本类型为“云”
-
-        # 从环境变量中获取OAuth相关配置
-        self.GITHUB_CLIENT_ID = get_env('GITHUB_CLIENT_ID')
-        self.GITHUB_CLIENT_SECRET = get_env('GITHUB_CLIENT_SECRET')
-        self.GOOGLE_CLIENT_ID = get_env('GOOGLE_CLIENT_ID')
-        self.GOOGLE_CLIENT_SECRET = get_env('GOOGLE_CLIENT_SECRET')
-        self.OAUTH_REDIRECT_PATH = get_env('OAUTH_REDIRECT_PATH')  # OAuth重定向路径

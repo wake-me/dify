@@ -121,8 +121,8 @@ class MessageCycleManage:
         处理检索资源事件。
         :param event: 事件对象，包含检索资源的信息。
         """
-        # 将检索到的资源信息更新到任务状态的元数据中
-        self._task_state.metadata['retriever_resources'] = event.retriever_resources
+        if self._application_generate_entity.app_config.additional_features.show_retrieve_source:
+            self._task_state.metadata['retriever_resources'] = event.retriever_resources
 
     def _get_response_metadata(self) -> dict:
         """

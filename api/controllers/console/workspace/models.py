@@ -11,6 +11,7 @@ from core.model_runtime.entities.model_entities import ModelType
 from core.model_runtime.errors.validate import CredentialsValidateFailedError
 from core.model_runtime.utils.encoders import jsonable_encoder
 from libs.login import login_required
+from models.account import TenantAccountRole
 from services.model_provider_service import ModelProviderService
 
 
@@ -136,25 +137,7 @@ class ModelProviderModelApi(Resource):
     @login_required
     @account_initialization_required
     def post(self, provider: str):
-        """
-        为指定提供者和模型添加认证信息。
-        
-        参数:
-        - provider: 模型提供者的标识符。
-        
-        请求体:
-        - model: 模型的标识符。
-        - model_type: 模型的类型。
-        - credentials: 模型访问所需的认证信息。
-        
-        返回值:
-        - 一个表示操作成功的JSON对象，以及状态码200。
-        
-        异常:
-        - Forbidden: 如果当前用户角色不是管理员或所有者。
-        """
-        # 检查用户角色是否具有权限
-        if current_user.current_tenant.current_role not in ['admin', 'owner']:
+        if not TenantAccountRole.is_privileged_role(current_user.current_tenant.current_role):
             raise Forbidden()
 
         tenant_id = current_user.current_tenant_id  # 获取当前租户ID
@@ -188,24 +171,7 @@ class ModelProviderModelApi(Resource):
     @login_required
     @account_initialization_required
     def delete(self, provider: str):
-        """
-        删除指定提供者和模型的认证信息。
-        
-        参数:
-        - provider: 模型提供者的标识符。
-        
-        请求体:
-        - model: 模型的标识符。
-        - model_type: 模型的类型。
-        
-        返回值:
-        - 一个表示操作成功的JSON对象，以及状态码204。
-        
-        异常:
-        - Forbidden: 如果当前用户角色不是管理员或所有者。
-        """
-        # 检查用户角色是否具有权限
-        if current_user.current_tenant.current_role not in ['admin', 'owner']:
+        if not TenantAccountRole.is_privileged_role(current_user.current_tenant.current_role):
             raise Forbidden()
 
         tenant_id = current_user.current_tenant_id  # 获取当前租户ID

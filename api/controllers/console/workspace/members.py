@@ -9,7 +9,7 @@ from controllers.console.wraps import account_initialization_required, cloud_edi
 from extensions.ext_database import db
 from fields.member_fields import account_with_role_list_fields
 from libs.login import login_required
-from models.account import Account
+from models.account import Account, TenantAccountRole
 from services.account_service import RegisterService, TenantService
 from services.errors.account import AccountAlreadyInTenantError
 
@@ -66,8 +66,7 @@ class MemberInviteEmailApi(Resource):
         invitee_emails = args['emails']
         invitee_role = args['role']
         interface_language = args['language']
-        # 检查角色是否有效
-        if invitee_role not in ['admin', 'normal']:
+        if invitee_role not in [TenantAccountRole.ADMIN, TenantAccountRole.NORMAL]:
             return {'code': 'invalid-role', 'message': 'Invalid role'}, 400
 
         # 获取当前邀请人

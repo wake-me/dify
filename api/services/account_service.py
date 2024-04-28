@@ -596,9 +596,9 @@ class TenantService:
 
         # 定义可执行操作及其所需权限
         perms = {
-            'add': ['owner', 'admin'],
-            'remove': ['owner'],
-            'update': ['owner']
+            'add': [TenantAccountRole.OWNER, TenantAccountRole.ADMIN],
+            'remove': [TenantAccountRole.OWNER],
+            'update': [TenantAccountRole.OWNER]
         }
 
         # 检查操作类型是否有效

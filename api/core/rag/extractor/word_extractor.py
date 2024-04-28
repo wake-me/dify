@@ -36,8 +36,7 @@ class WordExtractor(BaseExtractor):
             # 下载失败时抛出异常
             if r.status_code != 200:
                 raise ValueError(
-                    "Check the url of your file; returned status code %s"
-                    % r.status_code
+                    f"Check the url of your file; returned status code {r.status_code}"
                 )
 
             self.web_path = self.file_path
@@ -45,8 +44,7 @@ class WordExtractor(BaseExtractor):
             self.temp_file.write(r.content)
             self.file_path = self.temp_file.name
         elif not os.path.isfile(self.file_path):
-            # 如果文件路径无效，抛出异常
-            raise ValueError("File path %s is not a valid file or url" % self.file_path)
+            raise ValueError(f"File path {self.file_path} is not a valid file or url")
 
     def __del__(self) -> None:
         # 析构函数，确保临时文件被关闭
