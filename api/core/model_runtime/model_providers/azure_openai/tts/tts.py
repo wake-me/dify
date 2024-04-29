@@ -14,7 +14,6 @@ from core.model_runtime.errors.validate import CredentialsValidateFailedError
 from core.model_runtime.model_providers.__base.tts_model import TTSModel
 from core.model_runtime.model_providers.azure_openai._common import _CommonAzureOpenAI
 from core.model_runtime.model_providers.azure_openai._constant import TTS_BASE_MODELS, AzureBaseModel
-from extensions.ext_storage import storage
 
 
 class AzureOpenAIText2SpeechModel(_CommonAzureOpenAI, TTSModel):

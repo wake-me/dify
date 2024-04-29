@@ -18,6 +18,7 @@ from pydantic.types import SecretBytes, SecretStr
 
 from ._compat import PYDANTIC_V2, Url, _model_dump
 
+
 # 从Pydantic v1直接获取，未做修改
 def isoformat(o: Union[datetime.date, datetime.time]) -> str:
     """

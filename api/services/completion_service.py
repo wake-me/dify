@@ -4,8 +4,8 @@ from typing import Any, Union
 
 from sqlalchemy import and_
 
-from core.application_manager import ApplicationManager
 from core.app.entities.app_invoke_entities import InvokeFrom
+from core.application_manager import ApplicationManager
 from core.file.message_file_parser import MessageFileParser
 from extensions.ext_database import db
 from models.model import Account, App, AppModelConfig, Conversation, EndUser, Message

@@ -1,6 +1,5 @@
 from libs.exception import BaseHTTPException
 
-
 # 定义了一系列与用户账户操作相关的HTTP异常类，用于处理不同的错误情况
 
 class RepeatPasswordNotMatchError(BaseHTTPException):

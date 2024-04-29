@@ -9,13 +9,9 @@ from core.entities.provider_entities import QuotaConfiguration
 from core.model_runtime.entities.common_entities import I18nObject
 from core.model_runtime.entities.model_entities import ModelType, ProviderModel
 from core.model_runtime.entities.provider_entities import (
-    ConfigurateMethod,
-    ModelCredentialSchema,
-    ProviderCredentialSchema,
-    ProviderHelpEntity,
     SimpleProviderEntity,
 )
-from models.provider import ProviderQuotaType, ProviderType
+from models.provider import ProviderQuotaType
 
 
 class CustomConfigurationStatus(Enum):

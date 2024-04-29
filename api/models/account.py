@@ -9,6 +9,7 @@ from sqlalchemy.dialects.postgresql import UUID
 # 导入数据库扩展
 from extensions.ext_database import db
 
+
 #
 class AccountStatus(str, enum.Enum):
     """

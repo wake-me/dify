@@ -20,6 +20,7 @@ from core.app.app_config.features.suggested_questions_after_answer.manager impor
 from core.app.app_config.features.text_to_speech.manager import TextToSpeechConfigManager
 from core.entities.agent_entities import PlanningStrategy
 from models.model import App, AppMode, AppModelConfig, Conversation
+
 # 定义一个旧工具列表
 OLD_TOOLS = ["dataset", "google_search", "web_reader", "wikipedia", "current_datetime"]
 

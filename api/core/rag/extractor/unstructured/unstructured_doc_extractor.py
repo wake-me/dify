@@ -49,7 +49,7 @@ class UnstructuredWordExtractor(BaseExtractor):
 
         # 检查文件扩展名以确定是否为.doc文件
         try:
-            import magic  # 用于文件类型检测，若未安装则尝试基于扩展名判断
+            import magic  # noqa: F401
 
             is_doc = detect_filetype(self._file_path) == FileType.DOC
         except ImportError:

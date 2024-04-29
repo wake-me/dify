@@ -1,6 +1,5 @@
 from libs.exception import BaseHTTPException
 
-
 # 定义一系列的HTTP异常，用于处理应用程序在请求过程中可能出现的错误。
 
 class AppUnavailableError(BaseHTTPException):

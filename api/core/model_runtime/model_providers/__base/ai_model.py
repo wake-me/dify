@@ -21,15 +21,12 @@ from core.model_runtime.model_providers.__base.tokenizers.gpt2_tokenzier import 
 from core.utils.position_helper import get_position_map, sort_by_position_map
 
 
-from abc import ABC, abstractmethod
-from typing import List, Dict, Type
-
 class AIModel(ABC):
     """
     所有模型的基类。
     """
     model_type: ModelType  # 模型类型
-    model_schemas: List[AIModelEntity] = None  # 模型架构列表
+    model_schemas: list[AIModelEntity] = None  # 模型架构列表
     started_at: float = 0  # 模型启动时间（秒）
 
     @abstractmethod
@@ -45,7 +42,7 @@ class AIModel(ABC):
 
     @property
     @abstractmethod
-    def _invoke_error_mapping(self) -> Dict[Type[InvokeError], List[Type[Exception]]]:
+    def _invoke_error_mapping(self) -> dict[type[InvokeError], list[type[Exception]]]:
         """
         将模型调用错误映射到统一错误。
         键是抛给调用者的错误类型；

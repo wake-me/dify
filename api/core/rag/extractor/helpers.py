@@ -4,8 +4,6 @@ import concurrent.futures
 from typing import NamedTuple, Optional, cast
 
 
-from collections import NamedTuple
-
 # 定义一个文件编码信息的命名元组
 class FileEncoding(NamedTuple):
     """

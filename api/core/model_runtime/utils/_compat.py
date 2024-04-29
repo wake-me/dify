@@ -23,7 +23,6 @@ if PYDANTIC_V2:
         """
         return model.model_dump(mode=mode, **kwargs)
 else:
-    from pydantic import AnyUrl as Url  # pydantic 1.x 版本的 Url 类，此处导入但未使用
 
     def _model_dump(
         model: BaseModel, mode: Literal["json", "python"] = "json", **kwargs: Any
