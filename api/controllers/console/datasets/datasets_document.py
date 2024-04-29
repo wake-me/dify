@@ -730,54 +730,6 @@ class DocumentBatchIndexingStatusApi(DocumentResource):
         return data  # 返回文档状态数据
 
 
-class DocumentIndexingStatusApi(DocumentResource):
-    """
-    文档索引状态API，用于获取特定文档的索引状态信息。
-    
-    Attributes:
-        Inherits attributes from DocumentResource
-    """
-
-    @setup_required
-    @login_required
-    @account_initialization_required
-    def get(self, dataset_id, document_id):
-        """
-        获取指定数据集和文档的索引状态。
-        
-        Args:
-            dataset_id (int): 数据集的ID。
-            document_id (int): 文档的ID。
-        
-        Returns:
-            dict: 包含文档索引状态信息的字典，如完成的段落数、总段落数和索引状态。
-        """
-        # 将传入的ID转换为字符串格式
-        dataset_id = str(dataset_id)
-        document_id = str(document_id)
-        # 获取指定文档对象
-        document = self.get_document(dataset_id, document_id)
-
-        # 计算已完成的段落数量
-        completed_segments = DocumentSegment.query \
-            .filter(DocumentSegment.completed_at.isnot(None),
-                    DocumentSegment.document_id == str(document_id),
-                    DocumentSegment.status != 're_segment') \
-            .count()
-        # 计算总共的段落数量
-        total_segments = DocumentSegment.query \
-            .filter(DocumentSegment.document_id == str(document_id),
-                    DocumentSegment.status != 're_segment') \
-            .count()
-
-        # 更新文档对象的完成段落数和总段落数
-        document.completed_segments = completed_segments
-        document.total_segments = total_segments
-        # 如果文档暂停，则更新索引状态为'paused'
-        if document.is_paused:
-            document.indexing_status = 'paused'
-        # 返回处理后的文档状态信息
-        return marshal(document, document_status_fields)
 
 
 class DocumentIndexingStatusApi(DocumentResource):
