@@ -13,17 +13,32 @@ class ToolFileMessageTransformer:
                                        tenant_id: str,
                                        conversation_id: str) -> list[ToolInvokeMessage]:
         """
-        Transform tool message and handle file download
+        转换工具调用消息并处理文件下载。
+
+        此方法处理ToolInvokeMessage对象列表，根据其类型进行转换。
+        特别处理图像和二进制大对象(BLOB)类型的消息，尝试下载或存储它们。
+        转换后的消息作为列表返回。
+
+        参数:
+        - messages: 待转换的ToolInvokeMessage对象列表。
+        - user_id: 发起消息转换的用户ID。
+        - tenant_id: 用户所属租户的ID。
+        - conversation_id: 消息发送所在对话的唯一标识符。
+
+        返回:
+        转换后的ToolInvokeMessage对象列表。图像和BLOB类型的消息可能被转换为IMAGE_LINK或LINK类型。
         """
-        result = []
+
+        result = []  # 用于存放转换后的消息
 
         for message in messages:
+            # 针对不同消息类型分别处理
             if message.type == ToolInvokeMessage.MessageType.TEXT:
-                result.append(message)
+                result.append(message)  # 直接添加文本消息
             elif message.type == ToolInvokeMessage.MessageType.LINK:
-                result.append(message)
+                result.append(message)  # 直接添加链接消息
             elif message.type == ToolInvokeMessage.MessageType.IMAGE:
-                # try to download image
+                # 尝试下载并转换图像消息为IMAGE_LINK类型
                 try:
                     file = ToolFileManager.create_file_by_url(
                         user_id=user_id, 
@@ -42,6 +57,7 @@ class ToolFileMessageTransformer:
                     ))
                 except Exception as e:
                     logger.exception(e)
+                    # 图像下载失败时的备选文本消息
                     result.append(ToolInvokeMessage(
                         type=ToolInvokeMessage.MessageType.TEXT,
                         message=f"Failed to download image: {message.message}, you can try to download it yourself.",
@@ -49,9 +65,9 @@ class ToolFileMessageTransformer:
                         save_as=message.save_as,
                     ))
             elif message.type == ToolInvokeMessage.MessageType.BLOB:
-                # get mime type and save blob to storage
+                # 处理BLOB类型消息，存储并根据MIME类型转换为IMAGE_LINK或LINK类型
                 mimetype = message.meta.get('mime_type', 'octet/stream')
-                # if message is str, encode it to bytes
+                
                 if isinstance(message.message, str):
                     message.message = message.message.encode('utf-8')
                 
@@ -64,7 +80,7 @@ class ToolFileMessageTransformer:
                                                             
                 url = f'/files/tools/{file.id}{guess_extension(file.mimetype) or ".bin"}'
 
-                # check if file is image
+                # 根据MIME类型判断消息类型：如果是图像则为IMAGE_LINK，否则为LINK
                 if 'image' in mimetype:
                     result.append(ToolInvokeMessage(
                         type=ToolInvokeMessage.MessageType.IMAGE_LINK,
@@ -80,6 +96,7 @@ class ToolFileMessageTransformer:
                         meta=message.meta.copy() if message.meta is not None else {},
                     ))
             else:
+                # 未处理的消息类型直接传递
                 result.append(message)
 
-        return result
+        return result  # 返回转换后的消息列表

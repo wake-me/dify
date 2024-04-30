@@ -17,10 +17,22 @@ from core.tools.errors import ToolApiSchemaError, ToolNotSupportedError, ToolPro
 class ApiBasedToolSchemaParser:
     @staticmethod
     def parse_openapi_to_tool_bundle(openapi: dict, extra_info: dict = None, warning: dict = None) -> list[ApiBasedToolBundle]:
+        """
+        将 OpenAPI 规范解析为工具捆绑包列表。
+
+        参数:
+        - openapi: dict, 符合 OpenAPI 规范的字典。
+        - extra_info: dict, 额外的信息字典，用于存储从 OpenAPI 中提取的非参数信息，默认为 None。
+        - warning: dict, 警告信息字典，用于存储解析过程中发现的警告信息，默认为 None。
+
+        返回值:
+        - list[ApiBasedToolBundle], 根据 OpenAPI 规范解析得到的工具捆绑包列表。
+        """
+
         warning = warning if warning is not None else {}
         extra_info = extra_info if extra_info is not None else {}
 
-        # set description to extra_info
+        # 将 OpenAPI 中的描述信息添加到 extra_info 中
         if 'description' in openapi['info']:
             extra_info['description'] = openapi['info']['description']
         else:
@@ -31,7 +43,7 @@ class ApiBasedToolSchemaParser:
 
         server_url = openapi['servers'][0]['url']
 
-        # list all interfaces
+        # 列出所有接口
         interfaces = []
         for path, path_item in openapi['paths'].items():
             methods = ['get', 'post', 'put', 'delete', 'patch', 'head', 'options', 'trace']
@@ -43,10 +55,10 @@ class ApiBasedToolSchemaParser:
                         'operation': path_item[method],
                     })
 
-        # get all parameters
+        # 获取所有参数
         bundles = []
         for interface in interfaces:
-            # convert parameters
+            # 转换参数
             parameters = []
             if 'parameters' in interface['operation']:
                 for parameter in interface['operation']['parameters']:
@@ -66,33 +78,32 @@ class ApiBasedToolSchemaParser:
                         llm_description=parameter.get('description'),
                         default=parameter['schema']['default'] if 'schema' in parameter and 'default' in parameter['schema'] else None,
                     )
-                   
-                    # check if there is a type
+                
+                    # 检查是否有类型信息
                     typ = ApiBasedToolSchemaParser._get_tool_parameter_type(parameter)
                     if typ:
                         tool_parameter.type = typ
 
                     parameters.append(tool_parameter)
-            # create tool bundle
-            # check if there is a request body
+            # 检查是否有请求体
             if 'requestBody' in interface['operation']:
                 request_body = interface['operation']['requestBody']
                 if 'content' in request_body:
                     for content_type, content in request_body['content'].items():
-                        # if there is a reference, get the reference and overwrite the content
+                        # 如果存在引用，获取引用并覆盖内容
                         if 'schema' not in content:
                             continue
 
                         if '$ref' in content['schema']:
-                            # get the reference
+                            # 获取引用
                             root = openapi
                             reference = content['schema']['$ref'].split('/')[1:]
                             for ref in reference:
                                 root = root[ref]
-                            # overwrite the content
+                            # 覆盖内容
                             interface['operation']['requestBody']['content'][content_type]['schema'] = root
 
-                    # parse body parameters
+                    # 解析请求体参数
                     if 'schema' in interface['operation']['requestBody']['content'][content_type]:
                         body_schema = interface['operation']['requestBody']['content'][content_type]['schema']
                         required = body_schema['required'] if 'required' in body_schema else []
@@ -115,14 +126,14 @@ class ApiBasedToolSchemaParser:
                                 default=property['default'] if 'default' in property else None,
                             )
 
-                            # check if there is a type
+                            # 检查是否有类型信息
                             typ = ApiBasedToolSchemaParser._get_tool_parameter_type(property)
                             if typ:
                                 tool.type = typ
 
                             parameters.append(tool)
 
-            # check if parameters is duplicated
+            # 检查参数是否重复
             parameters_count = {}
             for parameter in parameters:
                 if parameter.name not in parameters_count:
@@ -132,13 +143,13 @@ class ApiBasedToolSchemaParser:
                 if count > 1:
                     warning['duplicated_parameter'] = f'Parameter {name} is duplicated.'
 
-            # check if there is a operation id, use $path_$method as operation id if not
+            # 检查是否存在 operationId，如果不存在，则使用 $path_$method 作为 operationId
             if 'operationId' not in interface['operation']:
-                # remove special characters like / to ensure the operation id is valid ^[a-zA-Z0-9_-]{1,64}$
+                # 移除特殊字符，以确保 operationId 是有效的 ^[a-zA-Z0-9_-]{1,64}$
                 path = interface['path']
                 if interface['path'].startswith('/'):
                     path = interface['path'][1:]
-                # remove special characters like / to ensure the operation id is valid ^[a-zA-Z0-9_-]{1,64}$
+                # 移除特殊字符，以确保 operationId 是有效的 ^[a-zA-Z0-9_-]{1,64}$
                 path = re.sub(r'[^a-zA-Z0-9_-]', '', path)
                 if not path:
                     path = str(uuid.uuid4())
@@ -161,13 +172,26 @@ class ApiBasedToolSchemaParser:
     
     @staticmethod
     def _get_tool_parameter_type(parameter: dict) -> ToolParameter.ToolParameterType:
+        """
+        根据给定的参数字典确定工具参数的类型。
+        
+        参数:
+        - parameter: 一个字典，包含关于参数的描述。预期包含键'type'或'schema'，
+                    其中'schema'也是一个字典，包含键'type'。
+        
+        返回值:
+        - 返回 ToolParameter.ToolParameterType 中定义的枚举类型，指示参数是数字、布尔值、字符串中的哪一种。
+        """
+        # 如果 parameter 为空，则初始化为一个空字典
         parameter = parameter or {}
         typ = None
+        # 尝试直接从 parameter 获取 'type'，如果不存在则从其 'schema' 字典中获取
         if 'type' in parameter:
             typ = parameter['type']
         elif 'schema' in parameter and 'type' in parameter['schema']:
             typ = parameter['schema']['type']
         
+        # 根据 typ 的值返回相应的 ToolParameterType
         if typ == 'integer' or typ == 'number':
             return ToolParameter.ToolParameterType.NUMBER
         elif typ == 'boolean':
@@ -178,28 +202,36 @@ class ApiBasedToolSchemaParser:
     @staticmethod
     def parse_openapi_yaml_to_tool_bundle(yaml: str, extra_info: dict = None, warning: dict = None) -> list[ApiBasedToolBundle]:
         """
-            parse openapi yaml to tool bundle
+        将 OpenAPI YAML 字符串解析为工具捆绑包列表。
 
-            :param yaml: the yaml string
-            :return: the tool bundle
+        :param yaml: OpenAPI 规范的 YAML 字符串。
+        :param extra_info: 附加信息字典，可用于提供额外的上下文信息给解析过程（可选）。
+        :param warning: 警告信息字典，用于收集解析过程中遇到的非致命性问题（可选）。
+        :return: 解析得到的 ApiBasedToolBundle 对象列表。
         """
+        # 如果未提供警告或额外信息，则默认为空字典
         warning = warning if warning is not None else {}
         extra_info = extra_info if extra_info is not None else {}
 
+        # 安全加载 YAML 字符串为字典
         openapi: dict = safe_load(yaml)
         if openapi is None:
+            # 如果加载失败，抛出工具 API 架构错误异常
             raise ToolApiSchemaError('Invalid openapi yaml.')
+        # 使用解析器将 OpenAPI 字典解析为工具捆绑包列表
         return ApiBasedToolSchemaParser.parse_openapi_to_tool_bundle(openapi, extra_info=extra_info, warning=warning)
     
     @staticmethod
     def parse_swagger_to_openapi(swagger: dict, extra_info: dict = None, warning: dict = None) -> dict:
         """
-            parse swagger to openapi
+        将Swagger规范的字典转换为OpenAPI规范的字典。
 
-            :param swagger: the swagger dict
-            :return: the openapi dict
+        :param swagger: 符合Swagger 2.0规范的字典。
+        :param extra_info: 用于存储额外信息的字典，可选。
+        :param warning: 用于记录警告信息的字典，可选。
+        :return: 一个符合OpenAPI 3.0规范的字典。
         """
-        # convert swagger to openapi
+        # 初始化OpenAPI规范的基础信息
         info = swagger.get('info', {
             'title': 'Swagger',
             'description': 'Swagger',
@@ -208,9 +240,11 @@ class ApiBasedToolSchemaParser:
 
         servers = swagger.get('servers', [])
 
+        # 检查是否提供了服务器信息
         if len(servers) == 0:
             raise ToolApiSchemaError('No server found in the swagger yaml.')
 
+        # 构建OpenAPI规范的初始结构
         openapi = {
             'openapi': '3.0.0',
             'info': {
@@ -218,28 +252,31 @@ class ApiBasedToolSchemaParser:
                 'description': info.get('description', 'Swagger'),
                 'version': info.get('version', '1.0.0')
             },
-            'servers': swagger['servers'],
+            'servers': servers,
             'paths': {},
             'components': {
                 'schemas': {}
             }
         }
 
-        # check paths
+        # 检查和转换路径信息
         if 'paths' not in swagger or len(swagger['paths']) == 0:
             raise ToolApiSchemaError('No paths found in the swagger yaml.')
 
-        # convert paths
+        # 遍历并转换每个路径和方法
         for path, path_item in swagger['paths'].items():
             openapi['paths'][path] = {}
             for method, operation in path_item.items():
+                # 检查operationId是否存在
                 if 'operationId' not in operation:
                     raise ToolApiSchemaError(f'No operationId found in operation {method} {path}.')
                 
+                # 检查摘要或描述是否存在，并记录警告
                 if ('summary' not in operation or len(operation['summary']) == 0) and \
                     ('description' not in operation or len(operation['description']) == 0):
                     warning['missing_summary'] = f'No summary or description found in operation {method} {path}.'
                 
+                # 转换并填充路径信息
                 openapi['paths'][path][method] = {
                     'operationId': operation['operationId'],
                     'summary': operation.get('summary', ''),
@@ -248,10 +285,11 @@ class ApiBasedToolSchemaParser:
                     'responses': operation.get('responses', {}),
                 }
 
+                # 如果存在请求体信息，则添加
                 if 'requestBody' in operation:
                     openapi['paths'][path][method]['requestBody'] = operation['requestBody']
 
-        # convert definitions
+        # 转换定义部分
         for name, definition in swagger['definitions'].items():
             openapi['components']['schemas'][name] = definition
 
@@ -260,11 +298,17 @@ class ApiBasedToolSchemaParser:
     @staticmethod
     def parse_openai_plugin_json_to_tool_bundle(json: str, extra_info: dict = None, warning: dict = None) -> list[ApiBasedToolBundle]:
         """
-            parse openapi plugin yaml to tool bundle
+            解析 OpenAI 插件的 JSON 字符串为工具捆绑包
 
-            :param json: the json string
-            :return: the tool bundle
+            :param json: JSON 字符串
+            :param extra_info: 额外信息字典，可选，默认为 None
+            :param warning: 警告信息字典，可选，默认为 None
+            :return: 工具捆绑包列表
+
+            此函数首先尝试从提供的 JSON 字符串中加载 OpenAI 插件信息，验证其 API 类型是否支持，
+            然后从指定的 API URL 获取 OpenAPI YAML 文件，并将其解析为工具捆绑包列表。
         """
+        # 如果未提供警告信息或额外信息，则初始化为空字典
         warning = warning if warning is not None else {}
         extra_info = extra_info if extra_info is not None else {}
 
@@ -279,7 +323,7 @@ class ApiBasedToolSchemaParser:
         if api_type != 'openapi':
             raise ToolNotSupportedError('Only openapi is supported now.')
         
-        # get openapi yaml
+        # 从 API URL 获取 OpenAPI YAML 内容
         response = get(api_url, headers={
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) '
         }, timeout=5)
@@ -287,42 +331,52 @@ class ApiBasedToolSchemaParser:
         if response.status_code != 200:
             raise ToolProviderNotFoundError('cannot get openapi yaml from url.')
         
+        # 解析获取到的 OpenAPI YAML 文本为工具捆绑包列表
         return ApiBasedToolSchemaParser.parse_openapi_yaml_to_tool_bundle(response.text, extra_info=extra_info, warning=warning)
     
     @staticmethod
     def auto_parse_to_tool_bundle(content: str, extra_info: dict = None, warning: dict = None) -> tuple[list[ApiBasedToolBundle], str]:
         """
-            auto parse to tool bundle
+            自动解析内容到工具包
 
-            :param content: the content
-            :return: tools bundle, schema_type
+            :param content: 需要解析的内容
+            :param extra_info: 额外信息字典，用于在解析过程中提供额外的上下文信息
+            :param warning: 警告信息字典，用于存储解析过程中遇到的非致命性错误警告
+            :return: 工具包列表和schema类型字符串的元组
         """
+        # 初始化警告和额外信息
         warning = warning if warning is not None else {}
         extra_info = extra_info if extra_info is not None else {}
 
+        # 去除内容两端的空白字符
         content = content.strip()
         loaded_content = None
         json_error = None
         yaml_error = None
         
+        # 尝试解析JSON格式内容
         try:
             loaded_content = json_loads(content)
         except JSONDecodeError as e:
             json_error = e
 
+        # 如果JSON解析失败，尝试解析YAML格式内容
         if loaded_content is None:
             try:
                 loaded_content = safe_load(content)
             except YAMLError as e:
                 yaml_error = e
+        # 如果两种格式都解析失败，抛出错误
         if loaded_content is None:
             raise ToolApiSchemaError(f'Invalid api schema, schema is neither json nor yaml. json error: {str(json_error)}, yaml error: {str(yaml_error)}')
 
+        # 初始化不同API规范解析相关的错误变量和schema类型
         swagger_error = None
         openapi_error = None
         openapi_plugin_error = None
         schema_type = None
         
+        # 尝试以OpenAPI规范解析内容
         try:
             openapi = ApiBasedToolSchemaParser.parse_openapi_to_tool_bundle(loaded_content, extra_info=extra_info, warning=warning)
             schema_type = ApiProviderSchemaType.OPENAPI.value
@@ -330,7 +384,7 @@ class ApiBasedToolSchemaParser:
         except ToolApiSchemaError as e:
             openapi_error = e
         
-        # openai parse error, fallback to swagger
+        # 如果OpenAPI解析失败，尝试以Swagger规范解析
         try:
             converted_swagger = ApiBasedToolSchemaParser.parse_swagger_to_openapi(loaded_content, extra_info=extra_info, warning=warning)
             schema_type = ApiProviderSchemaType.SWAGGER.value
@@ -338,12 +392,13 @@ class ApiBasedToolSchemaParser:
         except ToolApiSchemaError as e:
             swagger_error = e
         
-        # swagger parse error, fallback to openai plugin
+        # 如果Swagger解析失败，尝试解析为OpenAPI插件格式
         try:
             openapi_plugin = ApiBasedToolSchemaParser.parse_openai_plugin_json_to_tool_bundle(json_dumps(loaded_content), extra_info=extra_info, warning=warning)
             return openapi_plugin, ApiProviderSchemaType.OPENAI_PLUGIN.value
         except ToolNotSupportedError as e:
-            # maybe it's not plugin at all
+            # 如果不是支持的插件格式，记录错误信息
             openapi_plugin_error = e
 
+        # 如果所有解析尝试都失败，抛出解析错误
         raise ToolApiSchemaError(f'Invalid api schema, openapi error: {str(openapi_error)}, swagger error: {str(swagger_error)}, openapi plugin error: {str(openapi_plugin_error)}')

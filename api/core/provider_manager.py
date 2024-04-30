@@ -37,84 +37,78 @@ from models.provider import (
 
 class ProviderManager:
     """
-    ProviderManager is a class that manages the model providers includes Hosting and Customize Model Providers.
+    ProviderManager 是一个管理模型提供者类，包括托管和自定义模型提供者。
     """
     def __init__(self) -> None:
+        """
+        初始化 ProviderManager，设置默认值。
+        """
         self.decoding_rsa_key = None
         self.decoding_cipher_rsa = None
 
     def get_configurations(self, tenant_id: str) -> ProviderConfigurations:
         """
-        Get model provider configurations.
+        获取模型提供者的配置信息。
 
-        Construct ProviderConfiguration objects for each provider
-        Including:
-        1. Basic information of the provider
-        2. Hosting configuration information, including:
-          (1. Whether to enable (support) hosting type, if enabled, the following information exists
-          (2. List of hosting type provider configurations
-              (including quota type, quota limit, current remaining quota, etc.)
-          (3. The current hosting type in use (whether there is a quota or not)
-              paid quotas > provider free quotas > hosting trial quotas
-          (4. Unified credentials for hosting providers
-        3. Custom configuration information, including:
-          (1. Whether to enable (support) custom type, if enabled, the following information exists
-          (2. Custom provider configuration (including credentials)
-          (3. List of custom provider model configurations (including credentials)
-        4. Hosting/custom preferred provider type.
-        Provide methods:
-        - Get the current configuration (including credentials)
-        - Get the availability and status of the hosting configuration: active available,
-          quota_exceeded insufficient quota, unsupported hosting
-        - Get the availability of custom configuration
-          Custom provider available conditions:
-          (1. custom provider credentials available
-          (2. at least one custom model credentials available
-        - Verify, update, and delete custom provider configuration
-        - Verify, update, and delete custom provider model configuration
-        - Get the list of available models (optional provider filtering, model type filtering)
-          Append custom provider models to the list
-        - Get provider instance
-        - Switch selection priority
+        构建每个提供者的 ProviderConfiguration 对象，包括：
+        1. 提供者的基本信息。
+        2. 托管配置信息，如：
+          (1) 是否启用（支持）托管类型，如果启用，则存在以下信息：
+          (2) 托管类型提供商配置列表（包括配额类型、配额限制、当前剩余配额等）。
+          (3) 当前使用的托管类型（是否有配额）：付费配额 > 提供者免费配额 > 托管试用配额
+          (4) 托管提供商的统一凭证。
+        3. 自定义配置信息，如：
+          (1) 是否启用（支持）自定义类型，如果启用，则存在以下信息：
+          (2) 自定义提供商配置（包括凭证）。
+          (3) 自定义提供商模型配置列表（包括凭证）。
+        4. 托管/自定义优先级提供商类型。
+        提供的方法：
+        - 获取当前配置（包括凭证）
+        - 获取托管配置的可用性和状态：活动可用、配额超出、不支持托管
+        - 获取自定义配置的可用性
+          自定义提供商可用条件：
+          (1) 自定义提供商凭证可用
+          (2) 至少有一个自定义模型凭证可用
+        - 验证、更新和删除自定义提供商配置
+        - 验证、更新和删除自定义提供商模型配置
+        - 获取可用模型列表（可选提供者过滤，模型类型过滤）
+          将自定义提供商模型追加到列表中
+        - 获取提供商实例
+        - 切换选择优先级
 
-        :param tenant_id:
-        :return:
+        :param tenant_id: 工作空间的唯一标识。
+        :return: 包含所有提供商配置的 ProviderConfigurations 对象。
         """
-        # Get all provider records of the workspace
+        # 获取工作空间的所有提供商记录
         provider_name_to_provider_records_dict = self._get_all_providers(tenant_id)
 
-        # Initialize trial provider records if not exist
+        # 如果不存在，初始化试用提供商记录
         provider_name_to_provider_records_dict = self._init_trial_provider_records(
             tenant_id,
             provider_name_to_provider_records_dict
         )
 
-        # Get all provider model records of the workspace
+        # 获取工作空间的所有提供商模型记录
         provider_name_to_provider_model_records_dict = self._get_all_provider_models(tenant_id)
 
-        # Get all provider entities
+        # 获取所有提供商实体
         provider_entities = model_provider_factory.get_providers()
 
-        # Get All preferred provider types of the workspace
+        # 获取工作空间的所有首选模型提供商类型
         provider_name_to_preferred_model_provider_records_dict = self._get_all_preferred_model_providers(tenant_id)
 
         provider_configurations = ProviderConfigurations(
             tenant_id=tenant_id
         )
 
-        # Construct ProviderConfiguration objects for each provider
+        # 为每个提供商构建 ProviderConfiguration 对象
         for provider_entity in provider_entities:
             provider_name = provider_entity.provider
 
-            provider_records = provider_name_to_provider_records_dict.get(provider_entity.provider)
-            if not provider_records:
-                provider_records = []
+            provider_records = provider_name_to_provider_records_dict.get(provider_entity.provider, [])
+            provider_model_records = provider_name_to_provider_model_records_dict.get(provider_entity.provider, [])
 
-            provider_model_records = provider_name_to_provider_model_records_dict.get(provider_entity.provider)
-            if not provider_model_records:
-                provider_model_records = []
-
-            # Convert to custom configuration
+            # 转换为自定义配置
             custom_configuration = self._to_custom_configuration(
                 tenant_id,
                 provider_entity,
@@ -122,14 +116,14 @@ class ProviderManager:
                 provider_model_records
             )
 
-            # Convert to system configuration
+            # 转换为系统配置
             system_configuration = self._to_system_configuration(
                 tenant_id,
                 provider_entity,
                 provider_records
             )
 
-            # Get preferred provider type
+            # 获取首选提供商类型
             preferred_provider_type_record = provider_name_to_preferred_model_provider_records_dict.get(provider_name)
 
             if preferred_provider_type_record:
@@ -147,6 +141,7 @@ class ProviderManager:
                 if not system_configuration.enabled:
                     using_provider_type = ProviderType.CUSTOM
 
+                # 检查是否存在有效的系统提供商配额
                 has_valid_quota = False
                 for quota_configuration in system_configuration.quota_configurations:
                     if quota_configuration.is_valid:
@@ -156,6 +151,7 @@ class ProviderManager:
                 if not has_valid_quota:
                     using_provider_type = ProviderType.CUSTOM
             else:
+                # 如果没有完全配置自定义提供商，回退到系统提供商
                 if not custom_configuration.provider and not custom_configuration.models:
                     if system_configuration.enabled:
                         has_valid_quota = False
@@ -178,27 +174,31 @@ class ProviderManager:
 
             provider_configurations[provider_name] = provider_configuration
 
-        # Return the encapsulated object
+        # 返回封装的对象
         return provider_configurations
 
     def get_provider_model_bundle(self, tenant_id: str, provider: str, model_type: ModelType) -> ProviderModelBundle:
         """
-        Get provider model bundle.
-        :param tenant_id: workspace id
-        :param provider: provider name
-        :param model_type: model type
-        :return:
+        获取供应商模型捆绑包。
+        :param tenant_id: 工作空间id
+        :param provider: 供应商名称
+        :param model_type: 模型类型
+        :return: 返回一个包含供应商配置、供应商实例和模型类型实例的ProviderModelBundle对象
         """
+        # 获取租户的配置信息
         provider_configurations = self.get_configurations(tenant_id)
 
-        # get provider instance
+        # 获取指定供应商的配置
         provider_configuration = provider_configurations.get(provider)
         if not provider_configuration:
             raise ValueError(f"Provider {provider} does not exist.")
 
+        # 创建供应商实例
         provider_instance = provider_configuration.get_provider_instance()
+        # 创建模型类型实例
         model_type_instance = provider_instance.get_model_instance(model_type)
 
+        # 返回供应商模型捆绑包
         return ProviderModelBundle(
             configuration=provider_configuration,
             provider_instance=provider_instance,
@@ -207,26 +207,25 @@ class ProviderManager:
 
     def get_default_model(self, tenant_id: str, model_type: ModelType) -> Optional[DefaultModelEntity]:
         """
-        Get default model.
+        获取默认模型。
 
-        :param tenant_id: workspace id
-        :param model_type: model type
-        :return:
+        :param tenant_id: 工作空间ID
+        :param model_type: 模型类型
+        :return: 返回默认模型实体，如果不存在则返回None
         """
-        # Get the corresponding TenantDefaultModel record
+        # 查询对应的TenantDefaultModel记录
         default_model = db.session.query(TenantDefaultModel) \
             .filter(
             TenantDefaultModel.tenant_id == tenant_id,
             TenantDefaultModel.model_type == model_type.to_origin_model_type()
         ).first()
 
-        # If it does not exist, get the first available provider model from get_configurations
-        # and update the TenantDefaultModel record
+        # 如果不存在，则从get_configurations获取可用的提供者模型，并更新TenantDefaultModel记录
         if not default_model:
-            # Get provider configurations
+            # 获取提供者配置
             provider_configurations = self.get_configurations(tenant_id)
 
-            # get available models from provider_configurations
+            # 从提供者配置中获取可用模型
             available_models = provider_configurations.get_models(
                 model_type=model_type,
                 only_active=True
@@ -234,6 +233,7 @@ class ProviderManager:
 
             if available_models:
                 found = False
+                # 查找并设置默认为"gpt-4"模型，如果可用
                 for available_model in available_models:
                     if available_model.model == "gpt-4":
                         default_model = TenantDefaultModel(
@@ -247,6 +247,7 @@ class ProviderManager:
                         found = True
                         break
 
+                # 如果没有找到"gpt-4"模型，则设置为第一个可用模型
                 if not found:
                     available_model = available_models[0]
                     default_model = TenantDefaultModel(
@@ -258,12 +259,15 @@ class ProviderManager:
                     db.session.add(default_model)
                     db.session.commit()
 
+        # 如果没有找到默认模型，返回None
         if not default_model:
             return None
 
+        # 获取提供者实例和提供者方案
         provider_instance = model_provider_factory.get_provider_instance(default_model.provider_name)
         provider_schema = provider_instance.get_provider_schema()
 
+        # 构建并返回默认模型实体
         return DefaultModelEntity(
             model=default_model.model_name,
             model_type=model_type,
@@ -279,44 +283,45 @@ class ProviderManager:
     def update_default_model_record(self, tenant_id: str, model_type: ModelType, provider: str, model: str) \
             -> TenantDefaultModel:
         """
-        Update default model record.
+        更新默认模型记录。
 
-        :param tenant_id: workspace id
-        :param model_type: model type
-        :param provider: provider name
-        :param model: model name
-        :return:
+        :param tenant_id: 工作空间ID
+        :param model_type: 模型类型
+        :param provider: 提供者名称
+        :param model: 模型名称
+        :return: 返回更新或创建的默认模型记录
         """
+        # 获取配置信息
         provider_configurations = self.get_configurations(tenant_id)
+        # 检查提供者是否存在
         if provider not in provider_configurations:
             raise ValueError(f"Provider {provider} does not exist.")
 
-        # get available models from provider_configurations
+        # 从提供者配置中获取可用模型
         available_models = provider_configurations.get_models(
             model_type=model_type,
             only_active=True
         )
-
-        # check if the model is exist in available models
+        # 检查模型是否存在于可用模型中
         model_names = [model.model for model in available_models]
         if model not in model_names:
             raise ValueError(f"Model {model} does not exist.")
 
-        # Get the list of available models from get_configurations and check if it is LLM
+        # 从数据库查询当前的默认模型设置
         default_model = db.session.query(TenantDefaultModel) \
             .filter(
             TenantDefaultModel.tenant_id == tenant_id,
             TenantDefaultModel.model_type == model_type.to_origin_model_type()
         ).first()
 
-        # create or update TenantDefaultModel record
+        # 如果默认模型已存在，则更新；否则，创建新的默认模型记录
         if default_model:
-            # update default model
+            # 更新默认模型信息
             default_model.provider_name = provider
             default_model.model_name = model
             db.session.commit()
         else:
-            # create default model
+            # 创建新的默认模型记录
             default_model = TenantDefaultModel(
                 tenant_id=tenant_id,
                 model_type=model_type.value,
@@ -330,55 +335,73 @@ class ProviderManager:
 
     def _get_all_providers(self, tenant_id: str) -> dict[str, list[Provider]]:
         """
-        Get all provider records of the workspace.
+        获取工作空间的所有有效提供者记录。
 
-        :param tenant_id: workspace id
-        :return:
+        该函数根据给定的工作空间ID（tenant_id）查询数据库中的所有提供者，
+        并过滤掉无效的提供者。然后，它将提供者按名称分组，返回一个字典，
+        其中每个键是提供者名称，值是具有该名称的Provider对象列表。
+
+        :param tenant_id: 工作空间的唯一标识符，用于筛选返回的提供者，确保仅包含与指定工作空间关联的提供者。
+        :return: 一个字典，其中每个键是提供者名称，值是与该名称关联的Provider对象列表。
+                这使得可以通过名称快速访问所有提供者。
         """
+        # 根据指定的tenant_id查询数据库，获取所有有效且关联的提供者。
         providers = db.session.query(Provider) \
             .filter(
             Provider.tenant_id == tenant_id,
             Provider.is_valid == True
         ).all()
 
+        # 初始化一个字典，用于按提供者名称进行分组。
         provider_name_to_provider_records_dict = defaultdict(list)
+        # 遍历查询到的提供者，将它们按名称分组到字典中。
         for provider in providers:
             provider_name_to_provider_records_dict[provider.provider_name].append(provider)
 
+        # 返回填充后的字典，允许通过名称轻松访问提供者。
         return provider_name_to_provider_records_dict
 
     def _get_all_provider_models(self, tenant_id: str) -> dict[str, list[ProviderModel]]:
         """
-        Get all provider model records of the workspace.
+        获取指定工作区下的所有供应商模型记录。
 
-        :param tenant_id: workspace id
-        :return:
+        此函数负责从数据库中查询并收集与给定工作区ID（tenant_id）相关的所有有效供应商模型数据。
+        它将这些数据整理成一个字典，其中键是供应商名称，值是属于该供应商的模型列表。
+
+        :param tenant_id: 工作区的唯一标识符，用于定位要查询的数据。
+        :return: 一个字典，结构为供应商名称到该供应商相关模型列表的映射。
         """
-        # Get all provider model records of the workspace
+        # 查询数据库，筛选条件为租户ID匹配且模型有效
         provider_models = db.session.query(ProviderModel) \
             .filter(
-            ProviderModel.tenant_id == tenant_id,
-            ProviderModel.is_valid == True
-        ).all()
+                ProviderModel.tenant_id == tenant_id,
+                ProviderModel.is_valid == True
+            ).all()
 
-        provider_name_to_provider_model_records_dict = defaultdict(list)
+        # 初始化一个默认字典，用于存储按供应商名称分组的模型记录
+        provider_name_to_model_records_dict = defaultdict(list)
+
+        # 遍历查询结果，按供应商名称归类模型记录
         for provider_model in provider_models:
-            provider_name_to_provider_model_records_dict[provider_model.provider_name].append(provider_model)
+            provider_name_to_model_records_dict[provider_model.provider_name].append(provider_model)
 
-        return provider_name_to_provider_model_records_dict
+        # 返回分组后的供应商模型字典
+        return provider_name_to_model_records_dict
 
     def _get_all_preferred_model_providers(self, tenant_id: str) -> dict[str, TenantPreferredModelProvider]:
         """
-        Get All preferred provider types of the workspace.
+        获取工作空间的所有首选提供者类型。
 
-        :param tenant_id:
-        :return:
+        :param tenant_id: 租户ID，用于查询该租户的首选模型提供者类型。
+        :return: 返回一个字典，键为提供者名称，值为对应的TenantPreferredModelProvider实例。
         """
+        # 从数据库会话中查询指定租户ID的所有首选模型提供者类型记录
         preferred_provider_types = db.session.query(TenantPreferredModelProvider) \
             .filter(
             TenantPreferredModelProvider.tenant_id == tenant_id
         ).all()
 
+        # 将查询结果转换为字典格式，方便后续使用
         provider_name_to_preferred_provider_type_records_dict = {
             preferred_provider_type.provider_name: preferred_provider_type
             for preferred_provider_type in preferred_provider_types
@@ -387,38 +410,43 @@ class ProviderManager:
         return provider_name_to_preferred_provider_type_records_dict
 
     def _init_trial_provider_records(self, tenant_id: str,
-                                     provider_name_to_provider_records_dict: dict[str, list]) -> dict[str, list]:
+                                        provider_name_to_provider_records_dict: dict[str, list]) -> dict[str, list]:
         """
-        Initialize trial provider records if not exists.
+        初始化试用提供商记录，如果不存在的话。
 
-        :param tenant_id: workspace id
-        :param provider_name_to_provider_records_dict: provider name to provider records dict
-        :return:
+        :param tenant_id: 工作空间ID
+        :param provider_name_to_provider_records_dict: 提供商名称到提供商记录字典
+        :return: 更新后的提供商名称到提供商记录字典
         """
-        # Get hosting configuration
+        # 获取托管配置
         hosting_configuration = ext_hosting_provider.hosting_configuration
 
+        # 遍历托管配置中的提供商，初始化试用提供商记录
         for provider_name, configuration in hosting_configuration.provider_map.items():
             if not configuration.enabled:
-                continue
+                continue  # 跳过未启用的提供商
 
             provider_records = provider_name_to_provider_records_dict.get(provider_name)
             if not provider_records:
                 provider_records = []
 
+            # 为当前提供商构建配额到记录的映射
             provider_quota_to_provider_record_dict = dict()
             for provider_record in provider_records:
                 if provider_record.provider_type != ProviderType.SYSTEM.value:
-                    continue
+                    continue  # 忽略非系统类型的提供商记录
 
+                # 将符合条件的提供商记录映射到其配额类型
                 provider_quota_to_provider_record_dict[ProviderQuotaType.value_of(provider_record.quota_type)] \
                     = provider_record
 
+            # 初始化试用配额的提供商记录
             for quota in configuration.quotas:
                 if quota.quota_type == ProviderQuotaType.TRIAL:
-                    # Init trial provider records if not exists
+                    # 如果当前提供商不存在试用配额记录，则进行初始化
                     if ProviderQuotaType.TRIAL not in provider_quota_to_provider_record_dict:
                         try:
+                            # 尝试创建新的试用提供商记录并添加到数据库
                             provider_record = Provider(
                                 tenant_id=tenant_id,
                                 provider_name=provider_name,
@@ -431,6 +459,7 @@ class ProviderManager:
                             db.session.add(provider_record)
                             db.session.commit()
                         except IntegrityError:
+                            # 在插入时遇到唯一性约束异常，则尝试从数据库获取已存在的记录进行更新
                             db.session.rollback()
                             provider_record = db.session.query(Provider) \
                                 .filter(
@@ -440,35 +469,37 @@ class ProviderManager:
                                 Provider.quota_type == ProviderQuotaType.TRIAL.value
                             ).first()
 
+                            # 如果找到存在的记录且其状态无效，则将其状态更新为有效
                             if provider_record and not provider_record.is_valid:
                                 provider_record.is_valid = True
                                 db.session.commit()
 
+                        # 将新初始化的或已存在的试用提供商记录添加到字典中
                         provider_name_to_provider_records_dict[provider_name].append(provider_record)
 
         return provider_name_to_provider_records_dict
 
     def _to_custom_configuration(self,
-                                 tenant_id: str,
-                                 provider_entity: ProviderEntity,
-                                 provider_records: list[Provider],
-                                 provider_model_records: list[ProviderModel]) -> CustomConfiguration:
+                                tenant_id: str,
+                                provider_entity: ProviderEntity,
+                                provider_records: list[Provider],
+                                provider_model_records: list[ProviderModel]) -> CustomConfiguration:
         """
-        Convert to custom configuration.
+        将相关信息转换为自定义配置。
 
-        :param tenant_id: workspace id
-        :param provider_entity: provider entity
-        :param provider_records: provider records
-        :param provider_model_records: provider model records
-        :return:
+        :param tenant_id: 工作空间ID
+        :param provider_entity: 供应商实体
+        :param provider_records: 供应商记录列表
+        :param provider_model_records: 供应商模型记录列表
+        :return: 自定义配置对象
         """
-        # Get provider credential secret variables
+        # 提取供应商凭证的密钥变量
         provider_credential_secret_variables = self._extract_secret_variables(
             provider_entity.provider_credential_schema.credential_form_schemas
             if provider_entity.provider_credential_schema else []
         )
 
-        # Get custom provider record
+        # 获取自定义供应商记录
         custom_provider_record = None
         for provider_record in provider_records:
             if provider_record.provider_type == ProviderType.SYSTEM.value:
@@ -479,7 +510,7 @@ class ProviderManager:
 
             custom_provider_record = provider_record
 
-        # Get custom provider credentials
+        # 获取自定义供应商凭证配置
         custom_provider_configuration = None
         if custom_provider_record:
             provider_credentials_cache = ProviderCredentialsCache(
@@ -488,7 +519,7 @@ class ProviderManager:
                 cache_type=ProviderCredentialsCacheType.PROVIDER
             )
 
-            # Get cached provider credentials
+            # 获取缓存的供应商凭证
             cached_provider_credentials = provider_credentials_cache.get()
 
             if not cached_provider_credentials:
@@ -504,7 +535,7 @@ class ProviderManager:
                 except JSONDecodeError:
                     provider_credentials = {}
 
-                # Get decoding rsa key and cipher for decrypting credentials
+                # 解密凭证信息
                 if self.decoding_rsa_key is None or self.decoding_cipher_rsa is None:
                     self.decoding_rsa_key, self.decoding_cipher_rsa = encrypter.get_decrypt_decoding(tenant_id)
 
@@ -519,7 +550,7 @@ class ProviderManager:
                         except ValueError:
                             pass
 
-                # cache provider credentials
+                # 缓存供应商凭证
                 provider_credentials_cache.set(
                     credentials=provider_credentials
                 )
@@ -530,13 +561,13 @@ class ProviderManager:
                 credentials=provider_credentials
             )
 
-        # Get provider model credential secret variables
+        # 提取模型凭证的密钥变量
         model_credential_secret_variables = self._extract_secret_variables(
             provider_entity.model_credential_schema.credential_form_schemas
             if provider_entity.model_credential_schema else []
         )
 
-        # Get custom provider model credentials
+        # 获取自定义模型凭证配置
         custom_model_configurations = []
         for provider_model_record in provider_model_records:
             if not provider_model_record.encrypted_config:
@@ -548,16 +579,17 @@ class ProviderManager:
                 cache_type=ProviderCredentialsCacheType.MODEL
             )
 
-            # Get cached provider model credentials
+            # 获取缓存的模型凭证
             cached_provider_model_credentials = provider_model_credentials_cache.get()
 
             if not cached_provider_model_credentials:
+                # 解析模型凭证
                 try:
                     provider_model_credentials = json.loads(provider_model_record.encrypted_config)
                 except JSONDecodeError:
                     continue
 
-                # Get decoding rsa key and cipher for decrypting credentials
+                # 解密凭证信息
                 if self.decoding_rsa_key is None or self.decoding_cipher_rsa is None:
                     self.decoding_rsa_key, self.decoding_cipher_rsa = encrypter.get_decrypt_decoding(tenant_id)
 
@@ -572,7 +604,7 @@ class ProviderManager:
                         except ValueError:
                             pass
 
-                # cache provider model credentials
+                # 缓存模型凭证
                 provider_model_credentials_cache.set(
                     credentials=provider_model_credentials
                 )
@@ -593,20 +625,21 @@ class ProviderManager:
         )
 
     def _to_system_configuration(self,
-                                 tenant_id: str,
-                                 provider_entity: ProviderEntity,
-                                 provider_records: list[Provider]) -> SystemConfiguration:
+                                tenant_id: str,
+                                provider_entity: ProviderEntity,
+                                provider_records: list[Provider]) -> SystemConfiguration:
         """
-        Convert to system configuration.
+        将给定的参数转换为系统配置。
 
-        :param tenant_id: workspace id
-        :param provider_entity: provider entity
-        :param provider_records: provider records
-        :return:
+        :param tenant_id: 工作空间ID
+        :param provider_entity: 提供者实体
+        :param provider_records: 提供者记录列表
+        :return: 系统配置对象
         """
-        # Get hosting configuration
+        # 获取托管配置
         hosting_configuration = ext_hosting_provider.hosting_configuration
 
+        # 检查提供者是否在托管配置中，以及是否启用
         if provider_entity.provider not in hosting_configuration.provider_map \
                 or not hosting_configuration.provider_map.get(provider_entity.provider).enabled:
             return SystemConfiguration(
@@ -615,7 +648,7 @@ class ProviderManager:
 
         provider_hosting_configuration = hosting_configuration.provider_map.get(provider_entity.provider)
 
-        # Convert provider_records to dict
+        # 将提供者记录转换为字典格式
         quota_type_to_provider_records_dict = dict()
         for provider_record in provider_records:
             if provider_record.provider_type != ProviderType.SYSTEM.value:
@@ -626,6 +659,7 @@ class ProviderManager:
 
         quota_configurations = []
         for provider_quota in provider_hosting_configuration.quotas:
+            # 根据配额类型获取相应的提供者记录
             if provider_quota.quota_type not in quota_type_to_provider_records_dict:
                 if provider_quota.quota_type == ProviderQuotaType.FREE:
                     quota_configuration = QuotaConfiguration(
@@ -652,13 +686,16 @@ class ProviderManager:
 
             quota_configurations.append(quota_configuration)
 
+        # 若无配额配置，则返回禁用状态的系统配置
         if len(quota_configurations) == 0:
             return SystemConfiguration(
                 enabled=False
             )
 
+        # 选择当前使用的配额类型
         current_quota_type = self._choice_current_using_quota_type(quota_configurations)
 
+        # 获取当前使用的凭证
         current_using_credentials = provider_hosting_configuration.credentials
         if current_quota_type == ProviderQuotaType.FREE:
             provider_record = quota_type_to_provider_records_dict.get(current_quota_type)
@@ -670,7 +707,7 @@ class ProviderManager:
                     cache_type=ProviderCredentialsCacheType.PROVIDER
                 )
 
-                # Get cached provider credentials
+                # 尝试从缓存获取提供者凭证
                 cached_provider_credentials = provider_credentials_cache.get()
 
                 if not cached_provider_credentials:
@@ -679,13 +716,13 @@ class ProviderManager:
                     except JSONDecodeError:
                         provider_credentials = {}
 
-                    # Get provider credential secret variables
+                    # 解密凭证中的密文变量
                     provider_credential_secret_variables = self._extract_secret_variables(
                         provider_entity.provider_credential_schema.credential_form_schemas
                         if provider_entity.provider_credential_schema else []
                     )
 
-                    # Get decoding rsa key and cipher for decrypting credentials
+                    # 获取解密RSA密钥和密码，用于解密凭证
                     if self.decoding_rsa_key is None or self.decoding_cipher_rsa is None:
                         self.decoding_rsa_key, self.decoding_cipher_rsa = encrypter.get_decrypt_decoding(tenant_id)
 
@@ -702,7 +739,7 @@ class ProviderManager:
 
                     current_using_credentials = provider_credentials
 
-                    # cache provider credentials
+                    # 缓存提供者凭证
                     provider_credentials_cache.set(
                         credentials=current_using_credentials
                     )
@@ -712,6 +749,7 @@ class ProviderManager:
                 current_using_credentials = {}
                 quota_configurations = []
 
+        # 构建并返回系统配置对象
         return SystemConfiguration(
             enabled=True,
             current_quota_type=current_quota_type,
@@ -721,41 +759,52 @@ class ProviderManager:
 
     def _choice_current_using_quota_type(self, quota_configurations: list[QuotaConfiguration]) -> ProviderQuotaType:
         """
-        Choice current using quota type.
-        paid quotas > provider free quotas > hosting trial quotas
-        If there is still quota for the corresponding quota type according to the sorting,
+        选择当前使用的配额类型，优先级顺序为：付费配额 > 提供商免费配额 > 试用配额。
+        如果根据排序仍有对应配额类型可用，
 
-        :param quota_configurations:
-        :return:
+        :param quota_configurations: 配额配置列表，每个配置包含配额类型和相关信息
+        :return: 返回选中的配额类型
         """
-        # convert to dict
+        # 将配额配置列表转换为字典，以配额类型为键
         quota_type_to_quota_configuration_dict = {
             quota_configuration.quota_type: quota_configuration
             for quota_configuration in quota_configurations
         }
 
         last_quota_configuration = None
+        # 按照优先级顺序检查每种配额类型的可用性
         for quota_type in [ProviderQuotaType.PAID, ProviderQuotaType.FREE, ProviderQuotaType.TRIAL]:
             if quota_type in quota_type_to_quota_configuration_dict:
                 last_quota_configuration = quota_type_to_quota_configuration_dict[quota_type]
+                # 如果配额配置有效，返回当前配额类型
                 if last_quota_configuration.is_valid:
                     return quota_type
 
+        # 如果最后有一个有效的配额配置，返回其配额类型
         if last_quota_configuration:
             return last_quota_configuration.quota_type
 
+        # 如果没有可用的配额类型，抛出异常
         raise ValueError('No quota type available')
 
     def _extract_secret_variables(self, credential_form_schemas: list[CredentialFormSchema]) -> list[str]:
         """
-        Extract secret input form variables.
+        提取保密输入表单变量。
 
-        :param credential_form_schemas:
-        :return:
+        从给定的凭据表单模式列表中，找出保密输入类型的变量。
+
+        :param credential_form_schemas: 一个CredentialFormSchema对象列表，每个对象代表一个表单模式，
+                                        可能包含保密输入字段。
+        :return: 一个字符串列表，包含所有保密输入表单变量。
         """
+        # 初始化一个空列表，用于存储保密输入表单变量。
         secret_input_form_variables = []
+
+        # 遍历凭据表单模式列表。
         for credential_form_schema in credential_form_schemas:
+            # 如果表单模式类型为SECRET_INPUT，将其变量添加到列表中。
             if credential_form_schema.type == FormType.SECRET_INPUT:
                 secret_input_form_variables.append(credential_form_schema.variable)
 
+        # 返回保密输入表单变量列表。
         return secret_input_form_variables

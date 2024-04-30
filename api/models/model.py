@@ -2154,14 +2154,25 @@ class DatasetRetrieverResource(db.Model):
 
 
 class Tag(db.Model):
-    __tablename__ = 'tags'
+    """
+    标签模型，用于表示标签信息。
+
+    属性:
+    - id: 标签的唯一标识符，使用UUID生成。
+    - tenant_id: 租户ID，标识标签所属的租户，可为空。
+    - type: 标签类型，限定为['knowledge', 'app']中的值，不可为空。
+    - name: 标签名称，不可为空。
+    - created_by: 创建者的UUID，不可为空。
+    - created_at: 标签创建的时间戳，不可为空，默认为当前时间。
+    """
+    __tablename__ = 'tags'  # 指定数据库表名为tags
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='tag_pkey'),
-        db.Index('tag_type_idx', 'type'),
-        db.Index('tag_name_idx', 'name'),
+        db.PrimaryKeyConstraint('id', name='tag_pkey'),  # 指定id为primary key
+        db.Index('tag_type_idx', 'type'),  # 为type字段创建索引
+        db.Index('tag_name_idx', 'name'),  # 为name字段创建索引
     )
 
-    TAG_TYPE_LIST = ['knowledge', 'app']
+    TAG_TYPE_LIST = ['knowledge', 'app']  # 定义有效的标签类型列表
 
     id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
     tenant_id = db.Column(UUID, nullable=True)
@@ -2170,13 +2181,23 @@ class Tag(db.Model):
     created_by = db.Column(UUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
-
 class TagBinding(db.Model):
-    __tablename__ = 'tag_bindings'
+    """
+    标签绑定模型，用于表示标签与目标对象的绑定关系。
+
+    属性:
+    - id: 绑定关系的唯一标识符，使用UUID生成。
+    - tenant_id: 租户ID，标识绑定关系所属的租户，可为空。
+    - tag_id: 标签的UUID，不可为空。
+    - target_id: 目标对象的UUID，例如知识库条目或应用，不可为空。
+    - created_by: 创建者的UUID，不可为空。
+    - created_at: 绑定关系创建的时间戳，不可为空，默认为当前时间。
+    """
+    __tablename__ = 'tag_bindings'  # 指定数据库表名为tag_bindings
     __table_args__ = (
-        db.PrimaryKeyConstraint('id', name='tag_binding_pkey'),
-        db.Index('tag_bind_target_id_idx', 'target_id'),
-        db.Index('tag_bind_tag_id_idx', 'tag_id'),
+        db.PrimaryKeyConstraint('id', name='tag_binding_pkey'),  # 指定id为primary key
+        db.Index('tag_bind_target_id_idx', 'target_id'),  # 为目标ID字段创建索引
+        db.Index('tag_bind_tag_id_idx', 'tag_id'),  # 为标签ID字段创建索引
     )
 
     id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))

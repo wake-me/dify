@@ -19,24 +19,35 @@ from core.tools.tool.tool import Tool
 
 
 class ToolConfigurationManager(BaseModel):
-    tenant_id: str
-    provider_controller: ToolProviderController
+    # ToolConfigurationManager类继承自BaseModel，用于管理工具配置。
+    tenant_id: str  # 租户ID
+    provider_controller: ToolProviderController  # 工具提供者控制器
 
     def _deep_copy(self, credentials: dict[str, str]) -> dict[str, str]:
         """
-        deep copy credentials
+        深拷贝凭据信息。
+        
+        参数:
+        - credentials: 一个字典，包含需要深拷贝的凭据信息。
+        
+        返回值:
+        - 一个深拷贝后的凭据信息字典。
         """
         return deepcopy(credentials)
     
     def encrypt_tool_credentials(self, credentials: dict[str, str]) -> dict[str, str]:
         """
-        encrypt tool credentials with tenant id
-
-        return a deep copy of credentials with encrypted values
+        使用租户ID加密工具凭据。
+        
+        参数:
+        - credentials: 一个字典，包含未加密的工具凭据信息。
+        
+        返回值:
+        - 一个字典，包含使用租户ID加密后的凭据信息。
         """
         credentials = self._deep_copy(credentials)
 
-        # get fields need to be decrypted
+        # 获取需要加密的字段
         fields = self.provider_controller.get_credentials_schema()
         for field_name, field in fields.items():
             if field.type == ToolProviderCredentials.CredentialsType.SECRET_INPUT:
@@ -48,13 +59,17 @@ class ToolConfigurationManager(BaseModel):
     
     def mask_tool_credentials(self, credentials: dict[str, Any]) -> dict[str, Any]:
         """
-        mask tool credentials
-
-        return a deep copy of credentials with masked values
+        遮掩工具凭据信息。
+        
+        参数:
+        - credentials: 一个字典，包含未遮掩的工具凭据信息。
+        
+        返回值:
+        - 一个字典，包含凭据信息的深拷贝，并且敏感信息被遮掩。
         """
         credentials = self._deep_copy(credentials)
 
-        # get fields need to be decrypted
+        # 获取需要遮掩的字段
         fields = self.provider_controller.get_credentials_schema()
         for field_name, field in fields.items():
             if field.type == ToolProviderCredentials.CredentialsType.SECRET_INPUT:
@@ -71,20 +86,25 @@ class ToolConfigurationManager(BaseModel):
 
     def decrypt_tool_credentials(self, credentials: dict[str, str]) -> dict[str, str]:
         """
-        decrypt tool credentials with tenant id
-
-        return a deep copy of credentials with decrypted values
+        使用租户ID解密工具凭据。
+        
+        参数:
+        - credentials: 一个字典，包含加密的工具凭据信息。
+        
+        返回值:
+        - 一个字典，包含解密后的凭据信息。
         """
         cache = ToolProviderCredentialsCache(
             tenant_id=self.tenant_id, 
             identity_id=f'{self.provider_controller.app_type.value}.{self.provider_controller.identity.name}',
             cache_type=ToolProviderCredentialsCacheType.PROVIDER
         )
-        cached_credentials = cache.get()
+        cached_credentials = cache.get()  # 尝试从缓存获取凭据
         if cached_credentials:
             return cached_credentials
         credentials = self._deep_copy(credentials)
-        # get fields need to be decrypted
+        
+        # 获取需要解密的字段
         fields = self.provider_controller.get_credentials_schema()
         for field_name, field in fields.items():
             if field.type == ToolProviderCredentials.CredentialsType.SECRET_INPUT:
@@ -92,44 +112,53 @@ class ToolConfigurationManager(BaseModel):
                     try:
                         credentials[field_name] = encrypter.decrypt_token(self.tenant_id, credentials[field_name])
                     except:
-                        pass
+                        pass  # 解密失败时忽略该凭据项
 
-        cache.set(credentials)
+        cache.set(credentials)  # 将解密后的凭据缓存起来
         return credentials
     
     def delete_tool_credentials_cache(self):
+        """
+        删除工具凭据的缓存。
+        """
         cache = ToolProviderCredentialsCache(
             tenant_id=self.tenant_id, 
             identity_id=f'{self.provider_controller.app_type.value}.{self.provider_controller.identity.name}',
             cache_type=ToolProviderCredentialsCacheType.PROVIDER
         )
-        cache.delete()
+        cache.delete()  # 删除指定租户和身份的工具凭据缓存
 
 class ToolParameterConfigurationManager(BaseModel):
     """
-    Tool parameter configuration manager
+    工具参数配置管理器
+    负责处理工具参数的配置工作，包括复制、合并、遮蔽、加密与解密等功能。
     """
-    tenant_id: str
-    tool_runtime: Tool
-    provider_name: str
-    provider_type: str
-    identity_id: str
+    tenant_id: str  # 租户ID
+    tool_runtime: Tool  # 工具运行时实例
+    provider_name: str  # 提供商名称
+    provider_type: str  # 提供商类型
+    identity_id: str  # 身份标识ID
 
     def _deep_copy(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """
-        deep copy parameters
+        对给定的参数字典进行深度复制。
+
+        :param parameters: 需要深度复制的参数字典。
+        :return: 输入参数字典的深度副本。
         """
         return deepcopy(parameters)
     
     def _merge_parameters(self) -> list[ToolParameter]:
         """
-        merge parameters
+        合并工具参数与运行时参数。
+
+        :return: 考虑了工具默认参数及运行时特有参数的合并后工具参数列表。
         """
-        # get tool parameters
+        # 结合工具默认参数与运行时参数
         tool_parameters = self.tool_runtime.parameters or []
-        # get tool runtime parameters
         runtime_parameters = self.tool_runtime.get_runtime_parameters() or []
-        # override parameters
+        
+        # 使用运行时参数覆盖默认参数
         current_parameters = tool_parameters.copy()
         for runtime_parameter in runtime_parameters:
             found = False
@@ -138,30 +167,32 @@ class ToolParameterConfigurationManager(BaseModel):
                     current_parameters[index] = runtime_parameter
                     found = True
                     break
-
             if not found and runtime_parameter.form == ToolParameter.ToolParameterForm.FORM:
                 current_parameters.append(runtime_parameter)
-
+        
         return current_parameters
     
     def mask_tool_parameters(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """
-        mask tool parameters
+        对敏感工具参数进行遮蔽处理，用星号替换其值。
 
-        return a deep copy of parameters with masked values
+        :param parameters: 包含工具参数的字典。
+        :return: 带有敏感参数遮蔽值的字典。
         """
         parameters = self._deep_copy(parameters)
 
-        # override parameters
+        # 合并参数以识别需要遮蔽的项
         current_parameters = self._merge_parameters()
 
+        # 执行敏感参数的遮蔽逻辑
         for parameter in current_parameters:
             if parameter.form == ToolParameter.ToolParameterForm.FORM and parameter.type == ToolParameter.ToolParameterType.SECRET_INPUT:
                 if parameter.name in parameters:
+                    # 根据参数长度执行遮蔽逻辑
                     if len(parameters[parameter.name]) > 6:
                         parameters[parameter.name] = \
                             parameters[parameter.name][:2] + \
-                            '*' * (len(parameters[parameter.name]) - 4) +\
+                            '*' * (len(parameters[parameter.name]) - 4) + \
                             parameters[parameter.name][-2:]
                     else:
                         parameters[parameter.name] = '*' * len(parameters[parameter.name])
@@ -170,15 +201,17 @@ class ToolParameterConfigurationManager(BaseModel):
     
     def encrypt_tool_parameters(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """
-        encrypt tool parameters with tenant id
+        使用租户ID对敏感工具参数进行加密。
 
-        return a deep copy of parameters with encrypted values
+        :param parameters: 包含工具参数的字典，可能包含明文敏感信息。
+        :return: 带有敏感参数加密值的字典。
         """
-        # override parameters
+        # 合并参数以识别需要加密的项
         current_parameters = self._merge_parameters()
 
         parameters = self._deep_copy(parameters)
 
+        # 执行敏感参数的加密
         for parameter in current_parameters:
             if parameter.form == ToolParameter.ToolParameterForm.FORM and parameter.type == ToolParameter.ToolParameterType.SECRET_INPUT:
                 if parameter.name in parameters:
@@ -189,40 +222,12 @@ class ToolParameterConfigurationManager(BaseModel):
     
     def decrypt_tool_parameters(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """
-        decrypt tool parameters with tenant id
+        使用租户ID对已加密的敏感工具参数进行解密。
 
-        return a deep copy of parameters with decrypted values
+        :param parameters: 可能含有加密敏感参数的字典。
+        :return: 带有敏感参数解密值的字典。
         """
-        cache = ToolParameterCache(
-            tenant_id=self.tenant_id, 
-            provider=f'{self.provider_type}.{self.provider_name}',
-            tool_name=self.tool_runtime.identity.name,
-            cache_type=ToolParameterCacheType.PARAMETER,
-            identity_id=self.identity_id
-        )
-        cached_parameters = cache.get()
-        if cached_parameters:
-            return cached_parameters
-
-        # override parameters
-        current_parameters = self._merge_parameters()
-        has_secret_input = False
-
-        for parameter in current_parameters:
-            if parameter.form == ToolParameter.ToolParameterForm.FORM and parameter.type == ToolParameter.ToolParameterType.SECRET_INPUT:
-                if parameter.name in parameters:
-                    try:
-                        has_secret_input = True
-                        parameters[parameter.name] = encrypter.decrypt_token(self.tenant_id, parameters[parameter.name])
-                    except:
-                        pass
-        
-        if has_secret_input:
-            cache.set(parameters)
-
-        return parameters
-    
-    def delete_tool_parameters_cache(self):
+        # 尝试从缓存中获取已解密的参数
         cache = ToolParameterCache(
             tenant_id=self.tenant_id, 
             provider=f'{self.provider_type}.{self.provider_name}',
@@ -234,40 +239,52 @@ class ToolParameterConfigurationManager(BaseModel):
 
 class ModelToolConfigurationManager:
     """
-    Model as tool configuration
+    用于管理模型工具配置的类。
     """
-    _configurations: dict[str, ModelToolProviderConfiguration] = {}
-    _model_configurations: dict[str, ModelToolConfiguration] = {}
-    _inited = False
+
+    _configurations: dict[str, ModelToolProviderConfiguration] = {}  # 保存供应商配置的字典
+    _model_configurations: dict[str, ModelToolConfiguration] = {}  # 保存模型配置的字典
+    _inited = False  # 标记是否已经初始化配置
 
     @classmethod
     def _init_configuration(cls):
         """
-        init configuration
+        初始化配置。
+        从指定目录加载所有.yaml配置文件，解析并保存到类变量中。
         """
         
+        # 计算model_tools目录的绝对路径
         absolute_path = os.path.abspath(os.path.dirname(__file__))
         model_tools_path = os.path.join(absolute_path, '..', 'model_tools')
 
-        # get all .yaml file
+        # 获取所有.yaml配置文件
         files = [f for f in os.listdir(model_tools_path) if f.endswith('.yaml')]
 
         for file in files:
-            provider = file.split('.')[0]
+            provider = file.split('.')[0]  # 从文件名提取供应商名称
             with open(os.path.join(model_tools_path, file), encoding='utf-8') as f:
+                # 加载配置文件内容
                 configurations = ModelToolProviderConfiguration(**load(f, Loader=FullLoader))
-                models = configurations.models or []
+                models = configurations.models or []  # 获取模型列表，若不存在则默认为空列表
                 for model in models:
+                    # 生成并保存模型配置的键值对
                     model_key = f'{provider}.{model.model}'
                     cls._model_configurations[model_key] = model
 
+                # 保存供应商配置的键值对
                 cls._configurations[provider] = configurations
-        cls._inited = True
+        cls._inited = True  # 标记配置已初始化
 
     @classmethod
     def get_configuration(cls, provider: str) -> Union[ModelToolProviderConfiguration, None]:
         """
-        get configuration by provider
+        根据供应商名称获取配置。
+        
+        参数:
+        - provider: str，供应商名称。
+        
+        返回值:
+        - Union[ModelToolProviderConfiguration, None]，如果找到对应的配置则返回ModelToolProviderConfiguration对象，否则返回None。
         """
         if not cls._inited:
             cls._init_configuration()
@@ -276,7 +293,10 @@ class ModelToolConfigurationManager:
     @classmethod
     def get_all_configuration(cls) -> dict[str, ModelToolProviderConfiguration]:
         """
-        get all configurations
+        获取所有供应商的配置。
+        
+        返回值:
+        - dict[str, ModelToolProviderConfiguration]，键为供应商名称，值为对应的ModelToolProviderConfiguration对象。
         """
         if not cls._inited:
             cls._init_configuration()
@@ -285,9 +305,16 @@ class ModelToolConfigurationManager:
     @classmethod
     def get_model_configuration(cls, provider: str, model: str) -> Union[ModelToolConfiguration, None]:
         """
-        get model configuration
+        根据供应商和模型名称获取模型配置。
+        
+        参数:
+        - provider: str，供应商名称。
+        - model: str，模型名称。
+        
+        返回值:
+        - Union[ModelToolConfiguration, None]，如果找到对应的模型配置则返回ModelToolConfiguration对象，否则返回None。
         """
-        key = f'{provider}.{model}'
+        key = f'{provider}.{model}'  # 生成模型配置的键
 
         if not cls._inited:
             cls._init_configuration()

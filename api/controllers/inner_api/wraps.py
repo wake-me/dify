@@ -10,12 +10,22 @@ from models.model import EndUser
 
 
 def inner_api_only(view):
+    """
+    装饰器，用于限制只有内部API才能访问视图函数。
+    
+    参数:
+    - view: 被装饰的视图函数。
+    
+    返回值:
+    - 经过装饰，添加了API访问限制的视图函数。
+    """
     @wraps(view)
     def decorated(*args, **kwargs):
+        # 检查是否启用了内部API
         if not current_app.config['INNER_API']:
             abort(404)
 
-        # get header 'X-Inner-Api-Key'
+        # 验证请求头中的'X-Inner-Api-Key'
         inner_api_key = request.headers.get('X-Inner-Api-Key')
         if not inner_api_key or inner_api_key != current_app.config['INNER_API_KEY']:
             abort(404)
@@ -26,16 +36,27 @@ def inner_api_only(view):
 
 
 def inner_api_user_auth(view):
+    """
+    装饰器，用于内部API用户认证。
+    
+    参数:
+    - view: 被装饰的视图函数。
+    
+    返回值:
+    - 经过装饰，添加了用户认证逻辑的视图函数。
+    """
     @wraps(view)
     def decorated(*args, **kwargs):
+        # 检查是否启用了内部API，未启用则直接访问视图
         if not current_app.config['INNER_API']:
             return view(*args, **kwargs)
 
-        # get header 'X-Inner-Api-Key'
+        # 获取请求头中的'Authorization'字段
         authorization = request.headers.get('Authorization')
         if not authorization:
             return view(*args, **kwargs)
 
+        # 解析Authorization字段
         parts = authorization.split(':')
         if len(parts) != 2:
             return view(*args, **kwargs)
@@ -44,16 +65,17 @@ def inner_api_user_auth(view):
         if ' ' in user_id:
             user_id = user_id.split(' ')[1]
 
+        # 获取'X-Inner-Api-Key'并进行签名验证
         inner_api_key = request.headers.get('X-Inner-Api-Key')
 
         data_to_sign = f'DIFY {user_id}'
-
         signature = hmac_new(inner_api_key.encode('utf-8'), data_to_sign.encode('utf-8'), sha1)
         signature = b64encode(signature.digest()).decode('utf-8')
 
         if signature != token:
             return view(*args, **kwargs)
 
+        # 通过user_id查询用户信息，并传递给视图函数
         kwargs['user'] = db.session.query(EndUser).filter(EndUser.id == user_id).first()
 
         return view(*args, **kwargs)
