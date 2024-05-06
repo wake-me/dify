@@ -7,7 +7,6 @@ from core.entities.provider_entities import QuotaUnit, RestrictModel
 from core.model_runtime.entities.model_entities import ModelType
 from models.provider import ProviderQuotaType
 
-
 """
 HostingQuota 和其子类定义了不同类型的宿主配额信息。
 BaseModel 是一个基类，提供模型的基本结构。
