@@ -1,11 +1,9 @@
 # 导入枚举类
 import enum
 
-# 导入PostgreSQL中的UUID类型
-from sqlalchemy.dialects.postgresql import UUID
-
 # 导入数据库扩展模块
 from extensions.ext_database import db
+from models import StringUUID
 
 
 # 定义基于API的扩展点枚举类
@@ -38,9 +36,9 @@ class APIBasedExtension(db.Model):
         db.Index('api_based_extension_tenant_idx', 'tenant_id'),  # 为tenant_id创建索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，使用函数生成默认值
-    tenant_id = db.Column(UUID, nullable=False)  # 租户ID列，不可为空
-    name = db.Column(db.String(255), nullable=False)  # 名称列，不可为空
-    api_endpoint = db.Column(db.String(255), nullable=False)  # API端点列，不可为空
-    api_key = db.Column(db.Text, nullable=False)  # API密钥列，不可为空
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间列，不可为空，默认为当前时间
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    api_endpoint = db.Column(db.String(255), nullable=False)
+    api_key = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))

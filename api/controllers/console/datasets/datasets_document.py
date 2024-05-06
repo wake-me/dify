@@ -588,11 +588,6 @@ class DocumentBatchIndexingEstimateApi(DocumentResource):
         # 校验请求所需的设置和用户登录状态
         dataset_id = str(dataset_id)
         batch = str(batch)
-        # 获取指定ID的数据集
-        dataset = DatasetService.get_dataset(dataset_id)
-        if dataset is None:
-            raise NotFound("Dataset not found.")
-        # 获取批次的文档信息
         documents = self.get_batch_documents(dataset_id, batch)
         # 初始化响应信息
         response = {

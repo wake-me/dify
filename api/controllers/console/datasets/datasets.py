@@ -749,7 +749,7 @@ class DatasetRetrievalSettingApi(Resource):
             dict: 包含一个名为'retrieval_method'的列表键，列表中包含支持的检索方法。
         """
         vector_type = current_app.config['VECTOR_STORE']
-        if vector_type == 'milvus' or vector_type == 'relyt':
+        if vector_type == 'milvus' or vector_type == 'pgvecto_rs' or vector_type == 'relyt':
             return {
                 'retrieval_method': [
                     'semantic_search'

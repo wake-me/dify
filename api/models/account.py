@@ -4,10 +4,10 @@ import json
 
 # 导入Flask-Login的用户混合类和PostgreSQL的UUID类型
 from flask_login import UserMixin
-from sqlalchemy.dialects.postgresql import UUID
 
 # 导入数据库扩展
 from extensions.ext_database import db
+from models import StringUUID
 
 
 #
@@ -73,8 +73,7 @@ class Account(UserMixin, db.Model):
         db.Index('account_email_idx', 'email')
     )
 
-    # 定义数据库表和字段
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
     name = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255), nullable=False)
     password = db.Column(db.String(255), nullable=True)
@@ -239,7 +238,7 @@ class Tenant(db.Model):
         db.PrimaryKeyConstraint('id', name='tenant_pkey'),
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
     name = db.Column(db.String(255), nullable=False)
     encrypt_public_key = db.Column(db.Text)
     plan = db.Column(db.String(255), nullable=False, server_default=db.text("'basic'::character varying"))
@@ -311,12 +310,12 @@ class TenantAccountJoin(db.Model):
         db.UniqueConstraint('tenant_id', 'account_id', name='unique_tenant_account_join')
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
-    account_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    account_id = db.Column(StringUUID, nullable=False)
     current = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
     role = db.Column(db.String(16), nullable=False, server_default='normal')
-    invited_by = db.Column(UUID, nullable=True)
+    invited_by = db.Column(StringUUID, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
     updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
@@ -346,13 +345,13 @@ class AccountIntegrate(db.Model):
         db.UniqueConstraint('provider', 'open_id', name='unique_provider_open_id')  # 确保提供者和开放ID组合唯一
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，使用函数生成默认值
-    account_id = db.Column(UUID, nullable=False)  # 账户ID列，不允许为空
-    provider = db.Column(db.String(16), nullable=False)  # 提供者名称列，不允许为空
-    open_id = db.Column(db.String(255), nullable=False)  # 提供者的用户唯一标识符，不允许为空
-    encrypted_token = db.Column(db.String(255), nullable=False)  # 加密的令牌，不允许为空
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 记录创建时间，默认为当前时间
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 记录更新时间，默认为当前时间
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    account_id = db.Column(StringUUID, nullable=False)
+    provider = db.Column(db.String(16), nullable=False)
+    open_id = db.Column(db.String(255), nullable=False)
+    encrypted_token = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
 
 class InvitationCode(db.Model):
@@ -378,12 +377,12 @@ class InvitationCode(db.Model):
         db.Index('invitation_codes_code_idx', 'code', 'status')  # 为code和status创建复合索引
     )
 
-    id = db.Column(db.Integer, nullable=False)  # 邀请码的唯一标识符
-    batch = db.Column(db.String(255), nullable=False)  # 邀请码所属的批次
-    code = db.Column(db.String(32), nullable=False)  # 邀请码的代码
-    status = db.Column(db.String(16), nullable=False, server_default=db.text("'unused'::character varying"))  # 邀请码的状态
-    used_at = db.Column(db.DateTime)  # 邀请码被使用的时间
-    used_by_tenant_id = db.Column(UUID)  # 使用邀请码的租户ID
-    used_by_account_id = db.Column(UUID)  # 使用邀请码的账户ID
-    deprecated_at = db.Column(db.DateTime)  # 邀请码废弃的时间
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 邀请码创建的时间
+    id = db.Column(db.Integer, nullable=False)
+    batch = db.Column(db.String(255), nullable=False)
+    code = db.Column(db.String(32), nullable=False)
+    status = db.Column(db.String(16), nullable=False, server_default=db.text("'unused'::character varying"))
+    used_at = db.Column(db.DateTime)
+    used_by_tenant_id = db.Column(StringUUID)
+    used_by_account_id = db.Column(StringUUID)
+    deprecated_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))

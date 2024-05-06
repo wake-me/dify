@@ -1,6 +1,7 @@
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB
 
 from extensions.ext_database import db
+from models import StringUUID
 
 
 class DataSourceBinding(db.Model):
@@ -29,11 +30,11 @@ class DataSourceBinding(db.Model):
         db.Index('source_info_idx', "source_info", postgresql_using='gin')  # 基于source_info的GIN索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 绑定关系的唯一标识符
-    tenant_id = db.Column(UUID, nullable=False)  # 租户的唯一标识符
-    access_token = db.Column(db.String(255), nullable=False)  # 访问令牌
-    provider = db.Column(db.String(255), nullable=False)  # 提供者
-    source_info = db.Column(JSONB, nullable=False)  # 数据源信息
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间
-    disabled = db.Column(db.Boolean, nullable=True, server_default=db.text('false'))  # 是否禁用
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    access_token = db.Column(db.String(255), nullable=False)
+    provider = db.Column(db.String(255), nullable=False)
+    source_info = db.Column(JSONB, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    disabled = db.Column(db.Boolean, nullable=True, server_default=db.text('false'))

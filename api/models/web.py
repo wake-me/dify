@@ -1,6 +1,7 @@
-from sqlalchemy.dialects.postgresql import UUID
+
 
 from extensions.ext_database import db
+from models import StringUUID
 from models.model import Message
 
 
@@ -26,13 +27,12 @@ class SavedMessage(db.Model):
         db.Index('saved_message_message_idx', 'app_id', 'message_id', 'created_by_role', 'created_by'),  # 创建索引以优化查询
     )
 
-    # 定义数据库表的列
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # id列，使用UUID生成器
-    app_id = db.Column(UUID, nullable=False)  # app_id列，不可为空
-    message_id = db.Column(UUID, nullable=False)  # message_id列，不可为空
-    created_by_role = db.Column(db.String(255), nullable=False, server_default=db.text("'end_user'::character varying"))  # 创建者的角色，默认为终端用户
-    created_by = db.Column(UUID, nullable=False)  # 创建者的ID，不可为空
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间，不可为空，默认为当前时间
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
+    message_id = db.Column(StringUUID, nullable=False)
+    created_by_role = db.Column(db.String(255), nullable=False, server_default=db.text("'end_user'::character varying"))
+    created_by = db.Column(StringUUID, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
     @property
     def message(self):
@@ -62,9 +62,9 @@ class PinnedConversation(db.Model):
         db.Index('pinned_conversation_conversation_idx', 'app_id', 'conversation_id', 'created_by_role', 'created_by'),  # 创建索引以优化查询
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 为对话生成一个唯一的UUID
-    app_id = db.Column(UUID, nullable=False)  # 关联的应用ID
-    conversation_id = db.Column(UUID, nullable=False)  # 对话的ID
-    created_by_role = db.Column(db.String(255), nullable=False, server_default=db.text("'end_user'::character varying"))  # 创建者角色，默认为终端用户
-    created_by = db.Column(UUID, nullable=False)  # 创建者的ID
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间，默认为当前时间
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
+    conversation_id = db.Column(StringUUID, nullable=False)
+    created_by_role = db.Column(db.String(255), nullable=False, server_default=db.text("'end_user'::character varying"))
+    created_by = db.Column(StringUUID, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))

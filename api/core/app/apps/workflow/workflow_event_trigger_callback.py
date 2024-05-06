@@ -6,6 +6,7 @@ from core.app.entities.queue_entities import (
     QueueNodeFailedEvent,
     QueueNodeStartedEvent,
     QueueNodeSucceededEvent,
+    QueueTextChunkEvent,
     QueueWorkflowFailedEvent,
     QueueWorkflowStartedEvent,
     QueueWorkflowSucceededEvent,
@@ -178,7 +179,15 @@ class WorkflowEventTriggerCallback(BaseWorkflowCallback):
             text (str): 文本内容。
             metadata (Optional[dict]): 元数据，默认为None。
         """
-        pass
+        self._queue_manager.publish(
+            QueueTextChunkEvent(
+                text=text,
+                metadata={
+                    "node_id": node_id,
+                    **metadata
+                }
+            ), PublishFrom.APPLICATION_MANAGER
+        )
 
     def on_event(self, event: AppQueueEvent) -> None:
         """

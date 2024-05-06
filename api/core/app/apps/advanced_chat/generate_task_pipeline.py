@@ -28,9 +28,9 @@ from core.app.entities.task_entities import (
     AdvancedChatTaskState,
     ChatbotAppBlockingResponse,
     ChatbotAppStreamResponse,
+    ChatflowStreamGenerateRoute,
     ErrorStreamResponse,
     MessageEndStreamResponse,
-    StreamGenerateRoute,
     StreamResponse,
 )
 from core.app.task_pipeline.based_generate_task_pipeline import BasedGenerateTaskPipeline
@@ -386,7 +386,7 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
             **extras
         )
 
-    def _get_stream_generate_routes(self) -> dict[str, StreamGenerateRoute]:
+    def _get_stream_generate_routes(self) -> dict[str, ChatflowStreamGenerateRoute]:
         """
         获取流生成路由。
         :return: 返回一个字典，键为起始节点ID，值为StreamGenerateRoute对象，该对象包含答案节点ID和生成路由信息。
@@ -409,7 +409,7 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
                 continue
 
             for start_node_id in start_node_ids:
-                stream_generate_routes[start_node_id] = StreamGenerateRoute(
+                stream_generate_routes[start_node_id] = ChatflowStreamGenerateRoute(
                     answer_node_id=answer_node_id,
                     generate_route=generate_route
                 )
@@ -479,16 +479,14 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
                 # 处理文本类型的路由块
                 if route_chunk.type == 'text':
                     route_chunk = cast(TextGenerateRouteChunk, route_chunk)
-                    for token in route_chunk.text:
-                        # 处理输出审核块
-                        should_direct_answer = self._handle_output_moderation_chunk(token)
-                        if should_direct_answer:
-                            continue  # 直接回答，跳过当前token的处理
 
-                        self._task_state.answer += token
-                        yield self._message_to_stream_response(token, self._message.id)  # 将token转换为流响应并yield
-                        time.sleep(0.01)  # 为每个token添加一个小的延迟
+                    # handle output moderation chunk
+                    should_direct_answer = self._handle_output_moderation_chunk(route_chunk.text)
+                    if should_direct_answer:
+                        continue
 
+                    self._task_state.answer += route_chunk.text
+                    yield self._message_to_stream_response(route_chunk.text, self._message.id)
                 else:
                     break  # 如果遇到非文本类型的路由块，终止循环
 
@@ -517,10 +515,8 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
             # 处理文本类型的路由块
             if route_chunk.type == 'text':
                 route_chunk = cast(TextGenerateRouteChunk, route_chunk)
-                for token in route_chunk.text:
-                    self._task_state.answer += token
-                    yield self._message_to_stream_response(token, self._message.id)
-                    time.sleep(0.01)
+                self._task_state.answer += route_chunk.text
+                yield self._message_to_stream_response(route_chunk.text, self._message.id)
             else:
                 route_chunk = cast(VarGenerateRouteChunk, route_chunk)
                 value_selector = route_chunk.value_selector

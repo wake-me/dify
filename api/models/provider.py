@@ -1,8 +1,7 @@
 from enum import Enum
 
-from sqlalchemy.dialects.postgresql import UUID
-
 from extensions.ext_database import db
+from models import StringUUID
 
 
 class ProviderType(Enum):
@@ -79,9 +78,8 @@ class Provider(db.Model):
         db.UniqueConstraint('tenant_id', 'provider_name', 'provider_type', 'quota_type', name='unique_provider_name_type_quota')
     )
 
-    # 数据库表和字段的定义
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
     provider_name = db.Column(db.String(40), nullable=False)
     provider_type = db.Column(db.String(40), nullable=False, server_default=db.text("'custom'::character varying"))
     encrypted_config = db.Column(db.Text, nullable=True)
@@ -153,15 +151,16 @@ class ProviderModel(db.Model):
         db.UniqueConstraint('tenant_id', 'provider_name', 'model_name', 'model_type', name='unique_provider_model_name')  # 唯一性约束，保证四元组唯一
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，自动生成
-    tenant_id = db.Column(UUID, nullable=False)  # 租户ID列
-    provider_name = db.Column(db.String(40), nullable=False)  # 提供者名称列
-    model_name = db.Column(db.String(255), nullable=False)  # 模型名称列
-    model_type = db.Column(db.String(40), nullable=False)  # 模型类型列
-    encrypted_config = db.Column(db.Text, nullable=True)  # 加密配置信息列
-    is_valid = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))  # 是否有效列
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间列
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间列
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    provider_name = db.Column(db.String(40), nullable=False)
+    model_name = db.Column(db.String(255), nullable=False)
+    model_type = db.Column(db.String(40), nullable=False)
+    encrypted_config = db.Column(db.Text, nullable=True)
+    is_valid = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+
 
 class TenantDefaultModel(db.Model):
     """
@@ -188,13 +187,13 @@ class TenantDefaultModel(db.Model):
         db.Index('tenant_default_model_tenant_id_provider_type_idx', 'tenant_id', 'provider_name', 'model_type'),  # 定义复合索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，使用函数生成默认值
-    tenant_id = db.Column(UUID, nullable=False)  # 租户ID列，不可为空
-    provider_name = db.Column(db.String(40), nullable=False)  # 提供者名称列，不可为空，最大长度40
-    model_name = db.Column(db.String(40), nullable=False)  # 模型名称列，不可为空，最大长度40
-    model_type = db.Column(db.String(40), nullable=False)  # 模型类型列，不可为空，最大长度40
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 记录创建时间，不可为空，默认为当前时间
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 记录更新时间，不可为空，默认为当前时间
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    provider_name = db.Column(db.String(40), nullable=False)
+    model_name = db.Column(db.String(40), nullable=False)
+    model_type = db.Column(db.String(40), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
 
 class TenantPreferredModelProvider(db.Model):
@@ -219,12 +218,13 @@ class TenantPreferredModelProvider(db.Model):
         db.Index('tenant_preferred_model_provider_tenant_provider_idx', 'tenant_id', 'provider_name'),  # 创建索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 定义id列
-    tenant_id = db.Column(UUID, nullable=False)  # 定义tenant_id列
-    provider_name = db.Column(db.String(40), nullable=False)  # 定义provider_name列
-    preferred_provider_type = db.Column(db.String(40), nullable=False)  # 定义preferred_provider_type列
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 定义created_at列
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 定义updated_at列
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    provider_name = db.Column(db.String(40), nullable=False)
+    preferred_provider_type = db.Column(db.String(40), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+
 
 class ProviderOrder(db.Model):
     """
@@ -254,19 +254,19 @@ class ProviderOrder(db.Model):
         db.Index('provider_order_tenant_provider_idx', 'tenant_id', 'provider_name'),  # 创建索引以提高查询效率
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 订单唯一标识符
-    tenant_id = db.Column(UUID, nullable=False)  # 租户唯一标识符
-    provider_name = db.Column(db.String(40), nullable=False)  # 供应商名称
-    account_id = db.Column(UUID, nullable=False)  # 供应商账户标识符
-    payment_product_id = db.Column(db.String(191), nullable=False)  # 支付产品标识符
-    payment_id = db.Column(db.String(191))  # 支付标识符
-    transaction_id = db.Column(db.String(191))  # 交易标识符
-    quantity = db.Column(db.Integer, nullable=False, server_default=db.text('1'))  # 订单数量
-    currency = db.Column(db.String(40))  # 货币单位
-    total_amount = db.Column(db.Integer)  # 订单总金额
-    payment_status = db.Column(db.String(40), nullable=False, server_default=db.text("'wait_pay'::character varying"))  # 支付状态
-    paid_at = db.Column(db.DateTime)  # 支付完成时间
-    pay_failed_at = db.Column(db.DateTime)  # 支付失败时间
-    refunded_at = db.Column(db.DateTime)  # 退款完成时间
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 订单创建时间
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 订单最后更新时间
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    provider_name = db.Column(db.String(40), nullable=False)
+    account_id = db.Column(StringUUID, nullable=False)
+    payment_product_id = db.Column(db.String(191), nullable=False)
+    payment_id = db.Column(db.String(191))
+    transaction_id = db.Column(db.String(191))
+    quantity = db.Column(db.Integer, nullable=False, server_default=db.text('1'))
+    currency = db.Column(db.String(40))
+    total_amount = db.Column(db.Integer)
+    payment_status = db.Column(db.String(40), nullable=False, server_default=db.text("'wait_pay'::character varying"))
+    paid_at = db.Column(db.DateTime)
+    pay_failed_at = db.Column(db.DateTime)
+    refunded_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))

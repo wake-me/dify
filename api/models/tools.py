@@ -1,12 +1,12 @@
 import json
 
 from sqlalchemy import ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
 
 from core.tools.entities.common_entities import I18nObject
 from core.tools.entities.tool_bundle import ApiBasedToolBundle
 from core.tools.entities.tool_entities import ApiProviderSchemaType
 from extensions.ext_database import db
+from models import StringUUID
 from models.model import Account, App, Tenant
 
 
@@ -33,14 +33,18 @@ class BuiltinToolProvider(db.Model):
         db.UniqueConstraint('tenant_id', 'provider', name='unique_builtin_tool_provider')
     )
 
-    # 工具提供商信息的字段定义
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 自动生成的工具提供商ID
-    tenant_id = db.Column(UUID, nullable=True)  # 租户ID
-    user_id = db.Column(UUID, nullable=False)  # 创建者用户ID
-    provider = db.Column(db.String(40), nullable=False)  # 提供商名称
-    encrypted_credentials = db.Column(db.Text, nullable=True)  # 加密凭证信息
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间
+    # id of the tool provider
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    # id of the tenant
+    tenant_id = db.Column(StringUUID, nullable=True)
+    # who created this tool provider
+    user_id = db.Column(StringUUID, nullable=False)
+    # name of the tool provider
+    provider = db.Column(db.String(40), nullable=False)
+    # credential of the tool provider
+    encrypted_credentials = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
     @property
     def credentials(self) -> dict:
@@ -63,13 +67,13 @@ class PublishedAppTool(db.Model):
         db.UniqueConstraint('app_id', 'user_id', name='unique_published_app_tool')  # 唯一性约束，确保每个应用对每个人只能发布一次
     )
 
-    # 工具提供者的id
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()')) 
-    # 应用的id
-    app_id = db.Column(UUID, ForeignKey('apps.id'), nullable=False)
-    # 发布此工具的用户id
-    user_id = db.Column(UUID, nullable=False)
-    # 工具的描述，以i18n格式存储，供人类阅读
+    # id of the tool provider
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    # id of the app
+    app_id = db.Column(StringUUID, ForeignKey('apps.id'), nullable=False)
+    # who published this tool
+    user_id = db.Column(StringUUID, nullable=False)
+    # description of the tool, stored in i18n format, for human
     description = db.Column(db.Text, nullable=False)
     # 工具的llm描述，供LLM使用
     llm_description = db.Column(db.Text, nullable=False)
@@ -138,13 +142,17 @@ class ApiToolProvider(db.Model):
         db.UniqueConstraint('name', 'tenant_id', name='unique_api_tool_provider')
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    # name of the api provider
     name = db.Column(db.String(40), nullable=False)
     icon = db.Column(db.String(255), nullable=False)
     schema = db.Column(db.Text, nullable=False)
     schema_type_str = db.Column(db.String(40), nullable=False)
-    user_id = db.Column(UUID, nullable=False)
-    tenant_id = db.Column(UUID, nullable=False)
+    # who created this tool
+    user_id = db.Column(StringUUID, nullable=False)
+    # tenant id
+    tenant_id = db.Column(StringUUID, nullable=False)
+    # description of the provider
     description = db.Column(db.Text, nullable=False)
     tools_str = db.Column(db.Text, nullable=False)
     credentials_str = db.Column(db.Text, nullable=False)
@@ -223,9 +231,12 @@ class ToolModelInvoke(db.Model):
         db.PrimaryKeyConstraint('id', name='tool_model_invoke_pkey'),
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    user_id = db.Column(UUID, nullable=False)
-    tenant_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    # who invoke this tool
+    user_id = db.Column(StringUUID, nullable=False)
+    # tenant id
+    tenant_id = db.Column(StringUUID, nullable=False)
+    # provider
     provider = db.Column(db.String(40), nullable=False)
     tool_type = db.Column(db.String(40), nullable=False)
     tool_name = db.Column(db.String(40), nullable=False)
@@ -267,10 +278,14 @@ class ToolConversationVariables(db.Model):
         db.Index('conversation_id_idx', 'conversation_id'),  # 会话ID索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    user_id = db.Column(UUID, nullable=False)
-    tenant_id = db.Column(UUID, nullable=False)
-    conversation_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    # conversation user id
+    user_id = db.Column(StringUUID, nullable=False)
+    # tenant id
+    tenant_id = db.Column(StringUUID, nullable=False)
+    # conversation id
+    conversation_id = db.Column(StringUUID, nullable=False)
+    # variables pool
     variables_str = db.Column(db.Text, nullable=False)
 
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
@@ -310,13 +325,13 @@ class ToolFile(db.Model):
         db.Index('tool_file_conversation_id_idx', 'conversation_id'),
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
     # conversation user id
-    user_id = db.Column(UUID, nullable=False)
+    user_id = db.Column(StringUUID, nullable=False)
     # tenant id
-    tenant_id = db.Column(UUID, nullable=False)
+    tenant_id = db.Column(StringUUID, nullable=False)
     # conversation id
-    conversation_id = db.Column(UUID, nullable=True)
+    conversation_id = db.Column(StringUUID, nullable=True)
     # file key
     file_key = db.Column(db.String(255), nullable=False)
     # mime type

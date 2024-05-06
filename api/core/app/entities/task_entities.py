@@ -9,14 +9,17 @@ from core.workflow.entities.node_entities import NodeType
 from core.workflow.nodes.answer.entities import GenerateRouteChunk
 
 
-class StreamGenerateRoute(BaseModel):
+class WorkflowStreamGenerateNodes(BaseModel):
     """
-    StreamGenerateRoute 实体类
+    WorkflowStreamGenerateNodes entity
+    """
+    end_node_id: str
+    stream_node_ids: list[str]
 
-    参数:
-    - answer_node_id: 答案节点ID，类型为str
-    - generate_route: 生成路由片段列表，类型为list[GenerateRouteChunk]
-    - current_route_position: 当前路由位置，初始值为0，类型为int
+
+class ChatflowStreamGenerateRoute(BaseModel):
+    """
+    ChatflowStreamGenerateRoute entity
     """
 
     answer_node_id: str
@@ -64,6 +67,8 @@ class WorkflowTaskState(TaskState):
     ran_node_execution_infos: dict[str, NodeExecutionInfo] = {}
     latest_node_execution_info: Optional[NodeExecutionInfo] = None
 
+    current_stream_generate_state: Optional[WorkflowStreamGenerateNodes] = None
+
 
 class AdvancedChatTaskState(WorkflowTaskState):
     """
@@ -75,7 +80,8 @@ class AdvancedChatTaskState(WorkflowTaskState):
     """
     usage: LLMUsage
 
-    current_stream_generate_state: Optional[StreamGenerateRoute] = None
+    current_stream_generate_state: Optional[ChatflowStreamGenerateRoute] = None
+
 
 class StreamEvent(Enum):
     """

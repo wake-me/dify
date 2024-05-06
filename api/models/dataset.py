@@ -4,10 +4,11 @@ import pickle
 from json import JSONDecodeError
 
 from sqlalchemy import func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB
 
 from extensions.ext_database import db
 from extensions.ext_storage import storage
+from models import StringUUID
 from models.account import Account
 from models.model import App, Tag, TagBinding, UploadFile
 
@@ -57,11 +58,10 @@ class Dataset(db.Model):
         db.Index('retrieval_model_idx', "retrieval_model", postgresql_using='gin')  # 创建检索模型的Gin索引
     )
 
-    INDEXING_TECHNIQUE_LIST = ['high_quality', 'economy', None]  # 定义可用的索引技术列表
+    INDEXING_TECHNIQUE_LIST = ['high_quality', 'economy', None]
 
-    # 数据集表的所有字段及其属性
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=True)
     provider = db.Column(db.String(255), nullable=False,
@@ -71,15 +71,15 @@ class Dataset(db.Model):
     data_source_type = db.Column(db.String(255))
     indexing_technique = db.Column(db.String(255), nullable=True)
     index_struct = db.Column(db.Text, nullable=True)
-    created_by = db.Column(UUID, nullable=False)
+    created_by = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False,
                            server_default=db.text('CURRENT_TIMESTAMP(0)'))
-    updated_by = db.Column(UUID, nullable=True)
+    updated_by = db.Column(StringUUID, nullable=True)
     updated_at = db.Column(db.DateTime, nullable=False,
                            server_default=db.text('CURRENT_TIMESTAMP(0)'))
     embedding_model = db.Column(db.String(255), nullable=True)
     embedding_model_provider = db.Column(db.String(255), nullable=True)
-    collection_binding_id = db.Column(UUID, nullable=True)
+    collection_binding_id = db.Column(StringUUID, nullable=True)
     retrieval_model = db.Column(JSONB, nullable=True)
 
     @property
@@ -284,13 +284,13 @@ class DatasetProcessRule(db.Model):
         db.Index('dataset_process_rule_dataset_id_idx', 'dataset_id'),
     )
 
-    id = db.Column(UUID, nullable=False,
+    id = db.Column(StringUUID, nullable=False,
                    server_default=db.text('uuid_generate_v4()'))
-    dataset_id = db.Column(UUID, nullable=False)
+    dataset_id = db.Column(StringUUID, nullable=False)
     mode = db.Column(db.String(255), nullable=False,
                      server_default=db.text("'automatic'::character varying"))
     rules = db.Column(db.Text, nullable=True)
-    created_by = db.Column(UUID, nullable=False)
+    created_by = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False,
                            server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
@@ -403,20 +403,20 @@ class Document(db.Model):
         db.Index('document_tenant_idx', 'tenant_id'),
     )
 
-    # 初始化字段
-    id = db.Column(UUID, nullable=False,
+    # initial fields
+    id = db.Column(StringUUID, nullable=False,
                    server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
-    dataset_id = db.Column(UUID, nullable=False)
+    tenant_id = db.Column(StringUUID, nullable=False)
+    dataset_id = db.Column(StringUUID, nullable=False)
     position = db.Column(db.Integer, nullable=False)
     data_source_type = db.Column(db.String(255), nullable=False)
     data_source_info = db.Column(db.Text, nullable=True)
-    dataset_process_rule_id = db.Column(UUID, nullable=True)
+    dataset_process_rule_id = db.Column(StringUUID, nullable=True)
     batch = db.Column(db.String(255), nullable=False)
     name = db.Column(db.String(255), nullable=False)
     created_from = db.Column(db.String(255), nullable=False)
-    created_by = db.Column(UUID, nullable=False)
-    created_api_request_id = db.Column(UUID, nullable=True)
+    created_by = db.Column(StringUUID, nullable=False)
+    created_api_request_id = db.Column(StringUUID, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False,
                            server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
@@ -441,7 +441,7 @@ class Document(db.Model):
 
     # 暂停
     is_paused = db.Column(db.Boolean, nullable=True, server_default=db.text('false'))
-    paused_by = db.Column(UUID, nullable=True)
+    paused_by = db.Column(StringUUID, nullable=True)
     paused_at = db.Column(db.DateTime, nullable=True)
 
     # 错误
@@ -454,11 +454,11 @@ class Document(db.Model):
     enabled = db.Column(db.Boolean, nullable=False,
                         server_default=db.text('true'))
     disabled_at = db.Column(db.DateTime, nullable=True)
-    disabled_by = db.Column(UUID, nullable=True)
+    disabled_by = db.Column(StringUUID, nullable=True)
     archived = db.Column(db.Boolean, nullable=False,
                          server_default=db.text('false'))
     archived_reason = db.Column(db.String(255), nullable=True)
-    archived_by = db.Column(UUID, nullable=True)
+    archived_by = db.Column(StringUUID, nullable=True)
     archived_at = db.Column(db.DateTime, nullable=True)
     updated_at = db.Column(db.DateTime, nullable=False,
                            server_default=db.text('CURRENT_TIMESTAMP(0)'))
@@ -655,12 +655,12 @@ class DocumentSegment(db.Model):
         db.Index('document_segment_tenant_idx', 'tenant_id'),
     )
 
-    # 初始化字段
-    id = db.Column(UUID, nullable=False,
+    # initial fields
+    id = db.Column(StringUUID, nullable=False,
                    server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
-    dataset_id = db.Column(UUID, nullable=False)
-    document_id = db.Column(UUID, nullable=False)
+    tenant_id = db.Column(StringUUID, nullable=False)
+    dataset_id = db.Column(StringUUID, nullable=False)
+    document_id = db.Column(StringUUID, nullable=False)
     position = db.Column(db.Integer, nullable=False)
     content = db.Column(db.Text, nullable=False)
     answer = db.Column(db.Text, nullable=True)
@@ -677,13 +677,13 @@ class DocumentSegment(db.Model):
     enabled = db.Column(db.Boolean, nullable=False,
                         server_default=db.text('true'))
     disabled_at = db.Column(db.DateTime, nullable=True)
-    disabled_by = db.Column(UUID, nullable=True)
+    disabled_by = db.Column(StringUUID, nullable=True)
     status = db.Column(db.String(255), nullable=False,
                        server_default=db.text("'waiting'::character varying"))
-    created_by = db.Column(UUID, nullable=False)
+    created_by = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False,
                            server_default=db.text('CURRENT_TIMESTAMP(0)'))
-    updated_by = db.Column(UUID, nullable=True)
+    updated_by = db.Column(StringUUID, nullable=True)
     updated_at = db.Column(db.DateTime, nullable=False,
                            server_default=db.text('CURRENT_TIMESTAMP(0)'))
     indexing_at = db.Column(db.DateTime, nullable=True)
@@ -758,10 +758,9 @@ class AppDatasetJoin(db.Model):
         db.Index('app_dataset_join_app_dataset_idx', 'dataset_id', 'app_id'),  # 创建索引以优化查询
     )
 
-    # 定义模型的字段和类型
-    id = db.Column(UUID, primary_key=True, nullable=False, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=False)
-    dataset_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, primary_key=True, nullable=False, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
+    dataset_id = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
 
     @property
@@ -796,13 +795,13 @@ class DatasetQuery(db.Model):
         db.Index('dataset_query_dataset_id_idx', 'dataset_id'),  # 为dataset_id创建索引
     )
 
-    id = db.Column(UUID, primary_key=True, nullable=False, server_default=db.text('uuid_generate_v4()'))
-    dataset_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, primary_key=True, nullable=False, server_default=db.text('uuid_generate_v4()'))
+    dataset_id = db.Column(StringUUID, nullable=False)
     content = db.Column(db.Text, nullable=False)
     source = db.Column(db.String(255), nullable=False)
-    source_app_id = db.Column(UUID, nullable=True)
+    source_app_id = db.Column(StringUUID, nullable=True)
     created_by_role = db.Column(db.String, nullable=False)
-    created_by = db.Column(UUID, nullable=False)
+    created_by = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
 
 
@@ -825,9 +824,8 @@ class DatasetKeywordTable(db.Model):
         db.Index('dataset_keyword_table_dataset_id_idx', 'dataset_id'),  # 为dataset_id创建索引
     )
 
-
-    id = db.Column(UUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))
-    dataset_id = db.Column(UUID, nullable=False, unique=True)
+    id = db.Column(StringUUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))
+    dataset_id = db.Column(StringUUID, nullable=False, unique=True)
     keyword_table = db.Column(db.Text, nullable=False)
     data_source_type = db.Column(db.String(255), nullable=False,
                                  server_default=db.text("'database'::character varying"))
@@ -906,7 +904,7 @@ class Embedding(db.Model):
         db.UniqueConstraint('model_name', 'hash', 'provider_name', name='embedding_hash_idx')
     )
 
-    id = db.Column(UUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))  # UUID主键字段
+    id = db.Column(StringUUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))
     model_name = db.Column(db.String(40), nullable=False,
                            server_default=db.text("'text-embedding-ada-002'::character varying"))
     hash = db.Column(db.String(64), nullable=False)
@@ -956,9 +954,9 @@ class DatasetCollectionBinding(db.Model):
         db.Index('provider_model_name_idx', 'provider_name', 'model_name')  # 创建provider_name和model_name的索引
     )
 
-    id = db.Column(UUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))  # UUID列，作为主键，默认值使用UUID生成函数
-    provider_name = db.Column(db.String(40), nullable=False)  # 提供者名称列，不可为空
-    model_name = db.Column(db.String(40), nullable=False)  # 模型名称列，不可为空
-    type = db.Column(db.String(40), server_default=db.text("'dataset'::character varying"), nullable=False)  # 绑定类型列，默认为'dataset'
-    collection_name = db.Column(db.String(64), nullable=False)  # 集合名称列，不可为空
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间列，不可为空，默认为当前时间
+    id = db.Column(StringUUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))
+    provider_name = db.Column(db.String(40), nullable=False)
+    model_name = db.Column(db.String(40), nullable=False)
+    type = db.Column(db.String(40), server_default=db.text("'dataset'::character varying"), nullable=False)
+    collection_name = db.Column(db.String(64), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))

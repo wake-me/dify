@@ -7,13 +7,13 @@ from typing import Optional
 from flask import current_app, request
 from flask_login import UserMixin
 from sqlalchemy import Float, text
-from sqlalchemy.dialects.postgresql import UUID
 
 from core.file.tool_file_parser import ToolFileParser
 from core.file.upload_file_parser import UploadFileParser
 from extensions.ext_database import db
 from libs.helper import generate_string
 
+from . import StringUUID
 from .account import Account, Tenant
 
 
@@ -96,16 +96,15 @@ class App(db.Model):
         db.Index('app_tenant_id_idx', 'tenant_id')
     )
 
-    # 定义表字段和它们的数据类型
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=False, server_default=db.text("''::character varying"))
     mode = db.Column(db.String(255), nullable=False)
     icon = db.Column(db.String(255))
     icon_background = db.Column(db.String(255))
-    app_model_config_id = db.Column(UUID, nullable=True)
-    workflow_id = db.Column(UUID, nullable=True)
+    app_model_config_id = db.Column(StringUUID, nullable=True)
+    workflow_id = db.Column(StringUUID, nullable=True)
     status = db.Column(db.String(255), nullable=False, server_default=db.text("'normal'::character varying"))
     enable_site = db.Column(db.Boolean, nullable=False)
     enable_api = db.Column(db.Boolean, nullable=False)
@@ -353,8 +352,8 @@ class AppModelConfig(db.Model):
         db.Index('app_app_id_idx', 'app_id')
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
     provider = db.Column(db.String(255), nullable=True)
     model_id = db.Column(db.String(255), nullable=True)
     configs = db.Column(db.JSON, nullable=True)
@@ -718,8 +717,8 @@ class RecommendedApp(db.Model):
         db.Index('recommended_app_is_listed_idx', 'is_listed', 'language')  # 为is_listed和language创建复合索引
     )
 
-    id = db.Column(UUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, primary_key=True, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
     description = db.Column(db.JSON, nullable=False)
     copyright = db.Column(db.String(255), nullable=False)
     privacy_policy = db.Column(db.String(255), nullable=False)
@@ -769,14 +768,14 @@ class InstalledApp(db.Model):
         db.UniqueConstraint('tenant_id', 'app_id', name='unique_tenant_app')  # 确保每个租户对每个应用只能有一条安装记录
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 生成唯一的UUID作为ID
-    tenant_id = db.Column(UUID, nullable=False)  # 租户ID
-    app_id = db.Column(UUID, nullable=False)  # 应用ID
-    app_owner_tenant_id = db.Column(UUID, nullable=False)  # 应用所有者的租户ID
-    position = db.Column(db.Integer, nullable=False, default=0)  # 应用在界面中的位置
-    is_pinned = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))  # 应用是否被固定
-    last_used_at = db.Column(db.DateTime, nullable=True)  # 最后使用时间
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 记录创建时间
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    app_id = db.Column(StringUUID, nullable=False)
+    app_owner_tenant_id = db.Column(StringUUID, nullable=False)
+    position = db.Column(db.Integer, nullable=False, default=0)
+    is_pinned = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
+    last_used_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
     @property
     def app(self):
@@ -852,10 +851,9 @@ class Conversation(db.Model):
         db.Index('conversation_app_from_user_idx', 'app_id', 'from_source', 'from_end_user_id')
     )
 
-    # 对话的基本属性
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=False)
-    app_model_config_id = db.Column(UUID, nullable=True)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
+    app_model_config_id = db.Column(StringUUID, nullable=True)
     model_provider = db.Column(db.String(255), nullable=True)
     override_model_configs = db.Column(db.Text)
     model_id = db.Column(db.String(255), nullable=True)
@@ -869,10 +867,10 @@ class Conversation(db.Model):
     status = db.Column(db.String(255), nullable=False)
     invoke_from = db.Column(db.String(255), nullable=True)
     from_source = db.Column(db.String(255), nullable=False)
-    from_end_user_id = db.Column(UUID)
-    from_account_id = db.Column(UUID)
+    from_end_user_id = db.Column(StringUUID)
+    from_account_id = db.Column(StringUUID)
     read_at = db.Column(db.DateTime)
-    read_account_id = db.Column(UUID)
+    read_account_id = db.Column(StringUUID)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
     updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
@@ -1103,13 +1101,12 @@ class Message(db.Model):
         db.Index('message_account_idx', 'app_id', 'from_source', 'from_account_id'),
     )
 
-    # 消息表的字段定义
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
     model_provider = db.Column(db.String(255), nullable=True)
     model_id = db.Column(db.String(255), nullable=True)
     override_model_configs = db.Column(db.Text)
-    conversation_id = db.Column(UUID, db.ForeignKey('conversations.id'), nullable=False)
+    conversation_id = db.Column(StringUUID, db.ForeignKey('conversations.id'), nullable=False)
     inputs = db.Column(db.JSON)
     query = db.Column(db.Text, nullable=False)
     message = db.Column(db.JSON, nullable=False)
@@ -1128,12 +1125,12 @@ class Message(db.Model):
     message_metadata = db.Column(db.Text)
     invoke_from = db.Column(db.String(255), nullable=True)
     from_source = db.Column(db.String(255), nullable=False)
-    from_end_user_id = db.Column(UUID)
-    from_account_id = db.Column(UUID)
+    from_end_user_id = db.Column(StringUUID)
+    from_account_id = db.Column(StringUUID)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
     updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
     agent_based = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
-    workflow_run_id = db.Column(UUID)
+    workflow_run_id = db.Column(StringUUID)
 
     @property
     def re_sign_file_url_answer(self) -> str:
@@ -1410,17 +1407,17 @@ class MessageFeedback(db.Model):
         db.Index('message_feedback_conversation_idx', 'conversation_id', 'from_source', 'rating')  # 对话ID、来源和评分索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，使用函数生成默认值
-    app_id = db.Column(UUID, nullable=False)  # 应用ID列
-    conversation_id = db.Column(UUID, nullable=False)  # 对话ID列
-    message_id = db.Column(UUID, nullable=False)  # 消息ID列
-    rating = db.Column(db.String(255), nullable=False)  # 评分列
-    content = db.Column(db.Text)  # 内容列
-    from_source = db.Column(db.String(255), nullable=False)  # 来源列
-    from_end_user_id = db.Column(UUID)  # 终端用户ID列
-    from_account_id = db.Column(UUID)  # 账户ID列
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间列
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间列
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
+    conversation_id = db.Column(StringUUID, nullable=False)
+    message_id = db.Column(StringUUID, nullable=False)
+    rating = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.Text)
+    from_source = db.Column(db.String(255), nullable=False)
+    from_end_user_id = db.Column(StringUUID)
+    from_account_id = db.Column(StringUUID)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
     @property
     def from_account(self):
@@ -1460,16 +1457,16 @@ class MessageFile(db.Model):
         db.Index('message_file_created_by_idx', 'created_by')  # 为created_by创建索引，优化查询
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 文件的唯一标识符，使用UUID生成
-    message_id = db.Column(UUID, nullable=False)  # 关联的消息ID
-    type = db.Column(db.String(255), nullable=False)  # 文件类型
-    transfer_method = db.Column(db.String(255), nullable=False)  # 文件传输方法
-    url = db.Column(db.Text, nullable=True)  # 文件的URL
-    belongs_to = db.Column(db.String(255), nullable=True)  # 文件归属
-    upload_file_id = db.Column(UUID, nullable=True)  # 上传过程中的文件ID
-    created_by_role = db.Column(db.String(255), nullable=False)  # 创建文件的用户角色
-    created_by = db.Column(UUID, nullable=False)  # 创建文件的用户ID
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 文件创建时间，默认为当前时间
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    message_id = db.Column(StringUUID, nullable=False)
+    type = db.Column(db.String(255), nullable=False)
+    transfer_method = db.Column(db.String(255), nullable=False)
+    url = db.Column(db.Text, nullable=True)
+    belongs_to = db.Column(db.String(255), nullable=True)
+    upload_file_id = db.Column(StringUUID, nullable=True)
+    created_by_role = db.Column(db.String(255), nullable=False)
+    created_by = db.Column(StringUUID, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
 
 class MessageAnnotation(db.Model):
@@ -1501,16 +1498,16 @@ class MessageAnnotation(db.Model):
         db.Index('message_annotation_message_idx', 'message_id')  # 为message_id创建索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，使用函数生成默认值
-    app_id = db.Column(UUID, nullable=False)  # 不可为空的UUID列
-    conversation_id = db.Column(UUID, db.ForeignKey('conversations.id'), nullable=True)  # 可为空的外键列，指向对话表
-    message_id = db.Column(UUID, nullable=True)  # 可为空的UUID列
-    question = db.Column(db.Text, nullable=True)  # 可为空的文本列
-    content = db.Column(db.Text, nullable=False)  # 不可为空的文本列
-    hit_count = db.Column(db.Integer, nullable=False, server_default=db.text('0'))  # 不可为空的整数列，默认值为0
-    account_id = db.Column(UUID, nullable=False)  # 不可为空的UUID列，指向账户表
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 不可为空的日期时间列，默认为当前时间
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 不可为空的日期时间列，默认为当前时间
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
+    conversation_id = db.Column(StringUUID, db.ForeignKey('conversations.id'), nullable=True)
+    message_id = db.Column(StringUUID, nullable=True)
+    question = db.Column(db.Text, nullable=True)
+    content = db.Column(db.Text, nullable=False)
+    hit_count = db.Column(db.Integer, nullable=False, server_default=db.text('0'))
+    account_id = db.Column(StringUUID, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
     @property
     def account(self):
@@ -1569,15 +1566,15 @@ class AppAnnotationHitHistory(db.Model):
         db.Index('app_annotation_hit_histories_message_idx', 'message_id'),
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=False)
-    annotation_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
+    annotation_id = db.Column(StringUUID, nullable=False)
     source = db.Column(db.Text, nullable=False)
     question = db.Column(db.Text, nullable=False)
-    account_id = db.Column(UUID, nullable=False)
+    account_id = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
     score = db.Column(Float, nullable=False, server_default=db.text('0'))
-    message_id = db.Column(UUID, nullable=False)
+    message_id = db.Column(StringUUID, nullable=False)
     annotation_question = db.Column(db.Text, nullable=False)
     annotation_content = db.Column(db.Text, nullable=False)
 
@@ -1632,14 +1629,13 @@ class AppAnnotationSetting(db.Model):
         db.Index('app_annotation_settings_app_idx', 'app_id')  # 创建app_id的索引
     )
 
-    # 定义表字段和它们的数据类型以及默认值
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
     score_threshold = db.Column(Float, nullable=False, server_default=db.text('0'))
-    collection_binding_id = db.Column(UUID, nullable=False)
-    created_user_id = db.Column(UUID, nullable=False)
+    collection_binding_id = db.Column(StringUUID, nullable=False)
+    created_user_id = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
-    updated_user_id = db.Column(UUID, nullable=False)
+    updated_user_id = db.Column(StringUUID, nullable=False)
     updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
     @property
@@ -1702,14 +1698,15 @@ class OperationLog(db.Model):
         db.Index('operation_log_account_action_idx', 'tenant_id', 'account_id', 'action')  # 创建索引以加速查询
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，默认使用函数生成
-    tenant_id = db.Column(UUID, nullable=False)  # 租户ID列，不可为空
-    account_id = db.Column(UUID, nullable=False)  # 账户ID列，不可为空
-    action = db.Column(db.String(255), nullable=False)  # 动作描述列，字符串类型，不可为空
-    content = db.Column(db.JSON)  # 内容详情列，JSON类型
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间列，不可为空，默认为当前时间
-    created_ip = db.Column(db.String(255), nullable=False)  # 创建时的IP地址列，不可为空
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间列，不可为空，默认为当前时间
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    account_id = db.Column(StringUUID, nullable=False)
+    action = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.JSON)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    created_ip = db.Column(db.String(255), nullable=False)
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+
 
 class EndUser(UserMixin, db.Model):
     """
@@ -1738,16 +1735,16 @@ class EndUser(UserMixin, db.Model):
         db.Index('end_user_tenant_session_id_idx', 'tenant_id', 'session_id', 'type'),  # 创建 tenant_id, session_id 和 type 的索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID类型，生成唯一的用户ID
-    tenant_id = db.Column(UUID, nullable=False)  # 租户ID，不可为空
-    app_id = db.Column(UUID, nullable=True)  # 应用ID，可为空
-    type = db.Column(db.String(255), nullable=False)  # 用户类型，不可为空
-    external_user_id = db.Column(db.String(255), nullable=True)  # 外部用户ID，可为空
-    name = db.Column(db.String(255))  # 用户名，可为空
-    is_anonymous = db.Column(db.Boolean, nullable=False, server_default=db.text('true'))  # 是否为匿名用户，不可为空，默认为 True
-    session_id = db.Column(db.String(255), nullable=False)  # 会话ID，不可为空
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间，不可为空，默认为当前时间
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间，不可为空，默认为当前时间Time, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    app_id = db.Column(StringUUID, nullable=True)
+    type = db.Column(db.String(255), nullable=False)
+    external_user_id = db.Column(db.String(255), nullable=True)
+    name = db.Column(db.String(255))
+    is_anonymous = db.Column(db.Boolean, nullable=False, server_default=db.text('true'))
+    session_id = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
 
 class Site(db.Model):
@@ -1761,23 +1758,22 @@ class Site(db.Model):
         db.Index('site_code_idx', 'code', 'status')  # 创建 code 和 status 的复合索引
     )
 
-    # 定义数据库表的字段
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # 站点的唯一标识符，使用 UUID 生成
-    app_id = db.Column(UUID, nullable=False)  # 应用的唯一标识符，不可为空
-    title = db.Column(db.String(255), nullable=False)  # 站点的标题，不可为空
-    icon = db.Column(db.String(255))  # 站点的图标链接
-    icon_background = db.Column(db.String(255))  # 图标的背景颜色
-    description = db.Column(db.Text)  # 站点的描述信息
-    default_language = db.Column(db.String(255), nullable=False)  # 默认的语言
-    copyright = db.Column(db.String(255))  # 版权信息
-    privacy_policy = db.Column(db.String(255))  # 隐私政策链接
-    customize_domain = db.Column(db.String(255))  # 自定义域名
-    customize_token_strategy = db.Column(db.String(255), nullable=False)  # 自定义令牌策略
-    prompt_public = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))  # 是否公开提示
-    status = db.Column(db.String(255), nullable=False, server_default=db.text("'normal'::character varying"))  # 站点状态
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间
-    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 更新时间
-    code = db.Column(db.String(255))  # 站点的唯一代码
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=False)
+    title = db.Column(db.String(255), nullable=False)
+    icon = db.Column(db.String(255))
+    icon_background = db.Column(db.String(255))
+    description = db.Column(db.Text)
+    default_language = db.Column(db.String(255), nullable=False)
+    copyright = db.Column(db.String(255))
+    privacy_policy = db.Column(db.String(255))
+    customize_domain = db.Column(db.String(255))
+    customize_token_strategy = db.Column(db.String(255), nullable=False)
+    prompt_public = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
+    status = db.Column(db.String(255), nullable=False, server_default=db.text("'normal'::character varying"))
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    code = db.Column(db.String(255))
 
     @staticmethod
     def generate_code(n):
@@ -1815,9 +1811,9 @@ class ApiToken(db.Model):
         db.Index('api_token_tenant_idx', 'tenant_id', 'type')
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    app_id = db.Column(UUID, nullable=True)
-    tenant_id = db.Column(UUID, nullable=True)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    app_id = db.Column(StringUUID, nullable=True)
+    tenant_id = db.Column(StringUUID, nullable=True)
     type = db.Column(db.String(16), nullable=False)
     token = db.Column(db.String(255), nullable=False)
     last_used_at = db.Column(db.DateTime, nullable=True)
@@ -1860,21 +1856,22 @@ class UploadFile(db.Model):
         db.Index('upload_file_tenant_idx', 'tenant_id')  # 为tenant_id创建索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))  # UUID列，默认使用uuid_generate_v4()生成
-    tenant_id = db.Column(UUID, nullable=False)  # 租户ID列，不可为空
-    storage_type = db.Column(db.String(255), nullable=False)  # 存储类型列，不可为空
-    key = db.Column(db.String(255), nullable=False)  # 存储键列，不可为空
-    name = db.Column(db.String(255), nullable=False)  # 文件名列，不可为空
-    size = db.Column(db.Integer, nullable=False)  # 文件大小列，不可为空
-    extension = db.Column(db.String(255), nullable=False)  # 文件扩展名列，不可为空
-    mime_type = db.Column(db.String(255), nullable=True)  # MIME类型列，可为空
-    created_by_role = db.Column(db.String(255), nullable=False, server_default=db.text("'account'::character varying"))  # 创建者角色列，不可为空，默认为'account'
-    created_by = db.Column(UUID, nullable=False)  # 创建者ID列，不可为空
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 创建时间列，不可为空，默认为当前时间
-    used = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))  # 是否已使用列，不可为空，默认为false
-    used_by = db.Column(UUID, nullable=True)  # 使用者ID列，可为空
-    used_at = db.Column(db.DateTime, nullable=True)  # 使用时间列，可为空
-    hash = db.Column(db.String(255), nullable=True)  # 文件哈希值列，可为空
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    storage_type = db.Column(db.String(255), nullable=False)
+    key = db.Column(db.String(255), nullable=False)
+    name = db.Column(db.String(255), nullable=False)
+    size = db.Column(db.Integer, nullable=False)
+    extension = db.Column(db.String(255), nullable=False)
+    mime_type = db.Column(db.String(255), nullable=True)
+    created_by_role = db.Column(db.String(255), nullable=False, server_default=db.text("'account'::character varying"))
+    created_by = db.Column(StringUUID, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    used = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
+    used_by = db.Column(StringUUID, nullable=True)
+    used_at = db.Column(db.DateTime, nullable=True)
+    hash = db.Column(db.String(255), nullable=True)
+
 
 class ApiRequest(db.Model):
     """
@@ -1902,14 +1899,15 @@ class ApiRequest(db.Model):
         db.Index('api_request_token_idx', 'tenant_id', 'api_token_id')  # 定义组合索引
     )
 
-    id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))  # 生成唯一的UUID作为ID
-    tenant_id = db.Column(UUID, nullable=False)  # 租户ID
-    api_token_id = db.Column(UUID, nullable=False)  # API令牌ID
-    path = db.Column(db.String(255), nullable=False)  # 请求路径
-    request = db.Column(db.Text, nullable=True)  # 请求内容
-    response = db.Column(db.Text, nullable=True)  # 响应内容
-    ip = db.Column(db.String(255), nullable=False)  # 请求的IP地址
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))  # 请求创建时间，默认为当前时间
+    id = db.Column(StringUUID, nullable=False, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=False)
+    api_token_id = db.Column(StringUUID, nullable=False)
+    path = db.Column(db.String(255), nullable=False)
+    request = db.Column(db.Text, nullable=True)
+    response = db.Column(db.Text, nullable=True)
+    ip = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+
 
 class MessageChain(db.Model):
     """
@@ -1931,12 +1929,13 @@ class MessageChain(db.Model):
         db.Index('message_chain_message_id_idx', 'message_id')  # 创建message_id的索引
     )
 
-    id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))  # 消息链ID
-    message_id = db.Column(UUID, nullable=False)  # 消息ID
-    type = db.Column(db.String(255), nullable=False)  # 消息类型
-    input = db.Column(db.Text, nullable=True)  # 消息输入内容
-    output = db.Column(db.Text, nullable=True)  # 消息输出内容
-    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())  # 创建时间
+    id = db.Column(StringUUID, nullable=False, server_default=db.text('uuid_generate_v4()'))
+    message_id = db.Column(StringUUID, nullable=False)
+    type = db.Column(db.String(255), nullable=False)
+    input = db.Column(db.Text, nullable=True)
+    output = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
+
 
 class MessageAgentThought(db.Model):
     """
@@ -1980,10 +1979,9 @@ class MessageAgentThought(db.Model):
         db.Index('message_agent_thought_message_chain_id_idx', 'message_chain_id'),
     )
 
-    # 数据库字段定义
-    id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))
-    message_id = db.Column(UUID, nullable=False)
-    message_chain_id = db.Column(UUID, nullable=True)
+    id = db.Column(StringUUID, nullable=False, server_default=db.text('uuid_generate_v4()'))
+    message_id = db.Column(StringUUID, nullable=False)
+    message_chain_id = db.Column(StringUUID, nullable=True)
     position = db.Column(db.Integer, nullable=False)
     thought = db.Column(db.Text, nullable=True)
     tool = db.Column(db.Text, nullable=True)
@@ -1991,6 +1989,7 @@ class MessageAgentThought(db.Model):
     tool_meta_str = db.Column(db.Text, nullable=False, server_default=db.text("'{}'::text"))
     tool_input = db.Column(db.Text, nullable=True)
     observation = db.Column(db.Text, nullable=True)
+    # plugin_id = db.Column(StringUUID, nullable=True)  ## for future design
     tool_process_data = db.Column(db.Text, nullable=True)
     message = db.Column(db.Text, nullable=True)
     message_token = db.Column(db.Integer, nullable=True)
@@ -2006,7 +2005,7 @@ class MessageAgentThought(db.Model):
     currency = db.Column(db.String, nullable=True)
     latency = db.Column(db.Float, nullable=True)
     created_by_role = db.Column(db.String, nullable=False)
-    created_by = db.Column(UUID, nullable=False)
+    created_by = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
 
     @property
@@ -2133,15 +2132,15 @@ class DatasetRetrieverResource(db.Model):
         db.Index('dataset_retriever_resource_message_id_idx', 'message_id'),  # 为message_id创建索引，优化查询
     )
 
-    id = db.Column(UUID, nullable=False, server_default=db.text('uuid_generate_v4()'))
-    message_id = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, nullable=False, server_default=db.text('uuid_generate_v4()'))
+    message_id = db.Column(StringUUID, nullable=False)
     position = db.Column(db.Integer, nullable=False)
-    dataset_id = db.Column(UUID, nullable=False)
+    dataset_id = db.Column(StringUUID, nullable=False)
     dataset_name = db.Column(db.Text, nullable=False)
-    document_id = db.Column(UUID, nullable=False)
+    document_id = db.Column(StringUUID, nullable=False)
     document_name = db.Column(db.Text, nullable=False)
     data_source_type = db.Column(db.Text, nullable=False)
-    segment_id = db.Column(UUID, nullable=False)
+    segment_id = db.Column(StringUUID, nullable=False)
     score = db.Column(db.Float, nullable=True)
     content = db.Column(db.Text, nullable=False)
     hit_count = db.Column(db.Integer, nullable=True)
@@ -2149,7 +2148,7 @@ class DatasetRetrieverResource(db.Model):
     segment_position = db.Column(db.Integer, nullable=True)
     index_node_hash = db.Column(db.Text, nullable=True)
     retriever_from = db.Column(db.Text, nullable=False)
-    created_by = db.Column(UUID, nullable=False)
+    created_by = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.func.current_timestamp())
 
 
@@ -2174,11 +2173,11 @@ class Tag(db.Model):
 
     TAG_TYPE_LIST = ['knowledge', 'app']  # 定义有效的标签类型列表
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=True)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=True)
     type = db.Column(db.String(16), nullable=False)
     name = db.Column(db.String(255), nullable=False)
-    created_by = db.Column(UUID, nullable=False)
+    created_by = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
 class TagBinding(db.Model):
@@ -2200,9 +2199,9 @@ class TagBinding(db.Model):
         db.Index('tag_bind_tag_id_idx', 'tag_id'),  # 为标签ID字段创建索引
     )
 
-    id = db.Column(UUID, server_default=db.text('uuid_generate_v4()'))
-    tenant_id = db.Column(UUID, nullable=True)
-    tag_id = db.Column(UUID, nullable=True)
-    target_id = db.Column(UUID, nullable=True)
-    created_by = db.Column(UUID, nullable=False)
+    id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
+    tenant_id = db.Column(StringUUID, nullable=True)
+    tag_id = db.Column(StringUUID, nullable=True)
+    target_id = db.Column(StringUUID, nullable=True)
+    created_by = db.Column(StringUUID, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
