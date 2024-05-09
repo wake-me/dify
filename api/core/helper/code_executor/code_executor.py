@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Literal, Optional
 
 from httpx import post
@@ -23,12 +24,30 @@ class CodeExecutionResponse(BaseModel):
         stdout: Optional[str]  # 标准输出，如果有的话
         error: Optional[str]  # 错误信息，如果执行过程中有错误的话
 
-    code: int  # HTTP状态码或错误代码
-    message: str  # 相应的消息或错误描述
-    data: Data  # 包含执行结果的数据对象
+    code: int
+    message: str
+    data: Data
+
+
+class CodeLanguage(str, Enum):
+    PYTHON3 = 'python3'
+    JINJA2 = 'jinja2'
+    JAVASCRIPT = 'javascript'
 
 
 class CodeExecutor:
+    code_template_transformers = {
+        CodeLanguage.PYTHON3: PythonTemplateTransformer,
+        CodeLanguage.JINJA2: Jinja2TemplateTransformer,
+        CodeLanguage.JAVASCRIPT: NodeJsTemplateTransformer,
+    }
+
+    code_language_to_running_language = {
+        CodeLanguage.JAVASCRIPT: 'nodejs',
+        CodeLanguage.JINJA2: CodeLanguage.PYTHON3,
+        CodeLanguage.PYTHON3: CodeLanguage.PYTHON3,
+    }
+
     @classmethod
     def execute_code(cls, language: Literal['python3', 'javascript', 'jinja2'], preload: str, code: str) -> str:
         """
@@ -47,9 +66,7 @@ class CodeExecutor:
 
         # 根据不同的语言代码设置执行环境
         data = {
-            'language': 'python3' if language == 'jinja2' else
-                        'nodejs' if language == 'javascript' else
-                        'python3' if language == 'python3' else None,
+            'language': cls.code_language_to_running_language.get(language),
             'code': code,
             'preload': preload
         }
@@ -95,16 +112,9 @@ class CodeExecutor:
         :param inputs: 输入参数
         :return: 模板处理后的结果
         """
-        # 根据语言选择合适的模板转换器
-        template_transformer = None
-        if language == 'python3':
-            template_transformer = PythonTemplateTransformer
-        elif language == 'jinja2':
-            template_transformer = Jinja2TemplateTransformer
-        elif language == 'javascript':
-            template_transformer = NodeJsTemplateTransformer
-        else:
-            raise CodeExecutionException('Unsupported language')
+        template_transformer = cls.code_template_transformers.get(language)
+        if not template_transformer:
+            raise CodeExecutionException(f'Unsupported language {language}')
 
         # 转换代码和预加载信息以适应执行环境
         runner, preload = template_transformer.transform_caller(code, inputs)
