@@ -1,11 +1,3 @@
-'''
-Author: fanwenqi hi.fanwenqi@gmail.com
-Date: 2024-04-20 10:03:01
-LastEditors: fanwenqi hi.fanwenqi@gmail.com
-LastEditTime: 2024-04-20 12:42:53
-FilePath: /dify/api/events/event_handlers/update_provider_last_used_at_when_messaeg_created.py
-Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-'''
 from datetime import datetime, timezone
 
 from core.app.entities.app_invoke_entities import AgentChatAppGenerateEntity, ChatAppGenerateEntity
