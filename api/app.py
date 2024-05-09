@@ -80,25 +80,34 @@ config_type = os.getenv('EDITION', default='SELF_HOSTED')  # ce edition first
 
 
 def create_app() -> Flask:
-    app = DifyApp(__name__)
-    app.config.from_object(Config())
+    """
+    创建并初始化应用实例。
+    
+    :return: 初始化后的Flask应用实例。
+    """
+    app = DifyApp(__name__)  # 创建应用实例
+    app.config.from_object(Config())  # 从Config类加载配置
 
-    app.secret_key = app.config['SECRET_KEY']
+    app.secret_key = app.config['SECRET_KEY']  # 设置应用的密钥
 
+    # 初始化日志配置
     log_handlers = None
     log_file = app.config.get('LOG_FILE')
     if log_file:
+        # 确保日志文件目录存在
         log_dir = os.path.dirname(log_file)
         os.makedirs(log_dir, exist_ok=True)
+        # 配置日志文件处理器
         log_handlers = [
             RotatingFileHandler(
                 filename=log_file,
-                maxBytes=1024 * 1024 * 1024,
-                backupCount=5
+                maxBytes=1024 * 1024 * 1024,  # 日志文件最大1GB
+                backupCount=5  # 保留5个备份文件
             ),
-            logging.StreamHandler(sys.stdout)
+            logging.StreamHandler(sys.stdout)  # 配置标准输出处理器
         ]
 
+    # 配置基础日志设置
     logging.basicConfig(
         level=app.config.get('LOG_LEVEL'),
         format=app.config.get('LOG_FORMAT'),
@@ -106,12 +115,12 @@ def create_app() -> Flask:
         handlers=log_handlers
     )
 
+    # 初始化扩展、注册蓝图和命令
     initialize_extensions(app)
     register_blueprints(app)
     register_commands(app)
 
-    return app
-
+    return app  # 返回初始化后的应用实例
 
 # 初始化Flask扩展
 def initialize_extensions(app):
