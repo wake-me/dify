@@ -130,16 +130,12 @@ class TooManyFilesError(BaseHTTPException):
 
 
 class DraftWorkflowNotExist(BaseHTTPException):
-    """
-    一个用于表示草稿工作流不存在的HTTP异常类。
-    
-    继承自BaseHTTPException，用于在尝试访问或使用未初始化的草稿工作流时抛出。
-    
-    属性:
-    - error_code (str): 异常的错误代码，用于标识异常类型。
-    - description (str): 异常的描述信息，提供关于异常的简短说明。
-    - code (int): 异常对应的HTTP状态码。
-    """
-    error_code = 'draft_workflow_not_exist'  # 错误代码，标识草稿工作流不存在的异常
-    description = "Draft workflow need to be initialized."  # 异常描述，提示需要初始化草稿工作流
-    code = 400  # 对应的HTTP状态码，此处为400 Bad Request
+    error_code = 'draft_workflow_not_exist'
+    description = "Draft workflow need to be initialized."
+    code = 400
+
+
+class DraftWorkflowNotSync(BaseHTTPException):
+    error_code = 'draft_workflow_not_sync'
+    description = "Workflow graph might have been modified, please refresh and resubmit."
+    code = 400

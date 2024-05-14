@@ -1,4 +1,7 @@
 from abc import ABC, abstractmethod
+from typing import Optional
+
+from core.helper.code_executor.entities import CodeDependency
 
 
 class TemplateTransformer(ABC):
@@ -8,7 +11,8 @@ class TemplateTransformer(ABC):
     
     @classmethod
     @abstractmethod
-    def transform_caller(cls, code: str, inputs: dict) -> tuple[str, str]:
+    def transform_caller(cls, code: str, inputs: dict, 
+                         dependencies: Optional[list[CodeDependency]] = None) -> tuple[str, str, list[CodeDependency]]:
         """
         将代码转换为Python运行器可以执行的形式。
         

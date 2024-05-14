@@ -21,6 +21,7 @@ from models.workflow import (
     WorkflowNodeExecutionTriggeredFrom,
     WorkflowType,
 )
+from services.errors.app import WorkflowHashNotEqualError
 from services.workflow.workflow_converter import WorkflowConverter
 
 
@@ -75,24 +76,22 @@ class WorkflowService:
     def sync_draft_workflow(self, app_model: App,
                             graph: dict,
                             features: dict,
+                            unique_hash: Optional[str],
                             account: Account) -> Workflow:
         """
-        同步草稿工作流
-        
-        参数:
-        - app_model: App 类型，代表一个应用模型，用于获取应用相关信息。
-        - graph: 字典类型，代表工作流的图表结构。
-        - features: 字典类型，代表应用的功能特性配置。
-        - account: Account 类型，代表进行操作的账户信息。
-        
-        返回值:
-        - Workflow: 返回一个工作流实例。
+        Sync draft workflow
+        @throws WorkflowHashNotEqualError
         """
         
         # 根据 app_model 获取草稿工作流
         workflow = self.get_draft_workflow(app_model=app_model)
 
-        # 验证 features 结构的合法性
+        if workflow:
+            # validate unique hash
+            if workflow.unique_hash != unique_hash:
+                raise WorkflowHashNotEqualError()
+
+        # validate features structure
         self.validate_features_structure(
             app_model=app_model,
             features=features

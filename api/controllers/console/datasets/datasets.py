@@ -749,13 +749,13 @@ class DatasetRetrievalSettingApi(Resource):
             dict: 包含一个名为'retrieval_method'的列表键，列表中包含支持的检索方法。
         """
         vector_type = current_app.config['VECTOR_STORE']
-        if vector_type == 'milvus' or vector_type == 'pgvecto_rs' or vector_type == 'relyt':
+        if vector_type in {"milvus", "relyt", "pgvector", "pgvecto_rs"}:
             return {
                 'retrieval_method': [
                     'semantic_search'
                 ]
             }
-        elif vector_type == 'qdrant' or vector_type == 'weaviate':
+        elif vector_type in {"qdrant", "weaviate"}:
             return {
                 'retrieval_method': [
                     'semantic_search', 'full_text_search', 'hybrid_search'
@@ -784,14 +784,13 @@ class DatasetRetrievalSettingMockApi(Resource):
     @login_required
     @account_initialization_required
     def get(self, vector_type):
-
-        if vector_type == 'milvus' or vector_type == 'relyt':
+        if vector_type in {'milvus', 'relyt', 'pgvector'}:
             return {
                 'retrieval_method': [
                     'semantic_search'
                 ]
             }
-        elif vector_type == 'qdrant' or vector_type == 'weaviate':
+        elif vector_type in {'qdrant', 'weaviate'}:
             return {
                 'retrieval_method': [
                     'semantic_search', 'full_text_search', 'hybrid_search'

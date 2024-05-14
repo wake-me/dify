@@ -365,9 +365,28 @@ class NodeStartStreamResponse(StreamResponse):
         created_at: int  # 创建时间戳
         extras: dict = {}  # 额外信息，以字典形式，默认为空
 
-    event: StreamEvent = StreamEvent.NODE_STARTED  # 事件类型，此处为节点启动事件
-    workflow_run_id: str  # 工作流运行ID
-    data: Data  # 包含节点详细信息的数据实体
+    event: StreamEvent = StreamEvent.NODE_STARTED
+    workflow_run_id: str
+    data: Data
+
+    def to_ignore_detail_dict(self):
+        return {
+            "event": self.event.value,
+            "task_id": self.task_id,
+            "workflow_run_id": self.workflow_run_id,
+            "data": {
+                "id": self.data.id,
+                "node_id": self.data.node_id,
+                "node_type": self.data.node_type,
+                "title": self.data.title,
+                "index": self.data.index,
+                "predecessor_node_id": self.data.predecessor_node_id,
+                "inputs": None,
+                "created_at": self.data.created_at,
+                "extras": {}
+            }
+        }
+
 
 class NodeFinishStreamResponse(StreamResponse):
     """
@@ -394,9 +413,34 @@ class NodeFinishStreamResponse(StreamResponse):
         finished_at: int  # 完成时间戳
         files: Optional[list[dict]] = []  # 附件列表
 
-    event: StreamEvent = StreamEvent.NODE_FINISHED  # 事件类型（节点完成）
-    workflow_run_id: str  # 工作流运行ID
-    data: Data  # 节点完成的详细数据
+    event: StreamEvent = StreamEvent.NODE_FINISHED
+    workflow_run_id: str
+    data: Data
+
+    def to_ignore_detail_dict(self):
+        return {
+            "event": self.event.value,
+            "task_id": self.task_id,
+            "workflow_run_id": self.workflow_run_id,
+            "data": {
+                "id": self.data.id,
+                "node_id": self.data.node_id,
+                "node_type": self.data.node_type,
+                "title": self.data.title,
+                "index": self.data.index,
+                "predecessor_node_id": self.data.predecessor_node_id,
+                "inputs": None,
+                "process_data": None,
+                "outputs": None,
+                "status": self.data.status,
+                "error": None,
+                "elapsed_time": self.data.elapsed_time,
+                "execution_metadata": None,
+                "created_at": self.data.created_at,
+                "finished_at": self.data.finished_at,
+                "files": []
+            }
+        }
 
 
 class TextChunkStreamResponse(StreamResponse):
