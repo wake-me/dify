@@ -1,11 +1,3 @@
-'''
-Author: fanwenqi hi.fanwenqi@gmail.com
-Date: 2024-05-28 15:42:17
-LastEditors: fanwenqi hi.fanwenqi@gmail.com
-LastEditTime: 2024-05-28 15:48:50
-FilePath: /dify/api/core/rag/extractor/unstructured/unstructured_ppt_extractor.py
-Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-'''
 import logging
 
 from core.rag.extractor.extractor_base import BaseExtractor

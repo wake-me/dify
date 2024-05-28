@@ -519,32 +519,6 @@ class IterationNodeCompletedStreamResponse(StreamResponse):
 
 class TextChunkStreamResponse(StreamResponse):
     """
-    TextChunkStreamResponse entity
-    """
-    class Data(BaseModel):
-        """
-        Data entity
-        """
-        text: str
-
-    event: StreamEvent = StreamEvent.TEXT_CHUNK
-    data: Data
-
-class IterationNodeCompletedStreamResponse(StreamResponse):
-    """
-    TextReplaceStreamResponse entity
-    """
-    class Data(BaseModel):
-        """
-        Data entity
-        """
-        text: str
-
-    event: StreamEvent = StreamEvent.TEXT_REPLACE
-    data: Data
-
-class TextChunkStreamResponse(StreamResponse):
-    """
     TextChunkStreamResponse 实体类
     用于处理文本块流式响应的实体类。
     """

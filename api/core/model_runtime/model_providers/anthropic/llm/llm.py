@@ -422,20 +422,20 @@ class AnthropicLargeLanguageModel(LargeLanguageModel):
                 full_assistant_content += chunk_text
 
                     # 将助手消息转换为提示消息
-                    assistant_prompt_message = AssistantPromptMessage(
-                        content=chunk_text
-                    )
+                assistant_prompt_message = AssistantPromptMessage(
+                    content=chunk_text
+                )
 
-                    index = chunk.index  # 更新索引
+                index = chunk.index  # 更新索引
 
-                    yield LLMResultChunk(
-                        model=return_model,
-                        prompt_messages=prompt_messages,
-                        delta=LLMResultChunkDelta(
-                            index=chunk.index,
-                            message=assistant_prompt_message,
-                        )
+                yield LLMResultChunk(
+                    model=return_model,
+                    prompt_messages=prompt_messages,
+                    delta=LLMResultChunkDelta(
+                        index=chunk.index,
+                        message=assistant_prompt_message,
                     )
+                )
 
     def _to_credential_kwargs(self, credentials: dict) -> dict:
         """

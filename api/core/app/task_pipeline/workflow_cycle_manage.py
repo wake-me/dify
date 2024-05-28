@@ -263,12 +263,12 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
         workflow_node_execution.execution_metadata = json.dumps(jsonable_encoder(execution_metadata)) \
             if execution_metadata else None
 
-            # 提交数据库事务，更新工作流节点执行信息
-            db.session.commit()
-            db.session.refresh(workflow_node_execution)
-            db.session.close()
+        # 提交数据库事务，更新工作流节点执行信息
+        db.session.commit()
+        db.session.refresh(workflow_node_execution)
+        db.session.close()
 
-            return workflow_node_execution
+        return workflow_node_execution
 
     def _workflow_start_to_stream_response(self, task_id: str,
                                         workflow_run: WorkflowRun) -> WorkflowStartStreamResponse:
