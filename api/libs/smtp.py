@@ -1,3 +1,4 @@
+import logging
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -26,28 +27,30 @@ class SMTPClient:
         self._use_tls = use_tls
 
     def send(self, mail: dict):
-        """
-        发送电子邮件。
+        smtp = None
+        try:
+            smtp = smtplib.SMTP(self.server, self.port, timeout=10)
+            if self._use_tls:
+                smtp.starttls()
+            if self.username and self.password:
+                smtp.login(self.username, self.password)
 
-        参数:
-        mail: dict - 包含邮件信息的字典，应包含 subject, to 和 html 键。
-        """
-        # 连接到 SMTP 服务器
-        smtp = smtplib.SMTP(self.server, self.port)
-        # 如果配置了 TLS，则开始 TLS 加密会话
-        if self._use_tls:
-            smtp.starttls()
-        # 如果提供了用户名和密码，则登录 SMTP 服务器
-        if self.username and self.password:
-            smtp.login(self.username, self.password)
-        # 构建邮件消息体
-        msg = MIMEMultipart()
-        msg['Subject'] = mail['subject']
-        msg['From'] = self._from
-        msg['To'] = mail['to']
-        # 添加邮件正文
-        msg.attach(MIMEText(mail['html'], 'html'))
-        # 发送邮件
-        smtp.sendmail(self.username, mail['to'], msg.as_string())
-        # 关闭与 SMTP 服务器的连接
-        smtp.quit()
+            msg = MIMEMultipart()
+            msg['Subject'] = mail['subject']
+            msg['From'] = self._from
+            msg['To'] = mail['to']
+            msg.attach(MIMEText(mail['html'], 'html'))
+
+            smtp.sendmail(self._from, mail['to'], msg.as_string())
+        except smtplib.SMTPException as e:
+            logging.error(f"SMTP error occurred: {str(e)}")
+            raise
+        except TimeoutError as e:
+            logging.error(f"Timeout occurred while sending email: {str(e)}")
+            raise
+        except Exception as e:
+            logging.error(f"Unexpected error occurred while sending email: {str(e)}")
+            raise
+        finally:
+            if smtp:
+                smtp.quit()

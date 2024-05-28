@@ -39,7 +39,7 @@ def parse_app_site_args():
     parser.add_argument('copyright', type=str, required=False, location='json')
     # 添加应用程序隐私政策链接参数
     parser.add_argument('privacy_policy', type=str, required=False, location='json')
-    # 添加应用程序自定义令牌策略参数，可选值为'must', 'allow', 'not_allow'
+    parser.add_argument('custom_disclaimer', type=str, required=False, location='json')
     parser.add_argument('customize_token_strategy', type=str, choices=['must', 'allow', 'not_allow'],
                         required=False,
                         location='json')
@@ -83,6 +83,7 @@ class AppSite(Resource):
             'customize_domain',
             'copyright',
             'privacy_policy',
+            'custom_disclaimer',
             'customize_token_strategy',
             'prompt_public'
         ]:

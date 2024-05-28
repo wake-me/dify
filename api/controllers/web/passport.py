@@ -5,34 +5,22 @@ from flask_restful import Resource
 from werkzeug.exceptions import NotFound, Unauthorized
 
 from controllers.web import api
+from controllers.web.error import WebSSOAuthRequiredError
 from extensions.ext_database import db
 from libs.passport import PassportService
 from models.model import App, EndUser, Site
+from services.feature_service import FeatureService
 
 
 class PassportResource(Resource):
     """访问令牌资源基类。"""
     
     def get(self):
-        """
-        处理客户端的GET请求，验证X-App-Code头部信息，并生成访问令牌（access token）返回给客户端。
-        
-        验证流程包括：
-        - 验证X-App-Code头部是否存在；
-        - 根据X-App-Code查询站点信息，并验证站点状态是否为正常；
-        - 查询关联的应用信息，并验证应用状态是否为正常以及是否启用该站点。
-        
-        如果验证通过，将创建一个匿名的终端用户记录，并返回访问令牌。
-        
-        返回值:
-            - 包含访问令牌的字典。
-            
-        异常:
-            - Unauthorized: 当X-App-Code头部缺失时抛出。
-            - NotFound: 当对应的站点或应用信息不存在或状态不正常时抛出。
-        """
-        
-        # 验证X-App-Code头部信息
+
+        system_features = FeatureService.get_system_features()
+        if system_features.sso_enforced_for_web:
+            raise WebSSOAuthRequiredError()
+
         app_code = request.headers.get('X-App-Code')
         if app_code is None:
             raise Unauthorized('X-App-Code header is missing.')
@@ -49,8 +37,7 @@ class PassportResource(Resource):
         app_model = db.session.query(App).filter(App.id == site.app_id).first()
         if not app_model or app_model.status != 'normal' or not app_model.enable_site:
             raise NotFound()
-        
-        # 创建终端用户实例，并保存到数据库
+
         end_user = EndUser(
             tenant_id=app_model.tenant_id,
             app_id=app_model.id,
@@ -58,6 +45,7 @@ class PassportResource(Resource):
             is_anonymous=True,
             session_id=generate_session_id(),
         )
+
         db.session.add(end_user)
         db.session.commit()
 
@@ -77,7 +65,9 @@ class PassportResource(Resource):
             'access_token': tk,
         }
 
+
 api.add_resource(PassportResource, '/passport')
+
 
 def generate_session_id():
     """

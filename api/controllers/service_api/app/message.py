@@ -107,16 +107,7 @@ class MessageListApi(Resource):
 
 
 class MessageFeedbackApi(Resource):
-    """
-    消息反馈API，用于接收用户对特定消息的反馈。
-
-    Attributes:
-        app_model (App): 应用模型，代表一个具体的应用。
-        end_user (EndUser): 终端用户，代表进行反馈的用户。
-        message_id (str): 消息ID，用于标识需要反馈的具体消息。
-    """
-
-    @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.JSON))
+    @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.JSON, required=True))
     def post(self, app_model: App, end_user: EndUser, message_id):
         """
         提交消息反馈。
@@ -149,22 +140,7 @@ class MessageFeedbackApi(Resource):
         return {'result': 'success'}  # 返回反馈成功的响应
 
 class MessageSuggestedApi(Resource):
-    """
-    提供有关消息建议API的接口类。
-    
-    方法:
-    - get: 根据消息ID获取建议的问题。
-    
-    参数:
-    - app_model: 应用模型，用于确定应用的配置和模式。
-    - end_user: 终端用户模型，标识请求的用户。
-    - message_id: 消息的唯一标识符。
-    
-    返回值:
-    - 一个包含结果和数据的字典，其中数据为建议的问题列表。
-    """
-    
-    @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.QUERY))
+    @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.QUERY, required=True))
     def get(self, app_model: App, end_user: EndUser, message_id):
         message_id = str(message_id)
         app_mode = AppMode.value_of(app_model.mode)

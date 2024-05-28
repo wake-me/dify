@@ -23,6 +23,7 @@ recommended_app_fields = {
     'description': fields.String(attribute='description'),
     'copyright': fields.String,
     'privacy_policy': fields.String,
+    'custom_disclaimer': fields.String,
     'category': fields.String,
     'position': fields.Integer,
     'is_listed': fields.Boolean

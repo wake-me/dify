@@ -176,15 +176,14 @@ class DatasetDocumentStore:
                     enabled=False,
                     created_by=self._user_id,
                 )
-                # 如果存在答案信息，则保存到文档片段中
-                if 'answer' in doc.metadata and doc.metadata['answer']:
+                if doc.metadata.get('answer'):
                     segment_document.answer = doc.metadata.pop('answer', '')
 
                 db.session.add(segment_document)
             else:
                 # 更新已存在的文档片段信息
                 segment_document.content = doc.page_content
-                if 'answer' in doc.metadata and doc.metadata['answer']:
+                if doc.metadata.get('answer'):
                     segment_document.answer = doc.metadata.pop('answer', '')
                 segment_document.index_node_hash = doc.metadata['doc_hash']
                 segment_document.word_count = len(doc.page_content)

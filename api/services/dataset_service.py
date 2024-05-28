@@ -823,8 +823,7 @@ class DocumentService:
 
         documents = []
         batch = time.strftime('%Y%m%d%H%M%S') + str(random.randint(100000, 999999))
-        if 'original_document_id' in document_data and document_data["original_document_id"]:
-            # 如果存在原始文档ID，则更新文档信息
+        if document_data.get("original_document_id"):
             document = DocumentService.update_document_with_dataset_id(dataset, document_data, account)
             documents.append(document)
         else:
@@ -1063,13 +1062,11 @@ class DocumentService:
         # 如果文档不可用，则抛出异常
         if document.display_status != 'available':
             raise ValueError("Document is not available")
-        
-        # 更新文档名称
-        if 'name' in document_data and document_data['name']:
+        # update document name
+        if document_data.get('name'):
             document.name = document_data['name']
-        
-        # 保存处理规则
-        if 'process_rule' in document_data and document_data['process_rule']:
+        # save process rule
+        if document_data.get('process_rule'):
             process_rule = document_data["process_rule"]
             # 根据规则模式创建或更新数据集处理规则
             if process_rule["mode"] == "custom":
@@ -1090,10 +1087,8 @@ class DocumentService:
             db.session.add(dataset_process_rule)
             db.session.commit()
             document.dataset_process_rule_id = dataset_process_rule.id
-        
-        # 更新文档数据源
-        if 'data_source' in document_data and document_data['data_source']:
-            # 根据数据源类型更新文档的数据源信息
+        # update document data source
+        if document_data.get('data_source'):
             file_name = ''
             data_source_info = {}
             if document_data["data_source"]["type"] == "upload_file":
@@ -1215,7 +1210,7 @@ class DocumentService:
                 embedding_model.model
             )
             dataset_collection_binding_id = dataset_collection_binding.id
-            if 'retrieval_model' in document_data and document_data['retrieval_model']:
+            if document_data.get('retrieval_model'):
                 retrieval_model = document_data['retrieval_model']
             else:
                 default_retrieval_model = {
@@ -1280,10 +1275,9 @@ class DocumentService:
                     and ('process_rule' not in args and not args['process_rule']):
                 raise ValueError("Data source or Process rule is required")  # 必须提供数据源或处理规则
             else:
-                # 根据提供的参数，进行数据源或处理规则的参数验证
-                if 'data_source' in args and args['data_source']:
+                if args.get('data_source'):
                     DocumentService.data_source_args_validate(args)
-                if 'process_rule' in args and args['process_rule']:
+                if args.get('process_rule'):
                     DocumentService.process_rule_args_validate(args)
 
     @classmethod
@@ -1747,8 +1741,7 @@ class SegmentService:
                 # 更新QA模型的答案
                 if document.doc_form == 'qa_model':
                     segment.answer = args['answer']
-                # 更新关键词
-                if 'keywords' in args and args['keywords']:
+                if args.get('keywords'):
                     segment.keywords = args['keywords']
                 segment.enabled = True
                 segment.disabled_at = None

@@ -10,8 +10,7 @@ class RetrievalResourceConfigManager:
         show_retrieve_source = False  # 默认不展示检索源
         retriever_resource_dict = config.get('retriever_resource')
         if retriever_resource_dict:
-            # 如果retriever_resource字典存在且启用标志为真，则展示检索源
-            if 'enabled' in retriever_resource_dict and retriever_resource_dict['enabled']:
+            if retriever_resource_dict.get('enabled'):
                 show_retrieve_source = True
         return show_retrieve_source
 

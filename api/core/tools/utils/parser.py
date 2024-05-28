@@ -9,26 +9,14 @@ from requests import get
 from yaml import YAMLError, safe_load
 
 from core.tools.entities.common_entities import I18nObject
-from core.tools.entities.tool_bundle import ApiBasedToolBundle
+from core.tools.entities.tool_bundle import ApiToolBundle
 from core.tools.entities.tool_entities import ApiProviderSchemaType, ToolParameter
 from core.tools.errors import ToolApiSchemaError, ToolNotSupportedError, ToolProviderNotFoundError
 
 
 class ApiBasedToolSchemaParser:
     @staticmethod
-    def parse_openapi_to_tool_bundle(openapi: dict, extra_info: dict = None, warning: dict = None) -> list[ApiBasedToolBundle]:
-        """
-        将 OpenAPI 规范解析为工具捆绑包列表。
-
-        参数:
-        - openapi: dict, 符合 OpenAPI 规范的字典。
-        - extra_info: dict, 额外的信息字典，用于存储从 OpenAPI 中提取的非参数信息，默认为 None。
-        - warning: dict, 警告信息字典，用于存储解析过程中发现的警告信息，默认为 None。
-
-        返回值:
-        - list[ApiBasedToolBundle], 根据 OpenAPI 规范解析得到的工具捆绑包列表。
-        """
-
+    def parse_openapi_to_tool_bundle(openapi: dict, extra_info: dict = None, warning: dict = None) -> list[ApiToolBundle]:
         warning = warning if warning is not None else {}
         extra_info = extra_info if extra_info is not None else {}
 
@@ -156,7 +144,7 @@ class ApiBasedToolSchemaParser:
                     
                 interface['operation']['operationId'] = f'{path}_{interface["method"]}'
 
-            bundles.append(ApiBasedToolBundle(
+            bundles.append(ApiToolBundle(
                 server_url=server_url + interface['path'],
                 method=interface['method'],
                 summary=interface['operation']['description'] if 'description' in interface['operation'] else 
@@ -200,7 +188,7 @@ class ApiBasedToolSchemaParser:
             return ToolParameter.ToolParameterType.STRING
 
     @staticmethod
-    def parse_openapi_yaml_to_tool_bundle(yaml: str, extra_info: dict = None, warning: dict = None) -> list[ApiBasedToolBundle]:
+    def parse_openapi_yaml_to_tool_bundle(yaml: str, extra_info: dict = None, warning: dict = None) -> list[ApiToolBundle]:
         """
         将 OpenAPI YAML 字符串解析为工具捆绑包列表。
 
@@ -296,7 +284,7 @@ class ApiBasedToolSchemaParser:
         return openapi
 
     @staticmethod
-    def parse_openai_plugin_json_to_tool_bundle(json: str, extra_info: dict = None, warning: dict = None) -> list[ApiBasedToolBundle]:
+    def parse_openai_plugin_json_to_tool_bundle(json: str, extra_info: dict = None, warning: dict = None) -> list[ApiToolBundle]:
         """
             解析 OpenAI 插件的 JSON 字符串为工具捆绑包
 
@@ -335,16 +323,13 @@ class ApiBasedToolSchemaParser:
         return ApiBasedToolSchemaParser.parse_openapi_yaml_to_tool_bundle(response.text, extra_info=extra_info, warning=warning)
     
     @staticmethod
-    def auto_parse_to_tool_bundle(content: str, extra_info: dict = None, warning: dict = None) -> tuple[list[ApiBasedToolBundle], str]:
+    def auto_parse_to_tool_bundle(content: str, extra_info: dict = None, warning: dict = None) -> tuple[list[ApiToolBundle], str]:
         """
-            自动解析内容到工具包
+            auto parse to tool bundle
 
-            :param content: 需要解析的内容
-            :param extra_info: 额外信息字典，用于在解析过程中提供额外的上下文信息
-            :param warning: 警告信息字典，用于存储解析过程中遇到的非致命性错误警告
-            :return: 工具包列表和schema类型字符串的元组
+            :param content: the content
+            :return: tools bundle, schema_type
         """
-        # 初始化警告和额外信息
         warning = warning if warning is not None else {}
         extra_info = extra_info if extra_info is not None else {}
 

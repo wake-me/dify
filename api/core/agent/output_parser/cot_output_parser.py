@@ -13,7 +13,7 @@ class CotAgentOutputParser:
     """
 
     @classmethod
-    def handle_react_stream_output(cls, llm_response: Generator[LLMResultChunk, None, None]) -> \
+    def handle_react_stream_output(cls, llm_response: Generator[LLMResultChunk, None, None], usage_dict: dict) -> \
         Generator[Union[str, AgentScratchpadUnit.Action], None, None]:
         """
         处理LLM响应流中的输出，解析出动作、思考内容和代码块中的JSON数据。
@@ -90,6 +90,8 @@ class CotAgentOutputParser:
 
         # 遍历响应流
         for response in llm_response:
+            if response.delta.usage:
+                usage_dict['usage'] = response.delta.usage
             response = response.delta.message.content
             if not isinstance(response, str):
                 continue

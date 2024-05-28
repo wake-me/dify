@@ -28,14 +28,15 @@ class AppSiteApi(WebApiResource):
     # 定义站点信息字段
     # 该字典定义了站点信息的各种字段及其类型，用于构建站点的元数据。
     site_fields = {
-        'title': fields.String,  # 站点标题，字符串类型
-        'icon': fields.String,  # 站点图标链接，字符串类型
-        'icon_background': fields.String,  # 图标背景颜色，字符串类型
-        'description': fields.String,  # 站点描述，字符串类型
-        'copyright': fields.String,  # 知识产权声明，字符串类型
-        'privacy_policy': fields.String,  # 隐私政策链接，字符串类型
-        'default_language': fields.String,  # 默认语言，字符串类型
-        'prompt_public': fields.Boolean  # 是否公开提示，布尔类型
+        'title': fields.String,
+        'icon': fields.String,
+        'icon_background': fields.String,
+        'description': fields.String,
+        'copyright': fields.String,
+        'privacy_policy': fields.String,
+        'custom_disclaimer': fields.String,
+        'default_language': fields.String,
+        'prompt_public': fields.Boolean
     }
 
     # 定义应用信息字段，包含嵌套的站点和模型配置信息

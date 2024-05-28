@@ -1,14 +1,15 @@
 import logging
 from mimetypes import guess_extension
 
+from core.file.file_obj import FileTransferMethod, FileType, FileVar
 from core.tools.entities.tool_entities import ToolInvokeMessage
 from core.tools.tool_file_manager import ToolFileManager
 
 logger = logging.getLogger(__name__)
 
 class ToolFileMessageTransformer:
-    @staticmethod
-    def transform_tool_invoke_messages(messages: list[ToolInvokeMessage],
+    @classmethod
+    def transform_tool_invoke_messages(cls, messages: list[ToolInvokeMessage],
                                        user_id: str,
                                        tenant_id: str,
                                        conversation_id: str) -> list[ToolInvokeMessage]:
@@ -78,7 +79,7 @@ class ToolFileMessageTransformer:
                     mimetype=mimetype
                 )
                                                             
-                url = f'/files/tools/{file.id}{guess_extension(file.mimetype) or ".bin"}'
+                url = cls.get_tool_file_url(file.id, guess_extension(file.mimetype))
 
                 # 根据MIME类型判断消息类型：如果是图像则为IMAGE_LINK，否则为LINK
                 if 'image' in mimetype:
@@ -95,8 +96,31 @@ class ToolFileMessageTransformer:
                         save_as=message.save_as,
                         meta=message.meta.copy() if message.meta is not None else {},
                     ))
+            elif message.type == ToolInvokeMessage.MessageType.FILE_VAR:
+                file_var: FileVar = message.meta.get('file_var')
+                if file_var:
+                    if file_var.transfer_method == FileTransferMethod.TOOL_FILE:
+                        url = cls.get_tool_file_url(file_var.related_id, file_var.extension)
+                        if file_var.type == FileType.IMAGE:
+                            result.append(ToolInvokeMessage(
+                                type=ToolInvokeMessage.MessageType.IMAGE_LINK,
+                                message=url,
+                                save_as=message.save_as,
+                                meta=message.meta.copy() if message.meta is not None else {},
+                            ))
+                        else:
+                            result.append(ToolInvokeMessage(
+                                type=ToolInvokeMessage.MessageType.LINK,
+                                message=url,
+                                save_as=message.save_as,
+                                meta=message.meta.copy() if message.meta is not None else {},
+                            ))
             else:
                 # 未处理的消息类型直接传递
                 result.append(message)
 
-        return result  # 返回转换后的消息列表
+        return result
+    
+    @classmethod
+    def get_tool_file_url(cls, tool_file_id: str, extension: str) -> str:
+        return f'/files/tools/{tool_file_id}{extension or ".bin"}'

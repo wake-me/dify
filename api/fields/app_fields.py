@@ -113,19 +113,20 @@ template_list_fields = {
 
 # 定义站点信息的字段及其类型
 site_fields = {
-    'access_token': fields.String(attribute='code'),  # 站点的访问令牌
-    'code': fields.String,  # 站点的唯一标识符
-    'title': fields.String,  # 站点的标题
-    'icon': fields.String,  # 站点的图标链接
-    'icon_background': fields.String,  # 图标背景颜色
-    'description': fields.String,  # 站点的描述
-    'default_language': fields.String,  # 站点的默认语言
-    'customize_domain': fields.String,  # 自定义站点域名
-    'copyright': fields.String,  # 站点的版权信息
-    'privacy_policy': fields.String,  # 站点的隐私政策
-    'customize_token_strategy': fields.String,  # 自定义令牌策略
-    'prompt_public': fields.Boolean,  # 是否公开提示
-    'app_base_url': fields.String,  # 应用的基础URL
+    'access_token': fields.String(attribute='code'),
+    'code': fields.String,
+    'title': fields.String,
+    'icon': fields.String,
+    'icon_background': fields.String,
+    'description': fields.String,
+    'default_language': fields.String,
+    'customize_domain': fields.String,
+    'copyright': fields.String,
+    'privacy_policy': fields.String,
+    'custom_disclaimer': fields.String,
+    'customize_token_strategy': fields.String,
+    'prompt_public': fields.Boolean,
+    'app_base_url': fields.String,
 }
 
 # 定义包含站点信息的 app 详情字段
@@ -147,17 +148,18 @@ app_detail_fields_with_site = {
 
 # 定义站点相关字段
 app_site_fields = {
-    'app_id': fields.String,  # 关联的应用ID
-    'access_token': fields.String(attribute='code'),  # 访问令牌（代码）
-    'code': fields.String,  # 站点的唯一标识符
-    'title': fields.String,  # 站点的标题
-    'icon': fields.String,  # 站点的图标链接
-    'icon_background': fields.String,  # 站点图标的背景颜色
-    'description': fields.String,  # 站点的描述
-    'default_language': fields.String,  # 默认的语言设置
-    'customize_domain': fields.String,  # 自定义的域名
-    'copyright': fields.String,  # 版权信息
-    'privacy_policy': fields.String,  # 隐私政策
-    'customize_token_strategy': fields.String,  # 自定义令牌策略
-    'prompt_public': fields.Boolean  # 是否公开提示
+    'app_id': fields.String,
+    'access_token': fields.String(attribute='code'),
+    'code': fields.String,
+    'title': fields.String,
+    'icon': fields.String,
+    'icon_background': fields.String,
+    'description': fields.String,
+    'default_language': fields.String,
+    'customize_domain': fields.String,
+    'copyright': fields.String,
+    'privacy_policy': fields.String,
+    'custom_disclaimer': fields.String,
+    'customize_token_strategy': fields.String,
+    'prompt_public': fields.Boolean
 }

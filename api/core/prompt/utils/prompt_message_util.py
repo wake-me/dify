@@ -1,6 +1,7 @@
 from typing import cast
 
 from core.model_runtime.entities.message_entities import (
+    AssistantPromptMessage,
     ImagePromptMessageContent,
     PromptMessage,
     PromptMessageContentType,
@@ -22,14 +23,26 @@ class PromptMessageUtil:
         prompts = []
         # 当模型模式为聊天模式时，处理每个提示消息
         if model_mode == ModelMode.CHAT.value:
+            tool_calls = []
             for prompt_message in prompt_messages:
                 # 根据消息角色，转换为对应的字符串表示
                 if prompt_message.role == PromptMessageRole.USER:
                     role = 'user'
                 elif prompt_message.role == PromptMessageRole.ASSISTANT:
                     role = 'assistant'
+                    if isinstance(prompt_message, AssistantPromptMessage):
+                        tool_calls = [{
+                            'id': tool_call.id,
+                            'type': 'function',
+                            'function': {
+                                'name': tool_call.function.name,
+                                'arguments': tool_call.function.arguments,
+                            }
+                        } for tool_call in prompt_message.tool_calls]
                 elif prompt_message.role == PromptMessageRole.SYSTEM:
                     role = 'system'
+                elif prompt_message.role == PromptMessageRole.TOOL:
+                    role = 'tool'
                 else:
                     continue  # 跳过角色不识别的消息
 
@@ -52,12 +65,16 @@ class PromptMessageUtil:
                 else:
                     text = prompt_message.content
 
-                # 将角色、文本和文件列表添加到结果列表
-                prompts.append({
+                prompt = {
                     "role": role,
                     "text": text,
                     "files": files
-                })
+                }
+                
+                if tool_calls:
+                    prompt['tool_calls'] = tool_calls
+
+                prompts.append(prompt)
         else:
             # 对于非聊天模式，只处理第一个提示消息
             prompt_message = prompt_messages[0]

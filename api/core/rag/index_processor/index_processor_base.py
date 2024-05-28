@@ -2,6 +2,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from flask import current_app
+
 from core.model_manager import ModelInstance
 from core.rag.extractor.entity.extract_setting import ExtractSetting
 from core.rag.models.document import Document
@@ -100,8 +102,9 @@ class BaseIndexProcessor(ABC):
             # 获取用户自定义分割规则对应的分割器
             rules = processing_rule['rules']
             segmentation = rules["segmentation"]
-            if segmentation["max_tokens"] < 50 or segmentation["max_tokens"] > 1000:
-                raise ValueError("Custom segment length should be between 50 and 1000.")
+            max_segmentation_tokens_length = int(current_app.config['INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH'])
+            if segmentation["max_tokens"] < 50 or segmentation["max_tokens"] > max_segmentation_tokens_length:
+                raise ValueError(f"Custom segment length should be between 50 and {max_segmentation_tokens_length}.")
 
             separator = segmentation["separator"]
             if separator:
@@ -111,7 +114,7 @@ class BaseIndexProcessor(ABC):
                 chunk_size=segmentation["max_tokens"],
                 chunk_overlap=segmentation.get('chunk_overlap', 0),
                 fixed_separator=separator,
-                separators=["\n\n", "。", ".", " ", ""],
+                separators=["\n\n", "。", ". ", " ", ""],
                 embedding_model_instance=embedding_model_instance
             )
         else:
@@ -119,7 +122,7 @@ class BaseIndexProcessor(ABC):
             character_splitter = EnhanceRecursiveCharacterTextSplitter.from_encoder(
                 chunk_size=DatasetProcessRule.AUTOMATIC_RULES['segmentation']['max_tokens'],
                 chunk_overlap=DatasetProcessRule.AUTOMATIC_RULES['segmentation']['chunk_overlap'],
-                separators=["\n\n", "。", ".", " ", ""],
+                separators=["\n\n", "。", ". ", " ", ""],
                 embedding_model_instance=embedding_model_instance
             )
 

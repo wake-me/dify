@@ -53,6 +53,8 @@ class MessageFileParser:
                     raise ValueError('Invalid file url')
             if file.get('transfer_method') == FileTransferMethod.LOCAL_FILE.value and not file.get('upload_file_id'):
                 raise ValueError('Missing file upload_file_id')
+            if file.get('transform_method') == FileTransferMethod.TOOL_FILE.value and not file.get('tool_file_id'):
+                raise ValueError('Missing file tool_file_id')
 
         # 将文件列表转换为文件对象
         type_file_objs = self._to_file_objs(files, file_extra_config)
@@ -161,12 +163,21 @@ class MessageFileParser:
         if isinstance(file, dict):  # 当传入的file参数是字典时
             # 根据字典中的信息构建FileVar对象
             transfer_method = FileTransferMethod.value_of(file.get('transfer_method'))
+            if transfer_method != FileTransferMethod.TOOL_FILE:
+                return FileVar(
+                    tenant_id=self.tenant_id,
+                    type=FileType.value_of(file.get('type')),
+                    transfer_method=transfer_method,
+                    url=file.get('url') if transfer_method == FileTransferMethod.REMOTE_URL else None,
+                    related_id=file.get('upload_file_id') if transfer_method == FileTransferMethod.LOCAL_FILE else None,
+                    extra_config=file_extra_config
+                )
             return FileVar(
                 tenant_id=self.tenant_id,
                 type=FileType.value_of(file.get('type')),
                 transfer_method=transfer_method,
-                url=file.get('url') if transfer_method == FileTransferMethod.REMOTE_URL else None,
-                related_id=file.get('upload_file_id') if transfer_method == FileTransferMethod.LOCAL_FILE else None,
+                url=None,
+                related_id=file.get('tool_file_id'),
                 extra_config=file_extra_config
             )
         else:  # 当传入的file参数是MessageFile对象时

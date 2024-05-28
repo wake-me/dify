@@ -16,8 +16,7 @@ class FileUploadConfigManager:
         # 尝试从配置中获取文件上传字典
         file_upload_dict = config.get('file_upload')
         if file_upload_dict:
-            # 检查并处理图像配置
-            if 'image' in file_upload_dict and file_upload_dict['image']:
+            if file_upload_dict.get('image'):
                 if 'enabled' in file_upload_dict['image'] and file_upload_dict['image']['enabled']:
                     # 构建图像配置字典
                     image_config = {

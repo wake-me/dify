@@ -135,7 +135,7 @@ class ChatTextApi(InstalledAppResource):
             response = AudioService.transcript_tts(
                 app_model=app_model,
                 text=request.form['text'],
-                voice=request.form.get('voice'),
+                voice=request.form['voice'] if request.form.get('voice') else app_model.app_model_config.text_to_speech_dict.get('voice'),
                 streaming=False
             )
             # 返回转换后的音频数据

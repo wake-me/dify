@@ -1,9 +1,9 @@
 import json
 import time
 from datetime import datetime, timezone
-from typing import Any, Optional, Union, cast
+from typing import Optional, Union, cast
 
-from core.app.entities.app_invoke_entities import AdvancedChatAppGenerateEntity, InvokeFrom, WorkflowAppGenerateEntity
+from core.app.entities.app_invoke_entities import InvokeFrom
 from core.app.entities.queue_entities import (
     QueueNodeFailedEvent,
     QueueNodeStartedEvent,
@@ -13,18 +13,17 @@ from core.app.entities.queue_entities import (
     QueueWorkflowSucceededEvent,
 )
 from core.app.entities.task_entities import (
-    AdvancedChatTaskState,
     NodeExecutionInfo,
     NodeFinishStreamResponse,
     NodeStartStreamResponse,
     WorkflowFinishStreamResponse,
     WorkflowStartStreamResponse,
-    WorkflowTaskState,
 )
+from core.app.task_pipeline.workflow_iteration_cycle_manage import WorkflowIterationCycleManage
 from core.file.file_obj import FileVar
 from core.model_runtime.utils.encoders import jsonable_encoder
 from core.tools.tool_manager import ToolManager
-from core.workflow.entities.node_entities import NodeRunMetadataKey, NodeType, SystemVariable
+from core.workflow.entities.node_entities import NodeRunMetadataKey, NodeType
 from core.workflow.nodes.tool.entities import ToolNodeData
 from core.workflow.workflow_engine_manager import WorkflowEngineManager
 from extensions.ext_database import db
@@ -42,14 +41,7 @@ from models.workflow import (
 )
 
 
-class WorkflowCycleManage:
-    # 类 `WorkflowCycleManage` 用于管理工作流周期。
-    _application_generate_entity: Union[AdvancedChatAppGenerateEntity, WorkflowAppGenerateEntity]
-    _workflow: Workflow
-    _user: Union[Account, EndUser]
-    _task_state: Union[AdvancedChatTaskState, WorkflowTaskState]
-    _workflow_system_variables: dict[SystemVariable, Any]
-
+class WorkflowCycleManage(WorkflowIterationCycleManage):
     def _init_workflow_run(self, workflow: Workflow,
                            triggered_from: WorkflowRunTriggeredFrom,
                            user: Union[Account, EndUser],
@@ -244,34 +236,32 @@ class WorkflowCycleManage:
             return workflow_node_execution
 
     def _workflow_node_execution_failed(self, workflow_node_execution: WorkflowNodeExecution,
-                                            start_at: float,
-                                            error: str,
-                                            inputs: Optional[dict] = None,
-                                            process_data: Optional[dict] = None,
-                                            outputs: Optional[dict] = None,
-                                            ) -> WorkflowNodeExecution:
-            """
-            处理工作流节点执行失败的逻辑。
-            
-            :param workflow_node_execution: 工作流节点执行实例，包含该节点的执行信息。
-            :param start_at: 节点执行开始的时间戳。
-            :param error: 执行失败的错误信息。
-            :param inputs: 节点执行输入参数，可选。
-            :param process_data: 节点执行过程数据，可选。
-            :param outputs: 节点执行输出结果，可选。
-            :return: 更新后的工作流节点执行实例。
-            """
-            # 处理输入和输出中的特殊值
-            inputs = WorkflowEngineManager.handle_special_values(inputs)
-            outputs = WorkflowEngineManager.handle_special_values(outputs)
+                                        start_at: float,
+                                        error: str,
+                                        inputs: Optional[dict] = None,
+                                        process_data: Optional[dict] = None,
+                                        outputs: Optional[dict] = None,
+                                        execution_metadata: Optional[dict] = None
+                                        ) -> WorkflowNodeExecution:
+        """
+        Workflow node execution failed
+        :param workflow_node_execution: workflow node execution
+        :param start_at: start time
+        :param error: error message
+        :return:
+        """
+        inputs = WorkflowEngineManager.handle_special_values(inputs)
+        outputs = WorkflowEngineManager.handle_special_values(outputs)
 
-            workflow_node_execution.status = WorkflowNodeExecutionStatus.FAILED.value
-            workflow_node_execution.error = error
-            workflow_node_execution.elapsed_time = time.perf_counter() - start_at
-            workflow_node_execution.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
-            workflow_node_execution.inputs = json.dumps(inputs) if inputs else None
-            workflow_node_execution.process_data = json.dumps(process_data) if process_data else None
-            workflow_node_execution.outputs = json.dumps(outputs) if outputs else None
+        workflow_node_execution.status = WorkflowNodeExecutionStatus.FAILED.value
+        workflow_node_execution.error = error
+        workflow_node_execution.elapsed_time = time.perf_counter() - start_at
+        workflow_node_execution.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        workflow_node_execution.inputs = json.dumps(inputs) if inputs else None
+        workflow_node_execution.process_data = json.dumps(process_data) if process_data else None
+        workflow_node_execution.outputs = json.dumps(outputs) if outputs else None
+        workflow_node_execution.execution_metadata = json.dumps(jsonable_encoder(execution_metadata)) \
+            if execution_metadata else None
 
             # 提交数据库事务，更新工作流节点执行信息
             db.session.commit()
@@ -506,6 +496,22 @@ class WorkflowCycleManage:
         workflow_node_execution = db.session.query(WorkflowNodeExecution).filter(
             WorkflowNodeExecution.id == current_node_execution.workflow_node_execution_id).first()
         
+        execution_metadata = event.execution_metadata if isinstance(event, QueueNodeSucceededEvent) else None
+        
+        if self._iteration_state and self._iteration_state.current_iterations:
+            if not execution_metadata:
+                execution_metadata = {}
+            current_iteration_data = None
+            for iteration_node_id in self._iteration_state.current_iterations:
+                data = self._iteration_state.current_iterations[iteration_node_id]
+                if data.parent_iteration_id == None:
+                    current_iteration_data = data
+                    break
+
+            if current_iteration_data:
+                execution_metadata[NodeRunMetadataKey.ITERATION_ID] = current_iteration_data.iteration_id
+                execution_metadata[NodeRunMetadataKey.ITERATION_INDEX] = current_iteration_data.current_index
+
         if isinstance(event, QueueNodeSucceededEvent):
             # 节点成功完成时的处理逻辑
             workflow_node_execution = self._workflow_node_execution_success(
@@ -514,15 +520,19 @@ class WorkflowCycleManage:
                 inputs=event.inputs,
                 process_data=event.process_data,
                 outputs=event.outputs,
-                execution_metadata=event.execution_metadata
+                execution_metadata=execution_metadata
             )
 
-            # 如果执行元数据中包含总令牌数，则更新任务状态中的总令牌数
-            if event.execution_metadata and event.execution_metadata.get(NodeRunMetadataKey.TOTAL_TOKENS):
+            if execution_metadata and execution_metadata.get(NodeRunMetadataKey.TOTAL_TOKENS):
                 self._task_state.total_tokens += (
-                    int(event.execution_metadata.get(NodeRunMetadataKey.TOTAL_TOKENS)))
+                    int(execution_metadata.get(NodeRunMetadataKey.TOTAL_TOKENS)))
+                
+                if self._iteration_state:
+                    for iteration_node_id in self._iteration_state.current_iterations:
+                        data = self._iteration_state.current_iterations[iteration_node_id]
+                        if execution_metadata.get(NodeRunMetadataKey.TOTAL_TOKENS):
+                            data.total_tokens += int(execution_metadata.get(NodeRunMetadataKey.TOTAL_TOKENS))
 
-            # 如果节点类型为LLM，更新任务元数据中的usage信息
             if workflow_node_execution.node_type == NodeType.LLM.value:
                 outputs = workflow_node_execution.outputs_dict
                 usage_dict = outputs.get('usage', {})
@@ -535,7 +545,8 @@ class WorkflowCycleManage:
                 error=event.error,
                 inputs=event.inputs,
                 process_data=event.process_data,
-                outputs=event.outputs
+                outputs=event.outputs,
+                execution_metadata=execution_metadata
             )
 
         # 关闭数据库会话

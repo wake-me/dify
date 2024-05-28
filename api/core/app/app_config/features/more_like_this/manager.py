@@ -11,8 +11,7 @@ class MoreLikeThisConfigManager:
         # 尝试从配置中获取"more_like_this"字典
         more_like_this_dict = config.get('more_like_this')
         if more_like_this_dict:
-            # 如果"more_like_this"字典中包含"enabled"且其值为真，则启用"more_like_this"特性
-            if 'enabled' in more_like_this_dict and more_like_this_dict['enabled']:
+            if more_like_this_dict.get('enabled'):
                 more_like_this = True
         return more_like_this
 

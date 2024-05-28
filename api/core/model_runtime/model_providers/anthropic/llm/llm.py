@@ -150,44 +150,27 @@ class AnthropicLargeLanguageModel(LargeLanguageModel):
         return self._handle_chat_generate_response(model, credentials, response, prompt_messages)
 
     def _code_block_mode_wrapper(self, model: str, credentials: dict, prompt_messages: list[PromptMessage],
-                                    model_parameters: dict, tools: Optional[list[PromptMessageTool]] = None,
-                                    stop: Optional[list[str]] = None, stream: bool = True, user: Optional[str] = None,
-                                    callbacks: list[Callback] = None) -> Union[LLMResult, Generator]:
-            """
-            用于调用大型语言模型的代码块模式包装器
-            
-            参数:
-            - model: 模型名称，字符串类型，指定要调用的大型语言模型。
-            - credentials: 凭证字典，用于认证和访问模型。
-            - prompt_messages: 提示信息列表，PromptMessage类型，用于向模型提供输入。
-            - model_parameters: 模型参数字典，用于配置模型的行为。
-            - tools: 可选，PromptMessageTool类型的工具列表，提供额外的功能。
-            - stop: 可选，字符串列表，指定停止条件。
-            - stream: 布尔值，指示结果是否应流式传输。
-            - user: 可选，字符串类型，指定用户的名称。
-            - callbacks: 可选，Callback类型列表，用于处理特定事件的回调函数。
-            
-            返回值:
-            - LLMResult或Generator：调用大型语言模型的结果或生成器。
-            """
-            
-            # 如果模型参数中包含响应格式，则处理聊天模型的JSON提示
-            if 'response_format' in model_parameters and model_parameters['response_format']:
-                stop = stop or []
-                # 转换聊天模型的JSON提示信息
-                self._transform_chat_json_prompts(
-                    model=model,
-                    credentials=credentials,
-                    prompt_messages=prompt_messages,
-                    model_parameters=model_parameters,
-                    tools=tools,
-                    stop=stop,
-                    stream=stream,
-                    user=user,
-                    response_format=model_parameters['response_format']
-                )
-                # 从模型参数中移除响应格式参数
-                model_parameters.pop('response_format')
+                                 model_parameters: dict, tools: Optional[list[PromptMessageTool]] = None,
+                                 stop: Optional[list[str]] = None, stream: bool = True, user: Optional[str] = None,
+                                 callbacks: list[Callback] = None) -> Union[LLMResult, Generator]:
+        """
+        Code block mode wrapper for invoking large language model
+        """
+        if model_parameters.get('response_format'):
+            stop = stop or []
+            # chat model
+            self._transform_chat_json_prompts(
+                model=model,
+                credentials=credentials,
+                prompt_messages=prompt_messages,
+                model_parameters=model_parameters,
+                tools=tools,
+                stop=stop,
+                stream=stream,
+                user=user,
+                response_format=model_parameters['response_format']
+            )
+            model_parameters.pop('response_format')
 
             # 调用模型，并返回结果
             return self._invoke(model, credentials, prompt_messages, model_parameters, tools, stop, stream, user)
@@ -367,54 +350,76 @@ class AnthropicLargeLanguageModel(LargeLanguageModel):
         return response
 
     def _handle_chat_generate_stream_response(self, model: str, credentials: dict,
-                                                response: Stream[MessageStreamEvent],
-                                                prompt_messages: list[PromptMessage]) -> Generator:
-            """
-            处理聊天生成流式响应。
+                                              response: Stream[MessageStreamEvent],
+                                              prompt_messages: list[PromptMessage]) -> Generator:
+        """
+        Handle llm chat stream response
 
-            :param model: 模型名称
-            :param credentials: 凭据信息
-            :param response: 响应流
-            :param prompt_messages: 提示信息列表
-            :return: 返回llm响应块生成器
-            """
-            full_assistant_content = ''  # 保存完整助手内容
-            return_model = None  # 返回的模型
-            input_tokens = 0  # 输入令牌数
-            output_tokens = 0  # 输出令牌数
-            finish_reason = None  # 完成原因
-            index = 0  # 消息索引
+        :param model: model name
+        :param response: response
+        :param prompt_messages: prompt messages
+        :return: llm response chunk generator
+        """
+        full_assistant_content = ''
+        return_model = None
+        input_tokens = 0
+        output_tokens = 0
+        finish_reason = None
+        index = 0
 
-            # 遍历响应流中的每个块
-            for chunk in response:
-                if isinstance(chunk, MessageStartEvent):
-                    # 处理消息开始事件
+        tool_calls: list[AssistantPromptMessage.ToolCall] = []
+
+        for chunk in response:
+            if isinstance(chunk, MessageStartEvent):
+                if hasattr(chunk, 'content_block'):
+                    content_block = chunk.content_block
+                    if isinstance(content_block, dict):
+                        if content_block.get('type') == 'tool_use':
+                            tool_call = AssistantPromptMessage.ToolCall(
+                                id=content_block.get('id'),
+                                type='function',
+                                function=AssistantPromptMessage.ToolCall.ToolCallFunction(
+                                    name=content_block.get('name'),
+                                    arguments=''
+                                )
+                            )
+                            tool_calls.append(tool_call)
+                elif hasattr(chunk, 'delta'):
+                    delta = chunk.delta
+                    if isinstance(delta, dict) and len(tool_calls) > 0:
+                        if delta.get('type') == 'input_json_delta':
+                            tool_calls[-1].function.arguments += delta.get('partial_json', '')
+                elif chunk.message:
                     return_model = chunk.message.model
                     input_tokens = chunk.message.usage.input_tokens
-                elif isinstance(chunk, MessageDeltaEvent):
-                    # 处理消息增量事件
-                    output_tokens = chunk.usage.output_tokens
-                    finish_reason = chunk.delta.stop_reason
-                elif isinstance(chunk, MessageStopEvent):
-                    # 处理消息停止事件，计算并返回使用情况
-                    usage = self._calc_response_usage(model, credentials, input_tokens, output_tokens)
+            elif isinstance(chunk, MessageDeltaEvent):
+                output_tokens = chunk.usage.output_tokens
+                finish_reason = chunk.delta.stop_reason
+            elif isinstance(chunk, MessageStopEvent):
+                # transform usage
+                usage = self._calc_response_usage(model, credentials, input_tokens, output_tokens)
 
-                    yield LLMResultChunk(
-                        model=return_model,
-                        prompt_messages=prompt_messages,
-                        delta=LLMResultChunkDelta(
-                            index=index + 1,
-                            message=AssistantPromptMessage(
-                                content=''
-                            ),
-                            finish_reason=finish_reason,
-                            usage=usage
-                        )
+                # transform empty tool call arguments to {}
+                for tool_call in tool_calls:
+                    if not tool_call.function.arguments:
+                        tool_call.function.arguments = '{}'
+
+                yield LLMResultChunk(
+                    model=return_model,
+                    prompt_messages=prompt_messages,
+                    delta=LLMResultChunkDelta(
+                        index=index + 1,
+                        message=AssistantPromptMessage(
+                            content='',
+                            tool_calls=tool_calls
+                        ),
+                        finish_reason=finish_reason,
+                        usage=usage
                     )
-                elif isinstance(chunk, ContentBlockDeltaEvent):
-                    # 处理内容块增量事件，将助手内容拼接到一起
-                    chunk_text = chunk.delta.text if chunk.delta.text else ''
-                    full_assistant_content += chunk_text
+                )
+            elif isinstance(chunk, ContentBlockDeltaEvent):
+                chunk_text = chunk.delta.text if chunk.delta.text else ''
+                full_assistant_content += chunk_text
 
                     # 将助手消息转换为提示消息
                     assistant_prompt_message = AssistantPromptMessage(
@@ -446,8 +451,7 @@ class AnthropicLargeLanguageModel(LargeLanguageModel):
             "max_retries": 1,  # 设置最大重试次数
         }
 
-        # 如果提供了API URL，则将其添加到参数字典中
-        if 'anthropic_api_url' in credentials and credentials['anthropic_api_url']:
+        if credentials.get('anthropic_api_url'):
             credentials['anthropic_api_url'] = credentials['anthropic_api_url'].rstrip('/')
             credentials_kwargs['base_url'] = credentials['anthropic_api_url']
 

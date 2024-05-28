@@ -11,8 +11,9 @@ class SpeechToTextConfigManager:
         # 检查配置中是否存在语音转文本的配置，并尝试读取其启用状态
         speech_to_text_dict = config.get('speech_to_text')
         if speech_to_text_dict:
-            if 'enabled' in speech_to_text_dict and speech_to_text_dict['enabled']:
-                speech_to_text = True  # 如果启用了，则设置为True
+            if speech_to_text_dict.get('enabled'):
+                speech_to_text = True
+
         return speech_to_text
 
     @classmethod

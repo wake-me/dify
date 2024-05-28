@@ -9,23 +9,24 @@ from typing import Any, Union
 from flask import current_app
 
 from core.agent.entities import AgentToolEntity
+from core.app.entities.app_invoke_entities import InvokeFrom
 from core.model_runtime.utils.encoders import jsonable_encoder
-from core.provider_manager import ProviderManager
 from core.tools import *
+from core.tools.entities.api_entities import UserToolProvider, UserToolProviderTypeLiteral
 from core.tools.entities.common_entities import I18nObject
 from core.tools.entities.tool_entities import (
     ApiProviderAuthType,
+    ToolInvokeFrom,
     ToolParameter,
 )
-from core.tools.entities.user_entities import UserToolProvider
 from core.tools.errors import ToolProviderNotFoundError
-from core.tools.provider.api_tool_provider import ApiBasedToolProviderController
+from core.tools.provider.api_tool_provider import ApiToolProviderController
 from core.tools.provider.builtin._positions import BuiltinToolProviderSort
 from core.tools.provider.builtin_tool_provider import BuiltinToolProviderController
-from core.tools.provider.model_tool_provider import ModelToolProviderController
 from core.tools.tool.api_tool import ApiTool
 from core.tools.tool.builtin_tool import BuiltinTool
 from core.tools.tool.tool import Tool
+from core.tools.tool_label_manager import ToolLabelManager
 from core.tools.utils.configuration import (
     ToolConfigurationManager,
     ToolParameterConfigurationManager,
@@ -33,8 +34,8 @@ from core.tools.utils.configuration import (
 from core.utils.module_import_helper import load_single_subclass_from_source
 from core.workflow.nodes.tool.entities import ToolEntity
 from extensions.ext_database import db
-from models.tools import ApiToolProvider, BuiltinToolProvider
-from services.tools_transform_service import ToolTransformService
+from models.tools import ApiToolProvider, BuiltinToolProvider, WorkflowToolProvider
+from services.tools.tools_transform_service import ToolTransformService
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +119,12 @@ class ToolManager:
             raise ToolProviderNotFoundError(f'provider type {provider_type} not found')
 
     @classmethod
-    def get_tool_runtime(cls, provider_type: str, provider_name: str, tool_name: str, tenant_id: str) \
+    def get_tool_runtime(cls, provider_type: str, 
+                         provider_id: str,
+                         tool_name: str, 
+                         tenant_id: str, 
+                         invoke_from: InvokeFrom = InvokeFrom.DEBUGGER,
+                         tool_invoke_from: ToolInvokeFrom = ToolInvokeFrom.AGENT) \
         -> Union[BuiltinTool, ApiTool]:
         """
             获取工具运行时
@@ -135,35 +141,39 @@ class ToolManager:
             对于不同的提供者类型，需要进行不同的处理逻辑来获取工具运行时实例，这个过程可能涉及到凭证的解密和工具配置的处理。
         """
         if provider_type == 'builtin':
-            # 获取内置工具，并处理无需凭证的情况
-            builtin_tool = cls.get_builtin_tool(provider_name, tool_name)
+            builtin_tool = cls.get_builtin_tool(provider_id, tool_name)
 
-            provider_controller = cls.get_builtin_provider(provider_name)
+            # check if the builtin tool need credentials
+            provider_controller = cls.get_builtin_provider(provider_id)
             if not provider_controller.need_credentials:
-                return builtin_tool.fork_tool_runtime(meta={
+                return builtin_tool.fork_tool_runtime(runtime={
                     'tenant_id': tenant_id,
                     'credentials': {},
+                    'invoke_from': invoke_from,
+                    'tool_invoke_from': tool_invoke_from,
                 })
 
             # 处理需要凭证的情况，从数据库获取并解密凭证
             builtin_provider: BuiltinToolProvider = db.session.query(BuiltinToolProvider).filter(
                 BuiltinToolProvider.tenant_id == tenant_id,
-                BuiltinToolProvider.provider == provider_name,
+                BuiltinToolProvider.provider == provider_id,
             ).first()
 
             if builtin_provider is None:
-                raise ToolProviderNotFoundError(f'builtin provider {provider_name} not found')
+                raise ToolProviderNotFoundError(f'builtin provider {provider_id} not found')
 
             credentials = builtin_provider.credentials
-            controller = cls.get_builtin_provider(provider_name)
+            controller = cls.get_builtin_provider(provider_id)
             tool_configuration = ToolConfigurationManager(tenant_id=tenant_id, provider_controller=controller)
 
             decrypted_credentials = tool_configuration.decrypt_tool_credentials(credentials)
 
-            return builtin_tool.fork_tool_runtime(meta={
+            return builtin_tool.fork_tool_runtime(runtime={
                 'tenant_id': tenant_id,
                 'credentials': decrypted_credentials,
-                'runtime_parameters': {}
+                'runtime_parameters': {},
+                'invoke_from': invoke_from,
+                'tool_invoke_from': tool_invoke_from,
             })
         
         elif provider_type == 'api':
@@ -171,27 +181,35 @@ class ToolManager:
             if tenant_id is None:
                 raise ValueError('tenant id is required for api provider')
 
-            api_provider, credentials = cls.get_api_provider_controller(tenant_id, provider_name)
+            api_provider, credentials = cls.get_api_provider_controller(tenant_id, provider_id)
 
             tool_configuration = ToolConfigurationManager(tenant_id=tenant_id, provider_controller=api_provider)
             decrypted_credentials = tool_configuration.decrypt_tool_credentials(credentials)
 
-            return api_provider.get_tool(tool_name).fork_tool_runtime(meta={
+            return api_provider.get_tool(tool_name).fork_tool_runtime(runtime={
                 'tenant_id': tenant_id,
                 'credentials': decrypted_credentials,
+                'invoke_from': invoke_from,
+                'tool_invoke_from': tool_invoke_from,
             })
-        elif provider_type == 'model':
-            # 处理模型提供者的情况，获取模型工具并处理凭证
-            if tenant_id is None:
-                raise ValueError('tenant id is required for model provider')
-            
-            model_provider = cls.get_model_provider(tenant_id, provider_name)
+        elif provider_type == 'workflow':
+            workflow_provider = db.session.query(WorkflowToolProvider).filter(
+                WorkflowToolProvider.tenant_id == tenant_id,
+                WorkflowToolProvider.id == provider_id
+            ).first()
 
-            model_tool = model_provider.get_tool(tool_name)
+            if workflow_provider is None:
+                raise ToolProviderNotFoundError(f'workflow provider {provider_id} not found')
 
-            return model_tool.fork_tool_runtime(meta={
+            controller = ToolTransformService.workflow_provider_to_controller(
+                db_provider=workflow_provider
+            )
+
+            return controller.get_tools(user_id=None, tenant_id=workflow_provider.tenant_id)[0].fork_tool_runtime(runtime={
                 'tenant_id': tenant_id,
-                'credentials': model_tool.model_configuration['model_instance'].credentials
+                'credentials': {},
+                'invoke_from': invoke_from,
+                'tool_invoke_from': tool_invoke_from,
             })
         elif provider_type == 'app':
             # app提供者暂未实现
@@ -264,7 +282,7 @@ class ToolManager:
         return parameter_value
 
     @classmethod
-    def get_agent_tool_runtime(cls, tenant_id: str, app_id: str, agent_tool: AgentToolEntity) -> Tool:
+    def get_agent_tool_runtime(cls, tenant_id: str, app_id: str, agent_tool: AgentToolEntity, invoke_from: InvokeFrom = InvokeFrom.DEBUGGER) -> Tool:
         """
         获取代理工具的运行时信息。
 
@@ -279,15 +297,22 @@ class ToolManager:
         """
         # 获取工具的运行时实体
         tool_entity = cls.get_tool_runtime(
-            provider_type=agent_tool.provider_type, provider_name=agent_tool.provider_id,
+            provider_type=agent_tool.provider_type, 
+            provider_id=agent_tool.provider_id,
             tool_name=agent_tool.tool_name,
             tenant_id=tenant_id,
+            invoke_from=invoke_from,
+            tool_invoke_from=ToolInvokeFrom.AGENT
         )
         runtime_parameters = {}
         
         # 遍历并收集所有运行时参数
         parameters = tool_entity.get_all_runtime_parameters()
         for parameter in parameters:
+            # check file types
+            if parameter.type == ToolParameter.ToolParameterType.FILE:
+                raise ValueError(f"file type parameter {parameter.name} not supported in agent")
+            
             if parameter.form == ToolParameter.ToolParameterForm.FORM:
                 # 初始化并保存运行时参数到内存
                 value = cls._init_runtime_parameter(parameter, agent_tool.tool_parameters)
@@ -308,7 +333,7 @@ class ToolManager:
         return tool_entity
 
     @classmethod
-    def get_workflow_tool_runtime(cls, tenant_id: str, app_id: str, node_id: str, workflow_tool: ToolEntity):
+    def get_workflow_tool_runtime(cls, tenant_id: str, app_id: str, node_id: str, workflow_tool: ToolEntity, invoke_from: InvokeFrom = InvokeFrom.DEBUGGER) -> Tool:
         """
         获取工作流工具的运行时信息。
 
@@ -325,9 +350,11 @@ class ToolManager:
         # 获取工具的运行时配置
         tool_entity = cls.get_tool_runtime(
             provider_type=workflow_tool.provider_type,
-            provider_name=workflow_tool.provider_id,
+            provider_id=workflow_tool.provider_id,
             tool_name=workflow_tool.tool_name,
             tenant_id=tenant_id,
+            invoke_from=invoke_from,
+            tool_invoke_from=ToolInvokeFrom.WORKFLOW
         )
         runtime_parameters = {}
         parameters = tool_entity.get_all_runtime_parameters()
@@ -489,53 +516,6 @@ class ToolManager:
         cls._builtin_providers = {}  # 重置内置提供者的缓存为一个空字典
         cls._builtin_providers_loaded = False  # 标记内置提供者缓存为未加载状态
 
-    # @classmethod
-    # def list_model_providers(cls, tenant_id: str = None) -> list[ModelToolProviderController]:
-    #     """
-    #         list all the model providers
-
-    #         :return: the list of the model providers
-    #     """
-    #     tenant_id = tenant_id or 'ffffffff-ffff-ffff-ffff-ffffffffffff'
-    #     # get configurations
-    #     model_configurations = ModelToolConfigurationManager.get_all_configuration()
-    #     # get all providers
-    #     provider_manager = ProviderManager()
-    #     configurations = provider_manager.get_configurations(tenant_id).values()
-    #     # get model providers
-    #     model_providers: list[ModelToolProviderController] = []
-    #     for configuration in configurations:
-    #         # all the model tool should be configurated
-    #         if configuration.provider.provider not in model_configurations:
-    #             continue
-    #         if not ModelToolProviderController.is_configuration_valid(configuration):
-    #             continue
-    #         model_providers.append(ModelToolProviderController.from_db(configuration))
-
-    #     return model_providers
-
-    @classmethod
-    def get_model_provider(cls, tenant_id: str, provider_name: str) -> 'ModelToolProviderController':
-        """
-        获取模型提供者
-
-        :param tenant_id: 租户ID，用于获取租户特定的提供者配置
-        :param provider_name: 提供者名称，指定要获取的模型提供者
-        :return: 返回对应模型提供者的控制器实例
-        """
-        # 获取配置管理器并检索配置
-        provider_manager = ProviderManager()
-        configurations = provider_manager.get_configurations(tenant_id)
-        configuration = configurations.get(provider_name)
-        
-        # 如果指定名称的配置不存在，则抛出未找到提供者异常
-        if configuration is None:
-            raise ToolProviderNotFoundError(f'model provider {provider_name} not found')
-
-        # 从数据库配置加载并返回模型工具提供者控制器实例
-        return ModelToolProviderController.from_db(configuration)
-
-
     @classmethod
     def get_tool_label(cls, tool_name: str) -> Union[I18nObject, None]:
         """
@@ -547,8 +527,6 @@ class ToolManager:
             :return: 工具的标签，如果工具未找到则返回None
             :rtype: Union[I18nObject, None]
         """
-        # 判断内置工具标签是否已初始化
-        cls._builtin_tools_labels
         if len(cls._builtin_tools_labels) == 0:
             # 初始化内置工具提供者缓存
             cls.load_builtin_providers_cache()
@@ -560,76 +538,92 @@ class ToolManager:
         return cls._builtin_tools_labels[tool_name]
 
     @classmethod
-    def user_list_providers(cls, user_id: str, tenant_id: str) -> list[UserToolProvider]:
-        """
-        获取用户工具提供者列表。
-
-        参数:
-        cls - 类的引用，用于调用类方法和属性。
-        user_id - 用户的唯一标识符。
-        tenant_id - 租户的唯一标识符。
-
-        返回值:
-        返回一个UserToolProvider类型的列表，包含了用户能够使用的工具提供者。
-        """
+    def user_list_providers(cls, user_id: str, tenant_id: str, typ: UserToolProviderTypeLiteral) -> list[UserToolProvider]:
         result_providers: dict[str, UserToolProvider] = {}
 
-        # 获取内建工具提供者列表
-        builtin_providers = cls.list_builtin_providers()
-        
-        # 从数据库中获取内建工具提供者
-        db_builtin_providers: list[BuiltinToolProvider] = db.session.query(BuiltinToolProvider). \
-            filter(BuiltinToolProvider.tenant_id == tenant_id).all()
+        filters = []
+        if not typ:
+            filters.extend(['builtin', 'api', 'workflow'])
+        else:
+            filters.append(typ)
 
-        # 定义一个函数，用于在数据库内建工具提供者列表中查找指定的提供者
-        find_db_builtin_provider = lambda provider: next(
-            (x for x in db_builtin_providers if x.provider == provider),
-            None
-        )
+        if 'builtin' in filters:
 
-        # 将内建工具提供者添加到结果提供者字典中
-        for provider in builtin_providers:
-            user_provider = ToolTransformService.builtin_provider_to_user_provider(
-                provider_controller=provider,
-                db_provider=find_db_builtin_provider(provider.identity.name),
-                decrypt_credentials=False
+            # get builtin providers
+            builtin_providers = cls.list_builtin_providers()
+            
+            # get db builtin providers
+            db_builtin_providers: list[BuiltinToolProvider] = db.session.query(BuiltinToolProvider). \
+                filter(BuiltinToolProvider.tenant_id == tenant_id).all()
+
+            find_db_builtin_provider = lambda provider: next(
+                (x for x in db_builtin_providers if x.provider == provider),
+                None
             )
 
-            result_providers[provider.identity.name] = user_provider
+            # append builtin providers
+            for provider in builtin_providers:
+                user_provider = ToolTransformService.builtin_provider_to_user_provider(
+                    provider_controller=provider,
+                    db_provider=find_db_builtin_provider(provider.identity.name),
+                    decrypt_credentials=False
+                )
 
-        # # 从数据库中获取模型工具提供者
-        # db_model_providers: list[ModelToolProvider] = db.session.query(ModelToolProvider). \
-        #     filter(ModelToolProvider.tenant_id == tenant_id).all()
-        #
-        # # 将模型工具提供者添加到结果提供者字典中
-        # for db_model_provider in db_model_providers:
-        #     model_provider = ToolTransformService.db_model_provider_to_model_provider(
-        #         db_provider=db_model_provider,
-        #     )
-        #     result_providers[f'model_provider.{model_provider.identity.name}'] = model_provider
+                result_providers[provider.identity.name] = user_provider
 
-        # 从数据库中获取API工具提供者
-        db_api_providers: list[ApiToolProvider] = db.session.query(ApiToolProvider). \
-            filter(ApiToolProvider.tenant_id == tenant_id).all()
+        # get db api providers
 
-        # 将API工具提供者添加到结果提供者字典中
-        for db_api_provider in db_api_providers:
-            provider_controller = ToolTransformService.api_provider_to_controller(
-                db_provider=db_api_provider,
-            )
-            user_provider = ToolTransformService.api_provider_to_user_provider(
-                provider_controller=provider_controller,
-                db_provider=db_api_provider,
-                decrypt_credentials=False
-            )
-            result_providers[db_api_provider.name] = user_provider
+        if 'api' in filters:
+            db_api_providers: list[ApiToolProvider] = db.session.query(ApiToolProvider). \
+                filter(ApiToolProvider.tenant_id == tenant_id).all()
+            
+            api_provider_controllers = [{
+                'provider': provider,
+                'controller': ToolTransformService.api_provider_to_controller(provider)
+            } for provider in db_api_providers]
+
+            # get labels
+            labels = ToolLabelManager.get_tools_labels([x['controller'] for x in api_provider_controllers])
+
+            for api_provider_controller in api_provider_controllers:
+                user_provider = ToolTransformService.api_provider_to_user_provider(
+                    provider_controller=api_provider_controller['controller'],
+                    db_provider=api_provider_controller['provider'],
+                    decrypt_credentials=False,
+                    labels=labels.get(api_provider_controller['controller'].provider_id, [])
+                )
+                result_providers[f'api_provider.{user_provider.name}'] = user_provider
+
+        if 'workflow' in filters:
+            # get workflow providers
+            workflow_providers: list[WorkflowToolProvider] = db.session.query(WorkflowToolProvider). \
+                filter(WorkflowToolProvider.tenant_id == tenant_id).all()
+            
+            workflow_provider_controllers = []
+            for provider in workflow_providers:
+                try:
+                    workflow_provider_controllers.append(
+                        ToolTransformService.workflow_provider_to_controller(db_provider=provider)
+                    )
+                except Exception as e:
+                    # app has been deleted
+                    pass
+            
+            labels = ToolLabelManager.get_tools_labels(workflow_provider_controllers)
+
+            for provider_controller in workflow_provider_controllers:
+                user_provider = ToolTransformService.workflow_provider_to_user_provider(
+                    provider_controller=provider_controller,
+                    labels=labels.get(provider_controller.provider_id, []),
+                )
+                result_providers[f'workflow_provider.{user_provider.name}'] = user_provider
 
         # 对结果中的工具提供者进行排序后返回
         return BuiltinToolProviderSort.sort(list(result_providers.values()))
 
     @classmethod
     def get_api_provider_controller(cls, tenant_id: str, provider_id: str) -> tuple[
-        ApiBasedToolProviderController, dict[str, Any]]:
+        ApiToolProviderController, dict[str, Any]]:
         """
         获取API提供者控制器
 
@@ -650,8 +644,7 @@ class ToolManager:
         if provider is None:
             raise ToolProviderNotFoundError(f'api provider {provider_id} not found')
 
-        # 根据提供者的认证类型创建API基础工具提供者控制器，并加载提供的工具
-        controller = ApiBasedToolProviderController.from_db(
+        controller = ApiToolProviderController.from_db(
             provider,
             ApiProviderAuthType.API_KEY if provider.credentials['auth_type'] == 'api_key' else 
             ApiProviderAuthType.NONE
@@ -693,8 +686,8 @@ class ToolManager:
         except:
             credentials = {}
 
-        # 初始化工具提供者控制器和工具配置管理器
-        controller = ApiBasedToolProviderController.from_db(
+        # package tool provider controller
+        controller = ApiToolProviderController.from_db(
             provider, ApiProviderAuthType.API_KEY if credentials['auth_type'] == 'api_key' else ApiProviderAuthType.NONE
         )
         tool_configuration = ToolConfigurationManager(tenant_id=tenant_id, provider_controller=controller)
@@ -713,7 +706,9 @@ class ToolManager:
                 "content": "\ud83d\ude01"
             }
 
-        # 构建并返回提供者信息的JSON编码字典
+        # add tool labels
+        labels = ToolLabelManager.get_tool_labels(controller)
+
         return jsonable_encoder({
             'schema_type': provider.schema_type,
             'schema': provider.schema,
@@ -721,7 +716,9 @@ class ToolManager:
             'icon': icon,
             'description': provider.description,
             'credentials': masked_credentials,
-            'privacy_policy': provider.privacy_policy
+            'privacy_policy': provider.privacy_policy,
+            'custom_disclaimer': provider.custom_disclaimer,
+            'labels': labels,
         })
 
     @classmethod
@@ -757,6 +754,15 @@ class ToolManager:
                     "background": "#252525",
                     "content": "\ud83d\ude01"
                 }
+        elif provider_type == 'workflow':
+            provider: WorkflowToolProvider = db.session.query(WorkflowToolProvider).filter(
+                WorkflowToolProvider.tenant_id == tenant_id,
+                WorkflowToolProvider.id == provider_id
+            ).first()
+            if provider is None:
+                raise ToolProviderNotFoundError(f'workflow provider {provider_id} not found')
+
+            return json.loads(provider.icon)
         else:
             # 如果提供者类型不识别，则抛出异常
             raise ValueError(f"provider type {provider_type} not found")

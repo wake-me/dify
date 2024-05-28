@@ -2,6 +2,7 @@ from flask import current_app
 from pydantic import BaseModel
 
 from services.billing_service import BillingService
+from services.enterprise.enterprise_service import EnterpriseService
 
 
 class SubscriptionModel(BaseModel):
@@ -34,6 +35,13 @@ class FeatureModel(BaseModel):
     can_replace_logo: bool = False  # 是否可以替换标志，默认为False
 
 
+class SystemFeatureModel(BaseModel):
+    sso_enforced_for_signin: bool = False
+    sso_enforced_for_signin_protocol: str = ''
+    sso_enforced_for_web: bool = False
+    sso_enforced_for_web_protocol: str = ''
+
+
 class FeatureService:
     """
     功能服务类，用于获取和处理功能信息。
@@ -55,6 +63,15 @@ class FeatureService:
             cls._fulfill_params_from_billing_api(features, tenant_id)  # 如果计费启用，则从计费API填充参数
 
         return features
+
+    @classmethod
+    def get_system_features(cls) -> SystemFeatureModel:
+        system_features = SystemFeatureModel()
+
+        if current_app.config['ENTERPRISE_ENABLED']:
+            cls._fulfill_params_from_enterprise(system_features)
+
+        return system_features
 
     @classmethod
     def _fulfill_params_from_env(cls, features: FeatureModel):
@@ -99,3 +116,11 @@ class FeatureService:
         features.docs_processing = billing_info['docs_processing']
         features.can_replace_logo = billing_info['can_replace_logo']
 
+    @classmethod
+    def _fulfill_params_from_enterprise(cls, features):
+        enterprise_info = EnterpriseService.get_info()
+
+        features.sso_enforced_for_signin = enterprise_info['sso_enforced_for_signin']
+        features.sso_enforced_for_signin_protocol = enterprise_info['sso_enforced_for_signin_protocol']
+        features.sso_enforced_for_web = enterprise_info['sso_enforced_for_web']
+        features.sso_enforced_for_web_protocol = enterprise_info['sso_enforced_for_web_protocol']

@@ -9,9 +9,7 @@ class AgentToolEntity(BaseModel):
     Agent Tool Entity 类。
     代表一个代理工具实体，包含工具的基本信息和参数。
     """
-
-    provider_type: Literal["builtin", "api"]
-    # 提供者类型，"builtin" 表示内置，"api" 表示通过API提供。
+    provider_type: Literal["builtin", "api", "workflow"]
     provider_id: str
     # 提供者的唯一标识符。
     tool_name: str

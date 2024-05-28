@@ -2,7 +2,6 @@ import json
 from enum import Enum
 from typing import Optional, Union
 
-from core.tools.tool_manager import ToolManager
 from extensions.ext_database import db
 from libs import helper
 from models import StringUUID
@@ -201,6 +200,12 @@ class Workflow(db.Model):
 
         return helper.generate_text_hash(json.dumps(entity, sort_keys=True))
 
+    @property
+    def tool_published(self) -> bool:
+        from models.tools import WorkflowToolProvider
+        return db.session.query(WorkflowToolProvider).filter(
+            WorkflowToolProvider.app_id == self.app_id
+        ).first() is not None
 
 class WorkflowRunTriggeredFrom(Enum):
     """
@@ -564,10 +569,7 @@ class WorkflowNodeExecution(db.Model):
 
     @property
     def extras(self):
-        """
-        获取额外信息，如节点类型为工具时的图标信息
-        :return: 包含额外信息的字典
-        """
+        from core.tools.tool_manager import ToolManager
         extras = {}
         if self.execution_metadata_dict:
             from core.workflow.entities.node_entities import NodeType

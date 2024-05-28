@@ -22,8 +22,7 @@ class SensitiveWordAvoidanceConfigManager:
         if not sensitive_word_avoidance_dict:
             return None
 
-        # 检查是否启用了敏感词规避，并构造相应实体对象
-        if 'enabled' in sensitive_word_avoidance_dict and sensitive_word_avoidance_dict['enabled']:
+        if sensitive_word_avoidance_dict.get('enabled'):
             return SensitiveWordAvoidanceEntity(
                 type=sensitive_word_avoidance_dict.get('type'),
                 config=sensitive_word_avoidance_dict.get('config'),

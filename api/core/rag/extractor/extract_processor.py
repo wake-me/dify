@@ -1,6 +1,8 @@
+import re
 import tempfile
 from pathlib import Path
 from typing import Union
+from urllib.parse import unquote
 
 import requests
 from flask import current_app
@@ -14,7 +16,6 @@ from core.rag.extractor.markdown_extractor import MarkdownExtractor
 from core.rag.extractor.notion_extractor import NotionExtractor
 from core.rag.extractor.pdf_extractor import PdfExtractor
 from core.rag.extractor.text_extractor import TextExtractor
-from core.rag.extractor.unstructured.unstructured_doc_extractor import UnstructuredWordExtractor
 from core.rag.extractor.unstructured.unstructured_eml_extractor import UnstructuredEmailExtractor
 from core.rag.extractor.unstructured.unstructured_epub_extractor import UnstructuredEpubExtractor
 from core.rag.extractor.unstructured.unstructured_markdown_extractor import UnstructuredMarkdownExtractor
@@ -80,7 +81,17 @@ class ExtractProcessor:
         with tempfile.TemporaryDirectory() as temp_dir:
             # 获取URL对应的文件后缀
             suffix = Path(url).suffix
-            # 构造临时文件路径
+            if not suffix and suffix != '.':
+                # get content-type
+                if response.headers.get('Content-Type'):
+                    suffix = '.' + response.headers.get('Content-Type').split('/')[-1]
+                else:
+                    content_disposition = response.headers.get('Content-Disposition')
+                    filename_match = re.search(r'filename="([^"]+)"', content_disposition)
+                    if filename_match:
+                        filename = unquote(filename_match.group(1))
+                        suffix = '.' + re.search(r'\.(\w+)$', filename).group(1)
+
             file_path = f"{temp_dir}/{next(tempfile._get_candidate_names())}{suffix}"
             # 将获取到的内容写入临时文件
             with open(file_path, 'wb') as file:
@@ -127,16 +138,57 @@ class ExtractProcessor:
                 file_extension = input_file.suffix.lower()
                 etl_type = current_app.config['ETL_TYPE']
                 unstructured_api_url = current_app.config['UNSTRUCTURED_API_URL']
-                
-                # 根据文件扩展名选择合适的提取器
+                unstructured_api_key = current_app.config['UNSTRUCTURED_API_KEY']
                 if etl_type == 'Unstructured':
-                    # 针对自动提取和非自动提取使用不同的提取器
-                    extractor = cls.choose_extractor(file_extension, file_path, is_automatic, unstructured_api_url)
+                    if file_extension == '.xlsx' or file_extension == '.xls':
+                        extractor = ExcelExtractor(file_path)
+                    elif file_extension == '.pdf':
+                        extractor = PdfExtractor(file_path)
+                    elif file_extension in ['.md', '.markdown']:
+                        extractor = UnstructuredMarkdownExtractor(file_path, unstructured_api_url) if is_automatic \
+                            else MarkdownExtractor(file_path, autodetect_encoding=True)
+                    elif file_extension in ['.htm', '.html']:
+                        extractor = HtmlExtractor(file_path)
+                    elif file_extension in ['.docx']:
+                        extractor = WordExtractor(file_path, upload_file.tenant_id, upload_file.created_by)
+                    elif file_extension == '.csv':
+                        extractor = CSVExtractor(file_path, autodetect_encoding=True)
+                    elif file_extension == '.msg':
+                        extractor = UnstructuredMsgExtractor(file_path, unstructured_api_url)
+                    elif file_extension == '.eml':
+                        extractor = UnstructuredEmailExtractor(file_path, unstructured_api_url)
+                    elif file_extension == '.ppt':
+                        extractor = UnstructuredPPTExtractor(file_path, unstructured_api_url, unstructured_api_key)
+                    elif file_extension == '.pptx':
+                        extractor = UnstructuredPPTXExtractor(file_path, unstructured_api_url)
+                    elif file_extension == '.xml':
+                        extractor = UnstructuredXmlExtractor(file_path, unstructured_api_url)
+                    elif file_extension == 'epub':
+                        extractor = UnstructuredEpubExtractor(file_path, unstructured_api_url)
+                    else:
+                        # txt
+                        extractor = UnstructuredTextExtractor(file_path, unstructured_api_url) if is_automatic \
+                            else TextExtractor(file_path, autodetect_encoding=True)
                 else:
-                    extractor = cls.choose_extractor(file_extension, file_path)
+                    if file_extension == '.xlsx' or file_extension == '.xls':
+                        extractor = ExcelExtractor(file_path)
+                    elif file_extension == '.pdf':
+                        extractor = PdfExtractor(file_path)
+                    elif file_extension in ['.md', '.markdown']:
+                        extractor = MarkdownExtractor(file_path, autodetect_encoding=True)
+                    elif file_extension in ['.htm', '.html']:
+                        extractor = HtmlExtractor(file_path)
+                    elif file_extension in ['.docx']:
+                        extractor = WordExtractor(file_path, upload_file.tenant_id, upload_file.created_by)
+                    elif file_extension == '.csv':
+                        extractor = CSVExtractor(file_path, autodetect_encoding=True)
+                    elif file_extension == 'epub':
+                        extractor = UnstructuredEpubExtractor(file_path)
+                    else:
+                        # txt
+                        extractor = TextExtractor(file_path, autodetect_encoding=True)
                 return extractor.extract()
         elif extract_setting.datasource_type == DatasourceType.NOTION.value:
-            # 处理Notion数据源
             extractor = NotionExtractor(
                 notion_workspace_id=extract_setting.notion_info.notion_workspace_id,
                 notion_obj_id=extract_setting.notion_info.notion_obj_id,
@@ -146,47 +198,4 @@ class ExtractProcessor:
             )
             return extractor.extract()
         else:
-            # 抛出不支持的数据源类型错误
             raise ValueError(f"Unsupported datasource type: {extract_setting.datasource_type}")
-
-    def choose_extractor(file_extension, file_path, is_automatic=False, unstructured_api_url=None):
-        """
-        根据文件扩展名选择合适的提取器。
-        
-        :param file_extension: 文件扩展名，小写。
-        :param file_path: 文件路径。
-        :param is_automatic: 是否为自动化提取，影响某些提取器的行为。
-        :param unstructured_api_url: 用于自动化提取的API URL。
-        :return: 返回选定的提取器实例。
-        """
-        # 选择并实例化相应的文件提取器
-        if file_extension == '.xlsx' or file_extension == '.xls':
-            extractor = ExcelExtractor(file_path)
-        elif file_extension == '.pdf':
-            extractor = PdfExtractor(file_path)
-        elif file_extension in ['.md', '.markdown']:
-            extractor = UnstructuredMarkdownExtractor(file_path, unstructured_api_url) if is_automatic \
-                else MarkdownExtractor(file_path, autodetect_encoding=True)
-        elif file_extension in ['.htm', '.html']:
-            extractor = HtmlExtractor(file_path)
-        elif file_extension in ['.docx']:
-            extractor = UnstructuredWordExtractor(file_path, unstructured_api_url)
-        elif file_extension == '.csv':
-            extractor = CSVExtractor(file_path, autodetect_encoding=True)
-        elif file_extension == '.msg':
-            extractor = UnstructuredMsgExtractor(file_path, unstructured_api_url)
-        elif file_extension == '.eml':
-            extractor = UnstructuredEmailExtractor(file_path, unstructured_api_url)
-        elif file_extension == '.ppt':
-            extractor = UnstructuredPPTExtractor(file_path, unstructured_api_url)
-        elif file_extension == '.pptx':
-            extractor = UnstructuredPPTXExtractor(file_path, unstructured_api_url)
-        elif file_extension == '.xml':
-            extractor = UnstructuredXmlExtractor(file_path, unstructured_api_url)
-        elif file_extension == 'epub':
-            extractor = UnstructuredEpubExtractor(file_path, unstructured_api_url)
-        else:
-            # 默认为文本提取器
-            extractor = UnstructuredTextExtractor(file_path, unstructured_api_url) if is_automatic \
-                else TextExtractor(file_path, autodetect_encoding=True)
-        return extractor

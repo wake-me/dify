@@ -11,7 +11,7 @@ class SuggestedQuestionsAfterAnswerConfigManager:
         suggested_questions_after_answer_dict = config.get('suggested_questions_after_answer')
         # 检查配置中是否明确启用了回答后建议问题的功能
         if suggested_questions_after_answer_dict:
-            if 'enabled' in suggested_questions_after_answer_dict and suggested_questions_after_answer_dict['enabled']:
+            if suggested_questions_after_answer_dict.get('enabled'):
                 suggested_questions_after_answer = True
         return suggested_questions_after_answer
 

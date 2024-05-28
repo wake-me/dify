@@ -1,3 +1,11 @@
+'''
+Author: fanwenqi hi.fanwenqi@gmail.com
+Date: 2024-05-28 15:42:17
+LastEditors: fanwenqi hi.fanwenqi@gmail.com
+LastEditTime: 2024-05-28 15:48:50
+FilePath: /dify/api/core/rag/extractor/unstructured/unstructured_ppt_extractor.py
+Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+'''
 import logging
 
 from core.rag.extractor.extractor_base import BaseExtractor
@@ -18,17 +26,13 @@ class UnstructuredPPTExtractor(BaseExtractor):
     def __init__(
             self,
             file_path: str,
-            api_url: str
+            api_url: str,
+            api_key: str
     ):
-        """
-        初始化，设置文件路径和API URL。
-
-        Args:
-            file_path (str): 文件路径。
-            api_url (str): API URL。
-        """
-        self._file_path = file_path  # 文件路径
-        self._api_url = api_url  # API URL
+        """Initialize with file path."""
+        self._file_path = file_path
+        self._api_url = api_url
+        self._api_key = api_key
 
     def extract(self) -> list[Document]:
         """
@@ -42,10 +46,8 @@ class UnstructuredPPTExtractor(BaseExtractor):
         # 通过API对文件进行分区处理
         from unstructured.partition.api import partition_via_api
 
-        elements = partition_via_api(filename=self._file_path, api_url=self._api_url)
-        text_by_page = {}  # 用于存储按页面分隔的文本
-
-        # 将分区后的元素按页面合并文本
+        elements = partition_via_api(filename=self._file_path, api_url=self._api_url, api_key=self._api_key)
+        text_by_page = {}
         for element in elements:
             page = element.metadata.page_number
             text = element.text

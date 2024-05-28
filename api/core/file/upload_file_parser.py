@@ -95,4 +95,4 @@ class UploadFileParser:
             return False
 
         current_time = int(time.time())
-        return current_time - int(timestamp) <= 300  # 判断是否在5分钟有效期内
+        return current_time - int(timestamp) <= current_app.config.get('FILES_ACCESS_TIMEOUT')

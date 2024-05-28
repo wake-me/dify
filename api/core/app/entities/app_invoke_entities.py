@@ -112,6 +112,9 @@ class AppGenerateEntity(BaseModel):
     stream: bool
     invoke_from: InvokeFrom
 
+    # invoke call depth
+    call_depth: int = 0
+
     # extra parameters, like: auto_generate_conversation_name
     extras: dict[str, Any] = {}
 
@@ -155,9 +158,17 @@ class AdvancedChatAppGenerateEntity(AppGenerateEntity):
     # 应用配置
     app_config: WorkflowUIBasedAppConfig
 
-    conversation_id: Optional[str] = None  # 对话ID，可能为空
-    query: Optional[str] = None  # 查询字符串，可能为空
+    conversation_id: Optional[str] = None
+    query: Optional[str] = None
 
+    class SingleIterationRunEntity(BaseModel):
+        """
+        Single Iteration Run Entity.
+        """
+        node_id: str
+        inputs: dict
+
+    single_iteration_run: Optional[SingleIterationRunEntity] = None
 
 class WorkflowAppGenerateEntity(AppGenerateEntity):
     """
@@ -165,3 +176,12 @@ class WorkflowAppGenerateEntity(AppGenerateEntity):
     """
     # 应用配置
     app_config: WorkflowUIBasedAppConfig
+
+    class SingleIterationRunEntity(BaseModel):
+        """
+        Single Iteration Run Entity.
+        """
+        node_id: str
+        inputs: dict
+
+    single_iteration_run: Optional[SingleIterationRunEntity] = None

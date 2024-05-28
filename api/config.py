@@ -26,14 +26,17 @@ DEFAULTS = {
     'SERVICE_API_URL': 'https://api.dify.ai',
     'APP_WEB_URL': 'https://udify.app',
     'FILES_URL': '',
+    'FILES_ACCESS_TIMEOUT': 300,
     'S3_ADDRESS_STYLE': 'auto',
     'STORAGE_TYPE': 'local',
     'STORAGE_LOCAL_PATH': 'storage',
     'CHECK_UPDATE_URL': 'https://updates.dify.ai',
     'DEPLOY_ENV': 'PRODUCTION',
+    'SQLALCHEMY_DATABASE_URI_SCHEME': 'postgresql',
     'SQLALCHEMY_POOL_SIZE': 30,
     'SQLALCHEMY_MAX_OVERFLOW': 10,
     'SQLALCHEMY_POOL_RECYCLE': 3600,
+    'SQLALCHEMY_POOL_PRE_PING': 'False',
     'SQLALCHEMY_ECHO': 'False',
     'SENTRY_TRACES_SAMPLE_RATE': 1.0,
     'SENTRY_PROFILES_SAMPLE_RATE': 1.0,
@@ -80,6 +83,9 @@ DEFAULTS = {
     'KEYWORD_DATA_SOURCE_TYPE': 'database',
     'INNER_API': 'False',
     'ENTERPRISE_ENABLED': 'False',
+    'INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH': 1000,
+    'WORKFLOW_MAX_EXECUTION_STEPS': 50,
+    'WORKFLOW_MAX_EXECUTION_TIME': 600,
 }
 
 
@@ -140,7 +146,7 @@ class Config:
         # ------------------------
         # General Configurations.
         # ------------------------
-        self.CURRENT_VERSION = "0.6.8"
+        self.CURRENT_VERSION = "0.6.9"
         self.COMMIT_SHA = get_env('COMMIT_SHA')
         self.EDITION = get_env('EDITION')
         self.DEPLOY_ENV = get_env('DEPLOY_ENV')
@@ -166,7 +172,14 @@ class Config:
         # 初始化文件预览或下载的URL前缀
         self.FILES_URL = get_env('FILES_URL') if get_env('FILES_URL') else self.CONSOLE_API_URL
 
-        # 初始化应用的密钥，用于会话cookie的安全签名
+        # File Access Time specifies a time interval in seconds for the file to be accessed.
+        # The default value is 300 seconds.
+        self.FILES_ACCESS_TIMEOUT = int(get_env('FILES_ACCESS_TIMEOUT'))
+
+        # Your App secret key will be used for securely signing the session cookie
+        # Make sure you are changing this key for your deployment with a strong key.
+        # You can generate a strong key using `openssl rand -base64 42`.
+        # Alternatively you can set it with `SECRET_KEY` environment variable.
         self.SECRET_KEY = get_env('SECRET_KEY')
 
         # Enable or disable the inner API.
@@ -188,12 +201,17 @@ class Config:
             key: get_env(key) for key in
             ['DB_USERNAME', 'DB_PASSWORD', 'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_CHARSET']
         }
+        self.SQLALCHEMY_DATABASE_URI_SCHEME = get_env('SQLALCHEMY_DATABASE_URI_SCHEME')
+
         db_extras = f"?client_encoding={db_credentials['DB_CHARSET']}" if db_credentials['DB_CHARSET'] else ""
-        self.SQLALCHEMY_DATABASE_URI = f"postgresql://{db_credentials['DB_USERNAME']}:{db_credentials['DB_PASSWORD']}@{db_credentials['DB_HOST']}:{db_credentials['DB_PORT']}/{db_credentials['DB_DATABASE']}{db_extras}"
+
+        self.SQLALCHEMY_DATABASE_URI = f"{self.SQLALCHEMY_DATABASE_URI_SCHEME}://{db_credentials['DB_USERNAME']}:{db_credentials['DB_PASSWORD']}@{db_credentials['DB_HOST']}:{db_credentials['DB_PORT']}/{db_credentials['DB_DATABASE']}{db_extras}"
         self.SQLALCHEMY_ENGINE_OPTIONS = {
             'pool_size': int(get_env('SQLALCHEMY_POOL_SIZE')),
             'max_overflow': int(get_env('SQLALCHEMY_MAX_OVERFLOW')),
-            'pool_recycle': int(get_env('SQLALCHEMY_POOL_RECYCLE'))
+            'pool_recycle': int(get_env('SQLALCHEMY_POOL_RECYCLE')),
+            'pool_pre_ping': get_bool_env('SQLALCHEMY_POOL_PRE_PING'),
+            'connect_args': {'options': '-c timezone=UTC'},
         }
         self.SQLALCHEMY_ECHO = get_bool_env('SQLALCHEMY_ECHO')
 
@@ -225,12 +243,12 @@ class Config:
         self.AZURE_BLOB_ACCOUNT_KEY = get_env('AZURE_BLOB_ACCOUNT_KEY')
         self.AZURE_BLOB_CONTAINER_NAME = get_env('AZURE_BLOB_CONTAINER_NAME')
         self.AZURE_BLOB_ACCOUNT_URL = get_env('AZURE_BLOB_ACCOUNT_URL')
-        self.ALIYUN_OSS_BUCKET_NAME=get_env('ALIYUN_OSS_BUCKET_NAME')
-        self.ALIYUN_OSS_ACCESS_KEY=get_env('ALIYUN_OSS_ACCESS_KEY')
-        self.ALIYUN_OSS_SECRET_KEY=get_env('ALIYUN_OSS_SECRET_KEY')
-        self.ALIYUN_OSS_ENDPOINT=get_env('ALIYUN_OSS_ENDPOINT')
-        self.ALIYUN_OSS_REGION=get_env('ALIYUN_OSS_REGION')
-        self.ALIYUN_OSS_AUTH_VERSION=get_env('ALIYUN_OSS_AUTH_VERSION')
+        self.ALIYUN_OSS_BUCKET_NAME = get_env('ALIYUN_OSS_BUCKET_NAME')
+        self.ALIYUN_OSS_ACCESS_KEY = get_env('ALIYUN_OSS_ACCESS_KEY')
+        self.ALIYUN_OSS_SECRET_KEY = get_env('ALIYUN_OSS_SECRET_KEY')
+        self.ALIYUN_OSS_ENDPOINT = get_env('ALIYUN_OSS_ENDPOINT')
+        self.ALIYUN_OSS_REGION = get_env('ALIYUN_OSS_REGION')
+        self.ALIYUN_OSS_AUTH_VERSION = get_env('ALIYUN_OSS_AUTH_VERSION')
         self.GOOGLE_STORAGE_BUCKET_NAME = get_env('GOOGLE_STORAGE_BUCKET_NAME')
         self.GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64 = get_env('GOOGLE_STORAGE_SERVICE_ACCOUNT_JSON_BASE64')
 
@@ -293,7 +311,7 @@ class Config:
         self.SMTP_USERNAME = get_env('SMTP_USERNAME')
         self.SMTP_PASSWORD = get_env('SMTP_PASSWORD')
         self.SMTP_USE_TLS = get_bool_env('SMTP_USE_TLS')
-        
+
         # ------------------------
         # Workspace Configurations.
         # ------------------------
@@ -310,6 +328,11 @@ class Config:
         self.UPLOAD_FILE_SIZE_LIMIT = int(get_env('UPLOAD_FILE_SIZE_LIMIT'))
         self.UPLOAD_FILE_BATCH_LIMIT = int(get_env('UPLOAD_FILE_BATCH_LIMIT'))
         self.UPLOAD_IMAGE_FILE_SIZE_LIMIT = int(get_env('UPLOAD_IMAGE_FILE_SIZE_LIMIT'))
+
+        self.WORKFLOW_MAX_EXECUTION_STEPS = int(get_env('WORKFLOW_MAX_EXECUTION_STEPS'))
+        self.WORKFLOW_MAX_EXECUTION_TIME = int(get_env('WORKFLOW_MAX_EXECUTION_TIME'))
+
+        # Moderation in app Configurations.
         self.OUTPUT_MODERATION_BUFFER_SIZE = int(get_env('OUTPUT_MODERATION_BUFFER_SIZE'))
 
         # 初始化Notion集成设置
@@ -357,6 +380,7 @@ class Config:
 
         self.ETL_TYPE = get_env('ETL_TYPE')
         self.UNSTRUCTURED_API_URL = get_env('UNSTRUCTURED_API_URL')
+        self.UNSTRUCTURED_API_KEY = get_env('UNSTRUCTURED_API_KEY')
         self.BILLING_ENABLED = get_bool_env('BILLING_ENABLED')
         self.CAN_REPLACE_LOGO = get_bool_env('CAN_REPLACE_LOGO')
         self.BATCH_UPLOAD_LIMIT = get_env('BATCH_UPLOAD_LIMIT')
@@ -368,3 +392,8 @@ class Config:
         self.TOOL_ICON_CACHE_MAX_AGE = get_env('TOOL_ICON_CACHE_MAX_AGE')
         self.KEYWORD_DATA_SOURCE_TYPE = get_env('KEYWORD_DATA_SOURCE_TYPE')
         self.ENTERPRISE_ENABLED = get_bool_env('ENTERPRISE_ENABLED')
+
+        # ------------------------
+        # Indexing Configurations.
+        # ------------------------
+        self.INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH = get_env('INDEXING_MAX_SEGMENTATION_TOKENS_LENGTH')

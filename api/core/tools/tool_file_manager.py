@@ -83,7 +83,7 @@ class ToolFileManager:
 
         # 检查时间戳是否过期，过期时间为5分钟
         current_time = int(time.time())
-        return current_time - int(timestamp) <= 300
+        return current_time - int(timestamp) <= current_app.config.get('FILES_ACCESS_TIMEOUT')
 
     @staticmethod
     def create_file_by_raw(user_id: str, tenant_id: str,
@@ -108,9 +108,7 @@ class ToolFileManager:
         extension = guess_extension(mimetype) or '.bin'
         # 生成唯一的文件名
         unique_name = uuid4().hex
-        # 拼接文件存储路径
-        filename = f"/tools/{tenant_id}/{unique_name}{extension}"
-        # 保存文件到存储系统
+        filename = f"tools/{tenant_id}/{unique_name}{extension}"
         storage.save(filename, file_binary)
 
         # 创建ToolFile对象，关联用户、租户、会话和文件信息
@@ -148,8 +146,7 @@ class ToolFileManager:
         extension = guess_extension(mimetype) or '.bin'
         # 生成唯一文件名
         unique_name = uuid4().hex
-        filename = f"/tools/{tenant_id}/{unique_name}{extension}"
-        # 保存文件到存储
+        filename = f"tools/{tenant_id}/{unique_name}{extension}"
         storage.save(filename, blob)
 
         # 创建ToolFile对象并加入数据库会话

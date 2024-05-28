@@ -1,16 +1,12 @@
-import os
 from copy import deepcopy
-from typing import Any, Union
+from typing import Any
 
 from pydantic import BaseModel
-from yaml import FullLoader, load
 
 from core.helper import encrypter
 from core.helper.tool_parameter_cache import ToolParameterCache, ToolParameterCacheType
 from core.helper.tool_provider_cache import ToolProviderCredentialsCache, ToolProviderCredentialsCacheType
 from core.tools.entities.tool_entities import (
-    ModelToolConfiguration,
-    ModelToolProviderConfiguration,
     ToolParameter,
     ToolProviderCredentials,
 )
@@ -34,7 +30,7 @@ class ToolConfigurationManager(BaseModel):
         - 一个深拷贝后的凭据信息字典。
         """
         return deepcopy(credentials)
-    
+
     def encrypt_tool_credentials(self, credentials: dict[str, str]) -> dict[str, str]:
         """
         使用租户ID加密工具凭据。
@@ -54,9 +50,9 @@ class ToolConfigurationManager(BaseModel):
                 if field_name in credentials:
                     encrypted = encrypter.encrypt_token(self.tenant_id, credentials[field_name])
                     credentials[field_name] = encrypted
-        
+
         return credentials
-    
+
     def mask_tool_credentials(self, credentials: dict[str, Any]) -> dict[str, Any]:
         """
         遮掩工具凭据信息。
@@ -77,7 +73,7 @@ class ToolConfigurationManager(BaseModel):
                     if len(credentials[field_name]) > 6:
                         credentials[field_name] = \
                             credentials[field_name][:2] + \
-                            '*' * (len(credentials[field_name]) - 4) +\
+                            '*' * (len(credentials[field_name]) - 4) + \
                             credentials[field_name][-2:]
                     else:
                         credentials[field_name] = '*' * len(credentials[field_name])
@@ -96,7 +92,7 @@ class ToolConfigurationManager(BaseModel):
         """
         cache = ToolProviderCredentialsCache(
             tenant_id=self.tenant_id, 
-            identity_id=f'{self.provider_controller.app_type.value}.{self.provider_controller.identity.name}',
+            identity_id=f'{self.provider_controller.provider_type.value}.{self.provider_controller.identity.name}',
             cache_type=ToolProviderCredentialsCacheType.PROVIDER
         )
         cached_credentials = cache.get()  # 尝试从缓存获取凭据
@@ -116,14 +112,14 @@ class ToolConfigurationManager(BaseModel):
 
         cache.set(credentials)  # 将解密后的凭据缓存起来
         return credentials
-    
+
     def delete_tool_credentials_cache(self):
         """
         删除工具凭据的缓存。
         """
         cache = ToolProviderCredentialsCache(
             tenant_id=self.tenant_id, 
-            identity_id=f'{self.provider_controller.app_type.value}.{self.provider_controller.identity.name}',
+            identity_id=f'{self.provider_controller.provider_type.value}.{self.provider_controller.identity.name}',
             cache_type=ToolProviderCredentialsCacheType.PROVIDER
         )
         cache.delete()  # 删除指定租户和身份的工具凭据缓存
@@ -147,7 +143,7 @@ class ToolParameterConfigurationManager(BaseModel):
         :return: 输入参数字典的深度副本。
         """
         return deepcopy(parameters)
-    
+
     def _merge_parameters(self) -> list[ToolParameter]:
         """
         合并工具参数与运行时参数。
@@ -171,7 +167,7 @@ class ToolParameterConfigurationManager(BaseModel):
                 current_parameters.append(runtime_parameter)
         
         return current_parameters
-    
+
     def mask_tool_parameters(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """
         对敏感工具参数进行遮蔽处理，用星号替换其值。
@@ -198,7 +194,7 @@ class ToolParameterConfigurationManager(BaseModel):
                         parameters[parameter.name] = '*' * len(parameters[parameter.name])
 
         return parameters
-    
+
     def encrypt_tool_parameters(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """
         使用租户ID对敏感工具参数进行加密。
@@ -217,106 +213,50 @@ class ToolParameterConfigurationManager(BaseModel):
                 if parameter.name in parameters:
                     encrypted = encrypter.encrypt_token(self.tenant_id, parameters[parameter.name])
                     parameters[parameter.name] = encrypted
-        
+
         return parameters
-    
+
     def decrypt_tool_parameters(self, parameters: dict[str, Any]) -> dict[str, Any]:
         """
-        使用租户ID对已加密的敏感工具参数进行解密。
+        decrypt tool parameters with tenant id
 
-        :param parameters: 可能含有加密敏感参数的字典。
-        :return: 带有敏感参数解密值的字典。
+        return a deep copy of parameters with decrypted values
         """
-        # 尝试从缓存中获取已解密的参数
         cache = ToolParameterCache(
-            tenant_id=self.tenant_id, 
+            tenant_id=self.tenant_id,
+            provider=f'{self.provider_type}.{self.provider_name}',
+            tool_name=self.tool_runtime.identity.name,
+            cache_type=ToolParameterCacheType.PARAMETER,
+            identity_id=self.identity_id
+        )
+        cached_parameters = cache.get()
+        if cached_parameters:
+            return cached_parameters
+
+        # override parameters
+        current_parameters = self._merge_parameters()
+        has_secret_input = False
+
+        for parameter in current_parameters:
+            if parameter.form == ToolParameter.ToolParameterForm.FORM and parameter.type == ToolParameter.ToolParameterType.SECRET_INPUT:
+                if parameter.name in parameters:
+                    try:
+                        has_secret_input = True
+                        parameters[parameter.name] = encrypter.decrypt_token(self.tenant_id, parameters[parameter.name])
+                    except:
+                        pass
+
+        if has_secret_input:
+            cache.set(parameters)
+
+        return parameters
+
+    def delete_tool_parameters_cache(self):
+        cache = ToolParameterCache(
+            tenant_id=self.tenant_id,
             provider=f'{self.provider_type}.{self.provider_name}',
             tool_name=self.tool_runtime.identity.name,
             cache_type=ToolParameterCacheType.PARAMETER,
             identity_id=self.identity_id
         )
         cache.delete()
-
-class ModelToolConfigurationManager:
-    """
-    用于管理模型工具配置的类。
-    """
-
-    _configurations: dict[str, ModelToolProviderConfiguration] = {}  # 保存供应商配置的字典
-    _model_configurations: dict[str, ModelToolConfiguration] = {}  # 保存模型配置的字典
-    _inited = False  # 标记是否已经初始化配置
-
-    @classmethod
-    def _init_configuration(cls):
-        """
-        初始化配置。
-        从指定目录加载所有.yaml配置文件，解析并保存到类变量中。
-        """
-        
-        # 计算model_tools目录的绝对路径
-        absolute_path = os.path.abspath(os.path.dirname(__file__))
-        model_tools_path = os.path.join(absolute_path, '..', 'model_tools')
-
-        # 获取所有.yaml配置文件
-        files = [f for f in os.listdir(model_tools_path) if f.endswith('.yaml')]
-
-        for file in files:
-            provider = file.split('.')[0]  # 从文件名提取供应商名称
-            with open(os.path.join(model_tools_path, file), encoding='utf-8') as f:
-                # 加载配置文件内容
-                configurations = ModelToolProviderConfiguration(**load(f, Loader=FullLoader))
-                models = configurations.models or []  # 获取模型列表，若不存在则默认为空列表
-                for model in models:
-                    # 生成并保存模型配置的键值对
-                    model_key = f'{provider}.{model.model}'
-                    cls._model_configurations[model_key] = model
-
-                # 保存供应商配置的键值对
-                cls._configurations[provider] = configurations
-        cls._inited = True  # 标记配置已初始化
-
-    @classmethod
-    def get_configuration(cls, provider: str) -> Union[ModelToolProviderConfiguration, None]:
-        """
-        根据供应商名称获取配置。
-        
-        参数:
-        - provider: str，供应商名称。
-        
-        返回值:
-        - Union[ModelToolProviderConfiguration, None]，如果找到对应的配置则返回ModelToolProviderConfiguration对象，否则返回None。
-        """
-        if not cls._inited:
-            cls._init_configuration()
-        return cls._configurations.get(provider, None)
-    
-    @classmethod
-    def get_all_configuration(cls) -> dict[str, ModelToolProviderConfiguration]:
-        """
-        获取所有供应商的配置。
-        
-        返回值:
-        - dict[str, ModelToolProviderConfiguration]，键为供应商名称，值为对应的ModelToolProviderConfiguration对象。
-        """
-        if not cls._inited:
-            cls._init_configuration()
-        return cls._configurations
-    
-    @classmethod
-    def get_model_configuration(cls, provider: str, model: str) -> Union[ModelToolConfiguration, None]:
-        """
-        根据供应商和模型名称获取模型配置。
-        
-        参数:
-        - provider: str，供应商名称。
-        - model: str，模型名称。
-        
-        返回值:
-        - Union[ModelToolConfiguration, None]，如果找到对应的模型配置则返回ModelToolConfiguration对象，否则返回None。
-        """
-        key = f'{provider}.{model}'  # 生成模型配置的键
-
-        if not cls._inited:
-            cls._init_configuration()
-
-        return cls._model_configurations.get(key, None)

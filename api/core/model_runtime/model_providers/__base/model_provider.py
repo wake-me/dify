@@ -1,11 +1,10 @@
 import os
 from abc import ABC, abstractmethod
 
-import yaml
-
 from core.model_runtime.entities.model_entities import AIModelEntity, ModelType
 from core.model_runtime.entities.provider_entities import ProviderEntity
 from core.model_runtime.model_providers.__base.ai_model import AIModel
+from core.tools.utils.yaml_utils import load_yaml_file
 from core.utils.module_import_helper import get_subclasses_from_module, import_module_from_source
 
 
@@ -46,10 +45,7 @@ class ModelProvider(ABC):
 
         # 从yaml文件中读取提供者模式
         yaml_path = os.path.join(current_path, f'{provider_name}.yaml')
-        yaml_data = {}
-        if os.path.exists(yaml_path):
-            with open(yaml_path, encoding='utf-8') as f:
-                yaml_data = yaml.safe_load(f)
+        yaml_data = load_yaml_file(yaml_path, ignore_error=True)
 
         try:
             # 将yaml数据转换为实体

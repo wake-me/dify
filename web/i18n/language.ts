@@ -1,3 +1,4 @@
+import data from './languages.json'
 export type Item = {
   value: number | string
   name: string
@@ -19,107 +20,11 @@ export type I18nText = {
   'vi-VN': string
   'de_DE': string
   'zh_Hant': string
+  'ro-RO': string
   'pl-PL': string
 }
 
-export const languages = [
-  {
-    value: 'en-US',
-    name: 'English (United States)',
-    example: 'Hello, Dify!',
-    supported: true,
-  },
-  {
-    value: 'zh-Hans',
-    name: '简体中文',
-    example: '你好，Dify！',
-    supported: true,
-  },
-  {
-    value: 'zh-Hant',
-    name: '繁體中文',
-    example: '你好，Dify！',
-    supported: true,
-  },
-  {
-    value: 'pt-BR',
-    name: 'Português (Brasil)',
-    example: 'Olá, Dify!',
-    supported: true,
-  },
-  {
-    value: 'es-ES',
-    name: 'Español (España)',
-    example: 'Saluton, Dify!',
-    supported: false,
-  },
-  {
-    value: 'fr-FR',
-    name: 'Français (France)',
-    example: 'Bonjour, Dify!',
-    supported: true,
-  },
-  {
-    value: 'de-DE',
-    name: 'Deutsch (Deutschland)',
-    example: 'Hallo, Dify!',
-    supported: true,
-  },
-  {
-    value: 'ja-JP',
-    name: '日本語 (日本)',
-    example: 'こんにちは、Dify!',
-    supported: true,
-  },
-  {
-    value: 'ko-KR',
-    name: '한국어 (대한민국)',
-    example: '안녕하세요, Dify!',
-    supported: true,
-  },
-  {
-    value: 'ru-RU',
-    name: 'Русский (Россия)',
-    example: ' Привет, Dify!',
-    supported: false,
-  },
-  {
-    value: 'it-IT',
-    name: 'Italiano (Italia)',
-    example: 'Ciao, Dify!',
-    supported: false,
-  },
-  {
-    value: 'th-TH',
-    name: 'ไทย (ประเทศไทย)',
-    example: 'สวัสดี Dify!',
-    supported: false,
-  },
-  {
-    value: 'id-ID',
-    name: 'Bahasa Indonesia',
-    example: 'Saluto, Dify!',
-    supported: false,
-  },
-  {
-    value: 'uk-UA',
-    name: 'Українська (Україна)',
-    example: 'Привет, Dify!',
-    supported: true,
-  },
-  {
-    value: 'vi-VN',
-    name: 'Tiếng Việt (Việt Nam)',
-    example: 'Xin chào, Dify!',
-    supported: true,
-  },
-  {
-    value: 'pl-PL',
-    name: 'Polski (Polish)',
-    example: 'Cześć, Dify!',
-    supported: true,
-  },
-]
+export const languages = data.languages
 
 export const LanguagesSupported = languages.filter(item => item.supported).map(item => item.value)
 
