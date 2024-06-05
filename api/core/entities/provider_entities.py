@@ -72,5 +72,24 @@ class CustomConfiguration(BaseModel):
     """
     提供者自定义配置的模型类。
     """
-    provider: Optional[CustomProviderConfiguration] = None  # 提供者配置，可选
-    models: list[CustomModelConfiguration] = []  # 模型配置列表
+    provider: Optional[CustomProviderConfiguration] = None
+    models: list[CustomModelConfiguration] = []
+
+
+class ModelLoadBalancingConfiguration(BaseModel):
+    """
+    Class for model load balancing configuration.
+    """
+    id: str
+    name: str
+    credentials: dict
+
+
+class ModelSettings(BaseModel):
+    """
+    Model class for model settings.
+    """
+    model: str
+    model_type: ModelType
+    enabled: bool = True
+    load_balancing_configs: list[ModelLoadBalancingConfiguration] = []

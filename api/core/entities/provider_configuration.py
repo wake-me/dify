@@ -1,6 +1,7 @@
 import datetime
 import json
 import logging
+from collections import defaultdict
 from collections.abc import Iterator
 from json import JSONDecodeError
 from typing import Optional
@@ -8,7 +9,12 @@ from typing import Optional
 from pydantic import BaseModel
 
 from core.entities.model_entities import ModelStatus, ModelWithProviderEntity, SimpleModelProviderEntity
-from core.entities.provider_entities import CustomConfiguration, SystemConfiguration, SystemConfigurationStatus
+from core.entities.provider_entities import (
+    CustomConfiguration,
+    ModelSettings,
+    SystemConfiguration,
+    SystemConfigurationStatus,
+)
 from core.helper import encrypter
 from core.helper.model_provider_cache import ProviderCredentialsCache, ProviderCredentialsCacheType
 from core.model_runtime.entities.model_entities import FetchFrom, ModelType
@@ -22,7 +28,14 @@ from core.model_runtime.model_providers import model_provider_factory
 from core.model_runtime.model_providers.__base.ai_model import AIModel
 from core.model_runtime.model_providers.__base.model_provider import ModelProvider
 from extensions.ext_database import db
-from models.provider import Provider, ProviderModel, ProviderType, TenantPreferredModelProvider
+from models.provider import (
+    LoadBalancingModelConfig,
+    Provider,
+    ProviderModel,
+    ProviderModelSetting,
+    ProviderType,
+    TenantPreferredModelProvider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,13 +48,13 @@ class ProviderConfiguration(BaseModel):
     提供者配置的模型类。
     该类用于表示云服务提供者的配置信息，包括租户ID、提供者实体、首选的提供者类型、使用的提供者类型、系统配置和自定义配置。
     """
-
-    tenant_id: str  # 租户ID
-    provider: ProviderEntity  # 提供者实体
-    preferred_provider_type: ProviderType  # 首选的提供者类型
-    using_provider_type: ProviderType  # 使用的提供者类型
-    system_configuration: SystemConfiguration  # 系统配置
-    custom_configuration: CustomConfiguration  # 自定义配置
+    tenant_id: str
+    provider: ProviderEntity
+    preferred_provider_type: ProviderType
+    using_provider_type: ProviderType
+    system_configuration: SystemConfiguration
+    custom_configuration: CustomConfiguration
+    model_settings: list[ModelSettings]
 
     def __init__(self, **data):
         """
@@ -66,12 +79,20 @@ class ProviderConfiguration(BaseModel):
 
     def get_current_credentials(self, model_type: ModelType, model: str) -> Optional[dict]:
         """
-        获取当前的认证信息。
+        Get current credentials.
 
-        :param model_type: 模型类型
-        :param model: 模型名称
-        :return: 返回认证信息的字典，如果不存在则返回None
+        :param model_type: model type
+        :param model: model name
+        :return:
         """
+        if self.model_settings:
+            # check if model is disabled by admin
+            for model_setting in self.model_settings:
+                if (model_setting.model_type == model_type
+                        and model_setting.model == model):
+                    if not model_setting.enabled:
+                        raise ValueError(f'Model {model} is disabled.')
+
         if self.using_provider_type == ProviderType.SYSTEM:
             # 系统提供者类型的认证处理
             restrict_models = []
@@ -94,19 +115,19 @@ class ProviderConfiguration(BaseModel):
 
             return copy_credentials
         else:
-            # 自定义提供者类型的认证处理
+            credentials = None
             if self.custom_configuration.models:
                 # 在自定义配置的模型中查找匹配的模型认证信息
                 for model_configuration in self.custom_configuration.models:
                     if model_configuration.model_type == model_type and model_configuration.model == model:
-                        return model_configuration.credentials
+                        credentials = model_configuration.credentials
+                        break
 
             # 如果存在自定义提供者，返回其认证信息
             if self.custom_configuration.provider:
-                return self.custom_configuration.provider.credentials
-            else:
-                # 未找到匹配的认证信息，返回None
-                return None
+                credentials = self.custom_configuration.provider.credentials
+
+            return credentials
 
     def get_system_configuration_status(self) -> SystemConfigurationStatus:
         """
@@ -160,8 +181,8 @@ class ProviderConfiguration(BaseModel):
             # 直接返回凭证，未进行模糊处理
             return credentials
 
-        # 对凭证进行模糊处理后返回
-        return self._obfuscated_credentials(
+        # Obfuscate credentials
+        return self.obfuscated_credentials(
             credentials=credentials,
             credential_form_schemas=self.provider.provider_credential_schema.credential_form_schemas
             if self.provider.provider_credential_schema else []
@@ -181,8 +202,8 @@ class ProviderConfiguration(BaseModel):
             Provider.provider_type == ProviderType.CUSTOM.value
         ).first()
 
-        # 提取提供者凭证的密钥变量
-        provider_credential_secret_variables = self._extract_secret_variables(
+        # Get provider credential secret variables
+        provider_credential_secret_variables = self.extract_secret_variables(
             self.provider.provider_credential_schema.credential_form_schemas
             if self.provider.provider_credential_schema else []
         )
@@ -315,8 +336,8 @@ class ProviderConfiguration(BaseModel):
                 if not obfuscated:
                     return credentials
 
-                # 如果需要模糊处理，调用函数生成模糊凭证信息
-                return self._obfuscated_credentials(
+                # Obfuscate credentials
+                return self.obfuscated_credentials(
                     credentials=credentials,
                     credential_form_schemas=self.provider.model_credential_schema.credential_form_schemas
                     if self.provider.model_credential_schema else []
@@ -344,8 +365,8 @@ class ProviderConfiguration(BaseModel):
             ProviderModel.model_type == model_type.to_origin_model_type()
         ).first()
 
-        # 提取提供者凭证密钥变量
-        provider_credential_secret_variables = self._extract_secret_variables(
+        # Get provider credential secret variables
+        provider_credential_secret_variables = self.extract_secret_variables(
             self.provider.model_credential_schema.credential_form_schemas
             if self.provider.model_credential_schema else []
         )
@@ -451,25 +472,175 @@ class ProviderConfiguration(BaseModel):
 
             provider_model_credentials_cache.delete()
 
+    def enable_model(self, model_type: ModelType, model: str) -> ProviderModelSetting:
+        """
+        Enable model.
+        :param model_type: model type
+        :param model: model name
+        :return:
+        """
+        model_setting = db.session.query(ProviderModelSetting) \
+            .filter(
+            ProviderModelSetting.tenant_id == self.tenant_id,
+            ProviderModelSetting.provider_name == self.provider.provider,
+            ProviderModelSetting.model_type == model_type.to_origin_model_type(),
+            ProviderModelSetting.model_name == model
+        ).first()
+
+        if model_setting:
+            model_setting.enabled = True
+            model_setting.updated_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+            db.session.commit()
+        else:
+            model_setting = ProviderModelSetting(
+                tenant_id=self.tenant_id,
+                provider_name=self.provider.provider,
+                model_type=model_type.to_origin_model_type(),
+                model_name=model,
+                enabled=True
+            )
+            db.session.add(model_setting)
+            db.session.commit()
+
+        return model_setting
+
+    def disable_model(self, model_type: ModelType, model: str) -> ProviderModelSetting:
+        """
+        Disable model.
+        :param model_type: model type
+        :param model: model name
+        :return:
+        """
+        model_setting = db.session.query(ProviderModelSetting) \
+            .filter(
+            ProviderModelSetting.tenant_id == self.tenant_id,
+            ProviderModelSetting.provider_name == self.provider.provider,
+            ProviderModelSetting.model_type == model_type.to_origin_model_type(),
+            ProviderModelSetting.model_name == model
+        ).first()
+
+        if model_setting:
+            model_setting.enabled = False
+            model_setting.updated_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+            db.session.commit()
+        else:
+            model_setting = ProviderModelSetting(
+                tenant_id=self.tenant_id,
+                provider_name=self.provider.provider,
+                model_type=model_type.to_origin_model_type(),
+                model_name=model,
+                enabled=False
+            )
+            db.session.add(model_setting)
+            db.session.commit()
+
+        return model_setting
+
+    def get_provider_model_setting(self, model_type: ModelType, model: str) -> Optional[ProviderModelSetting]:
+        """
+        Get provider model setting.
+        :param model_type: model type
+        :param model: model name
+        :return:
+        """
+        return db.session.query(ProviderModelSetting) \
+            .filter(
+            ProviderModelSetting.tenant_id == self.tenant_id,
+            ProviderModelSetting.provider_name == self.provider.provider,
+            ProviderModelSetting.model_type == model_type.to_origin_model_type(),
+            ProviderModelSetting.model_name == model
+        ).first()
+
+    def enable_model_load_balancing(self, model_type: ModelType, model: str) -> ProviderModelSetting:
+        """
+        Enable model load balancing.
+        :param model_type: model type
+        :param model: model name
+        :return:
+        """
+        load_balancing_config_count = db.session.query(LoadBalancingModelConfig) \
+            .filter(
+            LoadBalancingModelConfig.tenant_id == self.tenant_id,
+            LoadBalancingModelConfig.provider_name == self.provider.provider,
+            LoadBalancingModelConfig.model_type == model_type.to_origin_model_type(),
+            LoadBalancingModelConfig.model_name == model
+        ).count()
+
+        if load_balancing_config_count <= 1:
+            raise ValueError('Model load balancing configuration must be more than 1.')
+
+        model_setting = db.session.query(ProviderModelSetting) \
+            .filter(
+            ProviderModelSetting.tenant_id == self.tenant_id,
+            ProviderModelSetting.provider_name == self.provider.provider,
+            ProviderModelSetting.model_type == model_type.to_origin_model_type(),
+            ProviderModelSetting.model_name == model
+        ).first()
+
+        if model_setting:
+            model_setting.load_balancing_enabled = True
+            model_setting.updated_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+            db.session.commit()
+        else:
+            model_setting = ProviderModelSetting(
+                tenant_id=self.tenant_id,
+                provider_name=self.provider.provider,
+                model_type=model_type.to_origin_model_type(),
+                model_name=model,
+                load_balancing_enabled=True
+            )
+            db.session.add(model_setting)
+            db.session.commit()
+
+        return model_setting
+
+    def disable_model_load_balancing(self, model_type: ModelType, model: str) -> ProviderModelSetting:
+        """
+        Disable model load balancing.
+        :param model_type: model type
+        :param model: model name
+        :return:
+        """
+        model_setting = db.session.query(ProviderModelSetting) \
+            .filter(
+            ProviderModelSetting.tenant_id == self.tenant_id,
+            ProviderModelSetting.provider_name == self.provider.provider,
+            ProviderModelSetting.model_type == model_type.to_origin_model_type(),
+            ProviderModelSetting.model_name == model
+        ).first()
+
+        if model_setting:
+            model_setting.load_balancing_enabled = False
+            model_setting.updated_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+            db.session.commit()
+        else:
+            model_setting = ProviderModelSetting(
+                tenant_id=self.tenant_id,
+                provider_name=self.provider.provider,
+                model_type=model_type.to_origin_model_type(),
+                model_name=model,
+                load_balancing_enabled=False
+            )
+            db.session.add(model_setting)
+            db.session.commit()
+
+        return model_setting
+
     def get_provider_instance(self) -> ModelProvider:
         """
-        获取提供者实例。
-        
-        :return: 返回一个ModelProvider类型的实例。
+        Get provider instance.
+        :return:
         """
-        # 通过工厂方法获取特定提供者的实例
         return model_provider_factory.get_provider_instance(self.provider.provider)
 
     def get_model_type_instance(self, model_type: ModelType) -> AIModel:
         """
-        获取当前模型类型的实例。
+        Get current model type instance.
 
-        :param model_type: 模型类型
-        :type model_type: ModelType
-        :return: 模型实例
-        :rtype: AIModel
+        :param model_type: model type
+        :return:
         """
-        # 获取提供者实例
+        # Get provider instance
         provider_instance = self.get_provider_instance()
 
         # 根据模型类型获取LLM的模型实例
@@ -510,14 +681,12 @@ class ProviderConfiguration(BaseModel):
         # 提交数据库会话，保存更改
         db.session.commit()
 
-    def _extract_secret_variables(self, credential_form_schemas: list[CredentialFormSchema]) -> list[str]:
+    def extract_secret_variables(self, credential_form_schemas: list[CredentialFormSchema]) -> list[str]:
         """
-        提取秘密输入表单变量。
+        Extract secret input form variables.
 
-        :param credential_form_schemas: 表单模式列表，其中包含了各种凭证表单的模式信息
-        :type credential_form_schemas: list[CredentialFormSchema]
-        :return: 秘密输入表单变量的列表
-        :rtype: list[str]
+        :param credential_form_schemas:
+        :return:
         """
         secret_input_form_variables = []  # 初始化存储秘密输入表单变量的列表
         for credential_form_schema in credential_form_schemas:
@@ -527,7 +696,7 @@ class ProviderConfiguration(BaseModel):
 
         return secret_input_form_variables
 
-    def _obfuscated_credentials(self, credentials: dict, credential_form_schemas: list[CredentialFormSchema]) -> dict:
+    def obfuscated_credentials(self, credentials: dict, credential_form_schemas: list[CredentialFormSchema]) -> dict:
         """
         对凭据进行混淆处理。
 
@@ -535,8 +704,8 @@ class ProviderConfiguration(BaseModel):
         :param credential_form_schemas: 凭据表单模式列表，用于定义哪些凭据字段是敏感的。
         :return: 混淆后的凭据字典，敏感信息被替换为混淆后的值。
         """
-        # 提取凭据中的敏感变量
-        credential_secret_variables = self._extract_secret_variables(
+        # Get provider credential secret variables
+        credential_secret_variables = self.extract_secret_variables(
             credential_form_schemas
         )
 
@@ -595,16 +764,22 @@ class ProviderConfiguration(BaseModel):
             # 如果没有指定模型类型，获取提供者支持的所有模型类型
             model_types = provider_instance.get_provider_schema().supported_model_types
 
-        # 根据提供者类型，调用不同的方法获取模型
+        # Group model settings by model type and model
+        model_setting_map = defaultdict(dict)
+        for model_setting in self.model_settings:
+            model_setting_map[model_setting.model_type][model_setting.model] = model_setting
+
         if self.using_provider_type == ProviderType.SYSTEM:
             provider_models = self._get_system_provider_models(
                 model_types=model_types,
-                provider_instance=provider_instance
+                provider_instance=provider_instance,
+                model_setting_map=model_setting_map
             )
         else:
             provider_models = self._get_custom_provider_models(
                 model_types=model_types,
-                provider_instance=provider_instance
+                provider_instance=provider_instance,
+                model_setting_map=model_setting_map
             )
 
         # 如果需要，筛选出活跃的模型
@@ -616,19 +791,28 @@ class ProviderConfiguration(BaseModel):
 
     def _get_system_provider_models(self,
                                     model_types: list[ModelType],
-                                    provider_instance: ModelProvider) -> list[ModelWithProviderEntity]:
+                                    provider_instance: ModelProvider,
+                                    model_setting_map: dict[ModelType, dict[str, ModelSettings]]) \
+            -> list[ModelWithProviderEntity]:
         """
         获取系统提供者的模型信息。
 
-        :param model_types: 模型类型列表
-        :param provider_instance: 模型提供者实例
-        :return: 包含模型和提供者信息的实体列表
+        :param model_types: model types
+        :param provider_instance: provider instance
+        :param model_setting_map: model setting map
+        :return:
         """
         provider_models = []
         # 遍历模型类型，获取每种类型下的模型信息
         for model_type in model_types:
-            provider_models.extend(
-                [
+            for m in provider_instance.models(model_type):
+                status = ModelStatus.ACTIVE
+                if m.model_type in model_setting_map and m.model in model_setting_map[m.model_type]:
+                    model_setting = model_setting_map[m.model_type][m.model]
+                    if model_setting.enabled is False:
+                        status = ModelStatus.DISABLED
+
+                provider_models.append(
                     ModelWithProviderEntity(
                         model=m.model,
                         label=m.label,
@@ -638,11 +822,9 @@ class ProviderConfiguration(BaseModel):
                         model_properties=m.model_properties,
                         deprecated=m.deprecated,
                         provider=SimpleModelProviderEntity(self.provider),
-                        status=ModelStatus.ACTIVE
+                        status=status
                     )
-                    for m in provider_instance.models(model_type)
-                ]
-            )
+                )
 
         # 初始化或更新提供者的配置方法列表
         if self.provider.provider not in original_provider_configurate_methods:
@@ -665,8 +847,9 @@ class ProviderConfiguration(BaseModel):
                 break
 
             if should_use_custom_model:
-                if original_provider_configurate_methods[self.provider.provider] == [ConfigurateMethod.CUSTOMIZABLE_MODEL]:
-                    # 仅使用可定制模型
+                if original_provider_configurate_methods[self.provider.provider] == [
+                    ConfigurateMethod.CUSTOMIZABLE_MODEL]:
+                    # only customizable model
                     for restrict_model in restrict_models:
                         copy_credentials = self.system_configuration.credentials.copy()
                         if restrict_model.base_model_name:
@@ -690,6 +873,13 @@ class ProviderConfiguration(BaseModel):
                         if custom_model_schema.model_type not in model_types:
                             continue
 
+                        status = ModelStatus.ACTIVE
+                        if (custom_model_schema.model_type in model_setting_map
+                                and custom_model_schema.model in model_setting_map[custom_model_schema.model_type]):
+                            model_setting = model_setting_map[custom_model_schema.model_type][custom_model_schema.model]
+                            if model_setting.enabled is False:
+                                status = ModelStatus.DISABLED
+
                         provider_models.append(
                             ModelWithProviderEntity(
                                 model=custom_model_schema.model,
@@ -700,7 +890,7 @@ class ProviderConfiguration(BaseModel):
                                 model_properties=custom_model_schema.model_properties,
                                 deprecated=custom_model_schema.deprecated,
                                 provider=SimpleModelProviderEntity(self.provider),
-                                status=ModelStatus.ACTIVE
+                                status=status
                             )
                         )
 
@@ -711,17 +901,21 @@ class ProviderConfiguration(BaseModel):
                     m.status = ModelStatus.NO_PERMISSION
                 elif not quota_configuration.is_valid:
                     m.status = ModelStatus.QUOTA_EXCEEDED
+
         return provider_models
 
     def _get_custom_provider_models(self,
                                     model_types: list[ModelType],
-                                    provider_instance: ModelProvider) -> list[ModelWithProviderEntity]:
+                                    provider_instance: ModelProvider,
+                                    model_setting_map: dict[ModelType, dict[str, ModelSettings]]) \
+            -> list[ModelWithProviderEntity]:
         """
         获取自定义提供者模型。
 
-        :param model_types: 模型类型列表
-        :param provider_instance: 模型提供者实例
-        :return: 包含模型及其提供者信息的列表
+        :param model_types: model types
+        :param provider_instance: provider instance
+        :param model_setting_map: model setting map
+        :return:
         """
         provider_models = []
 
@@ -737,7 +931,16 @@ class ProviderConfiguration(BaseModel):
 
             models = provider_instance.models(model_type)
             for m in models:
-                # 为每个支持的模型创建ModelWithProviderEntity实例，并添加到列表中
+                status = ModelStatus.ACTIVE if credentials else ModelStatus.NO_CONFIGURE
+                load_balancing_enabled = False
+                if m.model_type in model_setting_map and m.model in model_setting_map[m.model_type]:
+                    model_setting = model_setting_map[m.model_type][m.model]
+                    if model_setting.enabled is False:
+                        status = ModelStatus.DISABLED
+
+                    if len(model_setting.load_balancing_configs) > 1:
+                        load_balancing_enabled = True
+
                 provider_models.append(
                     ModelWithProviderEntity(
                         model=m.model,
@@ -748,7 +951,8 @@ class ProviderConfiguration(BaseModel):
                         model_properties=m.model_properties,
                         deprecated=m.deprecated,
                         provider=SimpleModelProviderEntity(self.provider),
-                        status=ModelStatus.ACTIVE if credentials else ModelStatus.NO_CONFIGURE
+                        status=status,
+                        load_balancing_enabled=load_balancing_enabled
                     )
                 )
 
@@ -773,7 +977,17 @@ class ProviderConfiguration(BaseModel):
             if not custom_model_schema:
                 continue
 
-            # 为自定义模型创建ModelWithProviderEntity实例，并添加到列表中
+            status = ModelStatus.ACTIVE
+            load_balancing_enabled = False
+            if (custom_model_schema.model_type in model_setting_map
+                    and custom_model_schema.model in model_setting_map[custom_model_schema.model_type]):
+                model_setting = model_setting_map[custom_model_schema.model_type][custom_model_schema.model]
+                if model_setting.enabled is False:
+                    status = ModelStatus.DISABLED
+
+                if len(model_setting.load_balancing_configs) > 1:
+                    load_balancing_enabled = True
+
             provider_models.append(
                 ModelWithProviderEntity(
                     model=custom_model_schema.model,
@@ -784,7 +998,8 @@ class ProviderConfiguration(BaseModel):
                     model_properties=custom_model_schema.model_properties,
                     deprecated=custom_model_schema.deprecated,
                     provider=SimpleModelProviderEntity(self.provider),
-                    status=ModelStatus.ACTIVE
+                    status=status,
+                    load_balancing_enabled=load_balancing_enabled
                 )
             )
 

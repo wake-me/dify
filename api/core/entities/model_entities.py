@@ -12,10 +12,11 @@ class ModelStatus(Enum):
     """
     模型状态枚举类。
     """
-    ACTIVE = "active"  # 活跃状态
-    NO_CONFIGURE = "no-configure"  # 未配置状态
-    QUOTA_EXCEEDED = "quota-exceeded"  # 配额超出状态
-    NO_PERMISSION = "no-permission"  # 无权限状态
+    ACTIVE = "active"
+    NO_CONFIGURE = "no-configure"
+    QUOTA_EXCEEDED = "quota-exceeded"
+    NO_PERMISSION = "no-permission"
+    DISABLED = "disabled"
 
 
 class SimpleModelProviderEntity(BaseModel):
@@ -44,13 +45,20 @@ class SimpleModelProviderEntity(BaseModel):
         )
 
 
-class ModelWithProviderEntity(ProviderModel):
+class ProviderModelWithStatusEntity(ProviderModel):
+    """
+    Model class for model response.
+    """
+    status: ModelStatus
+    load_balancing_enabled: bool = False
+
+
+class ModelWithProviderEntity(ProviderModelWithStatusEntity):
     """
     带提供者实体的模型类。
     用于表示一个具体模型及其相关的提供者信息。
     """
-    provider: SimpleModelProviderEntity  # 模型提供者实体
-    status: ModelStatus  # 模型状态
+    provider: SimpleModelProviderEntity
 
 
 class DefaultModelProviderEntity(BaseModel):

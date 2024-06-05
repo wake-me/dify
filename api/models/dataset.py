@@ -137,13 +137,8 @@ class Dataset(db.Model):
 
     @property
     def app_count(self):
-        """
-        获取使用该数据集的应用数量。
-
-        返回:
-        - 使用该数据集的应用数量。
-        """
-        return db.session.query(func.count(AppDatasetJoin.id)).filter(AppDatasetJoin.dataset_id == self.id).scalar()
+        return db.session.query(func.count(AppDatasetJoin.id)).filter(AppDatasetJoin.dataset_id == self.id,
+                                                                      App.id == AppDatasetJoin.app_id).scalar()
 
     @property
     def document_count(self):

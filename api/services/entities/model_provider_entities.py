@@ -4,10 +4,10 @@ from typing import Optional
 from flask import current_app
 from pydantic import BaseModel
 
-from core.entities.model_entities import ModelStatus, ModelWithProviderEntity
+from core.entities.model_entities import ModelWithProviderEntity, ProviderModelWithStatusEntity
 from core.entities.provider_entities import QuotaConfiguration
 from core.model_runtime.entities.common_entities import I18nObject
-from core.model_runtime.entities.model_entities import ModelType, ProviderModel
+from core.model_runtime.entities.model_entities import ModelType
 from core.model_runtime.entities.provider_entities import (
     SimpleProviderEntity,
 )
@@ -87,31 +87,17 @@ class ProviderResponse(BaseModel):
             )
 
 
-
-class ModelResponse(ProviderModel):
-    """
-    模型响应模型类。
-    该类描述了模型返回响应的数据结构。
-    属性:
-    - status: 模型状态。
-    """
-    status: ModelStatus
-
-
 class ProviderWithModelsResponse(BaseModel):
     """
-    包含模型的供应商响应模型类。
-    该类描述了供应商及其模型返回响应的数据结构。
-    属性:
-    - provider: 供应商名称。
-    - label: 本地化标签对象。
-    - icon_small: 可选的小图标本地化对象，默认为None。
-    - icon_large: 可选的大图标本地化对象，默认为None。
-    - status: 自定义配置状态。
-    - models: 模型响应对象列表。
+    Model class for provider with models response.
     """
+    provider: str
+    label: I18nObject
+    icon_small: Optional[I18nObject] = None
+    icon_large: Optional[I18nObject] = None
+    status: CustomConfigurationStatus
+    models: list[ProviderModelWithStatusEntity]
 
-    # 初始化函数，构造ProviderWithModelsResponse实例。
     def __init__(self, **data) -> None:
         super().__init__(**data)
 

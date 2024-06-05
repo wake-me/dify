@@ -80,7 +80,7 @@ class WorkflowService:
                             account: Account) -> Workflow:
         """
         Sync draft workflow
-        @throws WorkflowHashNotEqualError
+        :raises WorkflowHashNotEqualError
         """
         
         # 根据 app_model 获取草稿工作流

@@ -24,15 +24,15 @@ class LimitationModel(BaseModel):
 
 
 class FeatureModel(BaseModel):
-    # 功能模型，定义计费信息和各功能的限制
-    billing: BillingModel = BillingModel()  # 计费信息，默认为BillingModel实例
-    members: LimitationModel = LimitationModel(size=0, limit=1)  # 成员限制，默认大小为0，限制数量为1
-    apps: LimitationModel = LimitationModel(size=0, limit=10)  # 应用限制，默认大小为0，限制数量为10
-    vector_space: LimitationModel = LimitationModel(size=0, limit=5)  # 向量空间限制，默认大小为0，限制数量为5
-    annotation_quota_limit: LimitationModel = LimitationModel(size=0, limit=10)  # 注解配额限制，默认大小为0，限制数量为10
-    documents_upload_quota: LimitationModel = LimitationModel(size=0, limit=50)  # 文档上传配额限制，默认大小为0，限制数量为50
-    docs_processing: str = 'standard'  # 文档处理类型，默认为'standard'
-    can_replace_logo: bool = False  # 是否可以替换标志，默认为False
+    billing: BillingModel = BillingModel()
+    members: LimitationModel = LimitationModel(size=0, limit=1)
+    apps: LimitationModel = LimitationModel(size=0, limit=10)
+    vector_space: LimitationModel = LimitationModel(size=0, limit=5)
+    annotation_quota_limit: LimitationModel = LimitationModel(size=0, limit=10)
+    documents_upload_quota: LimitationModel = LimitationModel(size=0, limit=50)
+    docs_processing: str = 'standard'
+    can_replace_logo: bool = False
+    model_load_balancing_enabled: bool = False
 
 
 class SystemFeatureModel(BaseModel):
@@ -75,12 +75,8 @@ class FeatureService:
 
     @classmethod
     def _fulfill_params_from_env(cls, features: FeatureModel):
-        """
-        从环境变量填充功能模型的参数。
-
-        :param features: 要填充参数的FeatureModel实例。
-        """
-        features.can_replace_logo = current_app.config['CAN_REPLACE_LOGO']  # 是否可以替换标志的值来自环境变量
+        features.can_replace_logo = current_app.config['CAN_REPLACE_LOGO']
+        features.model_load_balancing_enabled = current_app.config['MODEL_LB_ENABLED']
 
     @classmethod
     def _fulfill_params_from_billing_api(cls, features: FeatureModel, tenant_id: str):
@@ -97,24 +93,34 @@ class FeatureService:
         features.billing.subscription.plan = billing_info['subscription']['plan']
         features.billing.subscription.interval = billing_info['subscription']['interval']
 
-        # 填充各功能限制信息
-        features.members.size = billing_info['members']['size']
-        features.members.limit = billing_info['members']['limit']
+        if 'members' in billing_info:
+            features.members.size = billing_info['members']['size']
+            features.members.limit = billing_info['members']['limit']
 
-        features.apps.size = billing_info['apps']['size']
-        features.apps.limit = billing_info['apps']['limit']
+        if 'apps' in billing_info:
+            features.apps.size = billing_info['apps']['size']
+            features.apps.limit = billing_info['apps']['limit']
 
-        features.vector_space.size = billing_info['vector_space']['size']
-        features.vector_space.limit = billing_info['vector_space']['limit']
+        if 'vector_space' in billing_info:
+            features.vector_space.size = billing_info['vector_space']['size']
+            features.vector_space.limit = billing_info['vector_space']['limit']
 
-        features.documents_upload_quota.size = billing_info['documents_upload_quota']['size']
-        features.documents_upload_quota.limit = billing_info['documents_upload_quota']['limit']
+        if 'documents_upload_quota' in billing_info:
+            features.documents_upload_quota.size = billing_info['documents_upload_quota']['size']
+            features.documents_upload_quota.limit = billing_info['documents_upload_quota']['limit']
 
-        features.annotation_quota_limit.size = billing_info['annotation_quota_limit']['size']
-        features.annotation_quota_limit.limit = billing_info['annotation_quota_limit']['limit']
+        if 'annotation_quota_limit' in billing_info:
+            features.annotation_quota_limit.size = billing_info['annotation_quota_limit']['size']
+            features.annotation_quota_limit.limit = billing_info['annotation_quota_limit']['limit']
 
-        features.docs_processing = billing_info['docs_processing']
-        features.can_replace_logo = billing_info['can_replace_logo']
+        if 'docs_processing' in billing_info:
+            features.docs_processing = billing_info['docs_processing']
+
+        if 'can_replace_logo' in billing_info:
+            features.can_replace_logo = billing_info['can_replace_logo']
+
+        if 'model_load_balancing_enabled' in billing_info:
+            features.model_load_balancing_enabled = billing_info['model_load_balancing_enabled']
 
     @classmethod
     def _fulfill_params_from_enterprise(cls, features):

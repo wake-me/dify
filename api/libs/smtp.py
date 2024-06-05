@@ -5,33 +5,27 @@ from email.mime.text import MIMEText
 
 
 class SMTPClient:
-    """
-    SMTP 客户端类，用于发送电子邮件。
-
-    参数:
-    server: str - SMTP 服务器的地址。
-    port: int - SMTP 服务器的端口号。
-    username: str - 发送邮件的账户用户名。
-    password: str - 发送邮件的账户密码。
-    _from: str - 邮件的发件人地址。
-    use_tls: bool - 是否使用 TLS 加密连接，默认为 False。
-    """
-
-    def __init__(self, server: str, port: int, username: str, password: str, _from: str, use_tls=False):
-        # 初始化 SMTP 客户端属性
+    def __init__(self, server: str, port: int, username: str, password: str, _from: str, use_tls=False, opportunistic_tls=False):
         self.server = server
         self.port = port
         self._from = _from
         self.username = username
         self.password = password
-        self._use_tls = use_tls
+        self.use_tls = use_tls
+        self.opportunistic_tls = opportunistic_tls
 
     def send(self, mail: dict):
         smtp = None
         try:
-            smtp = smtplib.SMTP(self.server, self.port, timeout=10)
-            if self._use_tls:
-                smtp.starttls()
+            if self.use_tls:
+                if self.opportunistic_tls:
+                    smtp = smtplib.SMTP(self.server, self.port, timeout=10)
+                    smtp.starttls()
+                else:
+                    smtp = smtplib.SMTP_SSL(self.server, self.port, timeout=10)
+            else:
+                smtp = smtplib.SMTP(self.server, self.port, timeout=10)
+                
             if self.username and self.password:
                 smtp.login(self.username, self.password)
 

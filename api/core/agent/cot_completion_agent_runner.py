@@ -26,17 +26,11 @@ class CotCompletionAgentRunner(CotAgentRunner):
         
         return system_prompt
 
-    def _organize_historic_prompt(self) -> str:
+    def _organize_historic_prompt(self, current_session_messages: list[PromptMessage] = None) -> str:
         """
-        组织历史提示信息
-        
-        该方法会将之前记录的历史提示信息（包括用户提问和助手回答）整理成字符串，每个问题或回答之间用两行空格分隔。
-        
-        返回值:
-            str: 组织好的历史提示信息字符串
+        Organize historic prompt
         """
-        # 获取历史提示信息列表
-        historic_prompt_messages = self._historic_prompt_messages
+        historic_prompt_messages = self._organize_historic_prompt_messages(current_session_messages)
         historic_prompt = ""
 
         # 遍历每条历史提示信息，区分用户提问和助手回答，并整理到historic_prompt字符串中

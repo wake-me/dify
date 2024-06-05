@@ -44,9 +44,6 @@ class CotChatAgentRunner(CotAgentRunner):
         # 组织系统提示消息
         system_message = self._organize_system_prompt()
 
-        # 组织历史对话消息
-        historic_messages = self._historic_prompt_messages
-
         # 组织当前助手的消息
         agent_scratchpad = self._agent_scratchpad
         if not agent_scratchpad:
@@ -71,7 +68,13 @@ class CotChatAgentRunner(CotAgentRunner):
 
         # 根据是否存在助手回复消息，组织消息列表
         if assistant_messages:
-            # 如果有助手回复消息，则在消息列表中加入继续提示
+            # organize historic prompt messages
+            historic_messages = self._organize_historic_prompt_messages([
+                system_message,
+                query_messages,
+                *assistant_messages,
+                UserPromptMessage(content='continue')
+            ])            
             messages = [
                 system_message,
                 *historic_messages,# 历史消息
@@ -80,7 +83,8 @@ class CotChatAgentRunner(CotAgentRunner):
                 UserPromptMessage(content='continue') # 继续提示
             ]
         else:
-            # 无助手回复时的消息列表
+            # organize historic prompt messages
+            historic_messages = self._organize_historic_prompt_messages([system_message, query_messages])
             messages = [system_message, *historic_messages, query_messages]
 
         # 将所有消息合并并返回

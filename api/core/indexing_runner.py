@@ -12,7 +12,6 @@ from flask import Flask, current_app
 from flask_login import current_user
 from sqlalchemy.orm.exc import ObjectDeletedError
 
-from core.docstore.dataset_docstore import DatasetDocumentStore
 from core.errors.error import ProviderTokenNotInitError
 from core.llm_generator.llm_generator import LLMGenerator
 from core.model_manager import ModelInstance, ModelManager
@@ -20,12 +19,16 @@ from core.model_runtime.entities.model_entities import ModelType, PriceType
 from core.model_runtime.model_providers.__base.large_language_model import LargeLanguageModel
 from core.model_runtime.model_providers.__base.text_embedding_model import TextEmbeddingModel
 from core.rag.datasource.keyword.keyword_factory import Keyword
+from core.rag.docstore.dataset_docstore import DatasetDocumentStore
 from core.rag.extractor.entity.extract_setting import ExtractSetting
 from core.rag.index_processor.index_processor_base import BaseIndexProcessor
 from core.rag.index_processor.index_processor_factory import IndexProcessorFactory
 from core.rag.models.document import Document
-from core.splitter.fixed_text_splitter import EnhanceRecursiveCharacterTextSplitter, FixedRecursiveCharacterTextSplitter
-from core.splitter.text_splitter import TextSplitter
+from core.rag.splitter.fixed_text_splitter import (
+    EnhanceRecursiveCharacterTextSplitter,
+    FixedRecursiveCharacterTextSplitter,
+)
+from core.rag.splitter.text_splitter import TextSplitter
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
 from extensions.ext_storage import storage
@@ -346,11 +349,7 @@ class IndexingRunner:
                 if len(preview_texts) < 5:
                     preview_texts.append(document.page_content)
                 if indexing_technique == 'high_quality' or embedding_model_instance:
-                    embedding_model_type_instance = embedding_model_instance.model_type_instance
-                    embedding_model_type_instance = cast(TextEmbeddingModel, embedding_model_type_instance)
-                    tokens += embedding_model_type_instance.get_num_tokens(
-                        model=embedding_model_instance.model,
-                        credentials=embedding_model_instance.credentials,
+                    tokens += embedding_model_instance.get_text_embedding_num_tokens(
                         texts=[self.filter_string(document.page_content)]
                     )
 
@@ -823,13 +822,7 @@ class IndexingRunner:
         tokens = 0
         chunk_size = 10
 
-        # 获取嵌入模型的类型实例，用于后续处理
-        embedding_model_type_instance = None
-        if embedding_model_instance:
-            embedding_model_type_instance = embedding_model_instance.model_type_instance
-            embedding_model_type_instance = cast(TextEmbeddingModel, embedding_model_type_instance)
-        
-        # 使用新线程创建关键词索引
+        # create keyword index
         create_keyword_thread = threading.Thread(target=self._process_keyword_index,
                                                 args=(current_app._get_current_object(),
                                                     dataset.id, dataset_document.id, documents))
@@ -842,9 +835,8 @@ class IndexingRunner:
                 for i in range(0, len(documents), chunk_size):
                     chunk_documents = documents[i:i + chunk_size]
                     futures.append(executor.submit(self._process_chunk, current_app._get_current_object(), index_processor,
-                                                chunk_documents, dataset,
-                                                dataset_document, embedding_model_instance,
-                                                embedding_model_type_instance))
+                                                   chunk_documents, dataset,
+                                                   dataset_document, embedding_model_instance))
 
                 for future in futures:
                     tokens += future.result()
@@ -904,19 +896,7 @@ class IndexingRunner:
                 db.session.commit()  # 提交数据库事务
 
     def _process_chunk(self, flask_app, index_processor, chunk_documents, dataset, dataset_document,
-                    embedding_model_instance, embedding_model_type_instance):
-        """
-        处理一个数据块的索引和嵌入任务。
-        
-        :param flask_app: Flask应用实例，用于提供应用上下文。
-        :param index_processor: 索引处理器实例，负责加载和处理文档索引。
-        :param chunk_documents: 数据块中的文档列表，每个文档包含页面内容和元数据。
-        :param dataset: 相关数据集的信息。
-        :param dataset_document: 数据集的文档信息，包含数据集的元数据。
-        :param embedding_model_instance: 嵌入模型的实例，用于计算文档嵌入。
-        :param embedding_model_type_instance: 嵌入模型类型的实例，用于获取模型特定的配置或方法。
-        :return: 数据块中所有文档的总令牌数。
-        """
+                       embedding_model_instance):
         with flask_app.app_context():
             # 检查文档是否暂停索引
             self._check_document_paused_status(dataset_document.id)
@@ -925,9 +905,7 @@ class IndexingRunner:
             # 如果使用高质量索引技术或配置了嵌入模型，则计算文档的总令牌数
             if dataset.indexing_technique == 'high_quality' or embedding_model_type_instance:
                 tokens += sum(
-                    embedding_model_type_instance.get_num_tokens(
-                        embedding_model_instance.model,
-                        embedding_model_instance.credentials,
+                    embedding_model_instance.get_text_embedding_num_tokens(
                         [document.page_content]
                     )
                     for document in chunk_documents

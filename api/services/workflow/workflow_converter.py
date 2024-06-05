@@ -315,7 +315,7 @@ class WorkflowConverter:
             }
 
             request_body_json = json.dumps(request_body)
-            request_body_json = request_body_json.replace('\{\{', '{{').replace('\}\}', '}}')
+            request_body_json = request_body_json.replace(r'\{\{', '{{').replace(r'\}\}', '}}')
 
             # 创建HTTP请求节点
             http_request_node = {

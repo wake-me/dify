@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 import resend
@@ -26,23 +27,11 @@ class Mail:
         return self._client is not None
 
     def init_app(self, app: Flask):
-        """
-        根据Flask应用配置初始化邮件客户端。
-
-        参数:
-            app (Flask): Flask应用实例。
-        """
-        # 检查邮件类型配置
-        mail_type = app.config.get('MAIL_TYPE')
-        if mail_type:
-            # 检查并设置默认发件人地址
-            default_send_from = app.config.get('MAIL_DEFAULT_SEND_FROM')
-            if default_send_from:
-                self._default_send_from = default_send_from
-
-            # 根据邮件类型初始化邮件客户端
-            if mail_type == 'resend':
-                # 重发邮件类型配置
+        if app.config.get('MAIL_TYPE'):
+            if app.config.get('MAIL_DEFAULT_SEND_FROM'):
+                self._default_send_from = app.config.get('MAIL_DEFAULT_SEND_FROM')
+            
+            if app.config.get('MAIL_TYPE') == 'resend':
                 api_key = app.config.get('RESEND_API_KEY')
                 if not api_key:
                     raise ValueError('RESEND_API_KEY is not set')
@@ -58,17 +47,23 @@ class Mail:
                 from libs.smtp import SMTPClient
                 if not app.config.get('SMTP_SERVER') or not app.config.get('SMTP_PORT'):
                     raise ValueError('SMTP_SERVER and SMTP_PORT are required for smtp mail type')
+                if not app.config.get('SMTP_USE_TLS') and app.config.get('SMTP_OPPORTUNISTIC_TLS'):
+                    raise ValueError('SMTP_OPPORTUNISTIC_TLS is not supported without enabling SMTP_USE_TLS')
                 self._client = SMTPClient(
                     server=app.config.get('SMTP_SERVER'),
                     port=app.config.get('SMTP_PORT'),
                     username=app.config.get('SMTP_USERNAME'),
                     password=app.config.get('SMTP_PASSWORD'),
                     _from=app.config.get('MAIL_DEFAULT_SEND_FROM'),
-                    use_tls=app.config.get('SMTP_USE_TLS')
+                    use_tls=app.config.get('SMTP_USE_TLS'),
+                    opportunistic_tls=app.config.get('SMTP_OPPORTUNISTIC_TLS')
                 )
             else:
                 # 不支持的邮件类型
                 raise ValueError('Unsupported mail type {}'.format(app.config.get('MAIL_TYPE')))
+        else:
+            logging.warning('MAIL_TYPE is not set')
+            
 
     def send(self, to: str, subject: str, html: str, from_: Optional[str] = None):
         """

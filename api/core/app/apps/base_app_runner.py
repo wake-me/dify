@@ -1,6 +1,6 @@
 import time
 from collections.abc import Generator
-from typing import Optional, Union, cast
+from typing import Optional, Union
 
 from core.app.app_config.entities import ExternalDataVariableEntity, PromptTemplateEntity
 from core.app.apps.base_app_queue_manager import AppQueueManager, PublishFrom
@@ -16,11 +16,11 @@ from core.app.features.hosting_moderation.hosting_moderation import HostingModer
 from core.external_data_tool.external_data_fetch import ExternalDataFetch
 from core.file.file_obj import FileVar
 from core.memory.token_buffer_memory import TokenBufferMemory
+from core.model_manager import ModelInstance
 from core.model_runtime.entities.llm_entities import LLMResult, LLMResultChunk, LLMResultChunkDelta, LLMUsage
 from core.model_runtime.entities.message_entities import AssistantPromptMessage, PromptMessage
 from core.model_runtime.entities.model_entities import ModelPropertyKey
 from core.model_runtime.errors.invoke import InvokeBadRequestError
-from core.model_runtime.model_providers.__base.large_language_model import LargeLanguageModel
 from core.moderation.input_moderation import InputModeration
 from core.prompt.advanced_prompt_transform import AdvancedPromptTransform
 from core.prompt.entities.advanced_prompt_entities import ChatModelMessage, CompletionModelPromptTemplate, MemoryConfig
@@ -45,9 +45,11 @@ class AppRunner:
         :param query: 查询字符串（可选）
         :return: 剩余令牌数。如果无法确定剩余令牌数，返回-1；如果请求的令牌数超过模型允许的最大值，抛出异常。
         """
-        # 获取模型类型实例，并断言为LargeLanguageModel类型
-        model_type_instance = model_config.provider_model_bundle.model_type_instance
-        model_type_instance = cast(LargeLanguageModel, model_type_instance)
+        # Invoke model
+        model_instance = ModelInstance(
+            provider_model_bundle=model_config.provider_model_bundle,
+            model=model_config.model
+        )
 
         # 尝试从模型属性中获取上下文大小
         model_context_tokens = model_config.model_schema.model_properties.get(ModelPropertyKey.CONTEXT_SIZE)
@@ -78,10 +80,7 @@ class AppRunner:
             query=query
         )
 
-        # 计算提示消息的令牌数
-        prompt_tokens = model_type_instance.get_num_tokens(
-            model_config.model,
-            model_config.credentials,
+        prompt_tokens = model_instance.get_llm_num_tokens(
             prompt_messages
         )
 
@@ -95,22 +94,12 @@ class AppRunner:
         return rest_tokens
 
     def recalc_llm_max_tokens(self, model_config: ModelConfigWithCredentialsEntity,
-                            prompt_messages: list[PromptMessage]):
-        """
-        重新计算最大令牌数（max_tokens）。
-        如果提示消息和最大令牌数的总和超过模型的令牌限制，则调整最大令牌数。
-
-        参数:
-        - model_config: ModelConfigWithCredentialsEntity，包含模型配置和认证信息的对象。
-        - prompt_messages: list[PromptMessage]，一个提示消息列表，每个提示消息都是PromptMessage类型。
-
-        返回值:
-        - int，如果无法计算或不需要调整，则返回-1；否则返回调整后的最大令牌数。
-        """
-
-        # 获取模型实例，并断言其类型为LargeLanguageModel
-        model_type_instance = model_config.provider_model_bundle.model_type_instance
-        model_type_instance = cast(LargeLanguageModel, model_type_instance)
+                              prompt_messages: list[PromptMessage]):
+        # recalc max_tokens if sum(prompt_token +  max_tokens) over model token limit
+        model_instance = ModelInstance(
+            provider_model_bundle=model_config.provider_model_bundle,
+            model=model_config.model
+        )
 
         # 尝试获取模型的上下文令牌数
         model_context_tokens = model_config.model_schema.model_properties.get(ModelPropertyKey.CONTEXT_SIZE)
@@ -131,10 +120,7 @@ class AppRunner:
         if max_tokens is None:
             max_tokens = 0
 
-        # 计算提示消息的总令牌数
-        prompt_tokens = model_type_instance.get_num_tokens(
-            model_config.model,
-            model_config.credentials,
+        prompt_tokens = model_instance.get_llm_num_tokens(
             prompt_messages
         )
 

@@ -81,8 +81,8 @@ class CSVExtractor(BaseExtractor):
 
         docs = []
         try:
-            # 将CSV文件加载为Pandas DataFrame
-            df = pd.read_csv(csvfile, error_bad_lines=False, **self.csv_args)
+            # load csv file into pandas dataframe
+            df = pd.read_csv(csvfile, on_bad_lines='skip', **self.csv_args)
 
             # 检查源列是否存在
             if self.source_column and self.source_column not in df.columns:

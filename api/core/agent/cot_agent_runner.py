@@ -15,6 +15,7 @@ from core.model_runtime.entities.message_entities import (
     ToolPromptMessage,
     UserPromptMessage,
 )
+from core.prompt.agent_history_prompt_transform import AgentHistoryPromptTransform
 from core.tools.entities.tool_entities import ToolInvokeMeta
 from core.tools.tool.tool import Tool
 from core.tools.tool_engine import ToolEngine
@@ -445,7 +446,7 @@ class CotAgentRunner(BaseAgentRunner, ABC):
 
         return message
 
-    def _organize_historic_prompt_messages(self) -> list[PromptMessage]:
+    def _organize_historic_prompt_messages(self, current_session_messages: list[PromptMessage] = None) -> list[PromptMessage]:
         """
         组织历史提示消息。
 
@@ -455,11 +456,17 @@ class CotAgentRunner(BaseAgentRunner, ABC):
         返回:
             list[PromptMessage]: 经过组织整理后的提示消息列表。
         """
-        result: list[PromptMessage] = []  # 存储最终结果的列表
-        scratchpad: list[AgentScratchpadUnit] = []  # 临时存储助手思考过程的列表
-        current_scratchpad: AgentScratchpadUnit = None  # 当前正在处理的助手思考单元
+        result: list[PromptMessage] = []
+        scratchpad: list[AgentScratchpadUnit] = []
+        current_scratchpad: AgentScratchpadUnit = None
 
-        # 遍历所有历史提示消息
+        self.history_prompt_messages = AgentHistoryPromptTransform(
+            model_config=self.model_config,
+            prompt_messages=current_session_messages or [],
+            history_messages=self.history_prompt_messages,
+            memory=self.memory
+        ).get_prompt()
+
         for message in self.history_prompt_messages:
             if isinstance(message, AssistantPromptMessage):
                 # 如果是助手提示消息，更新当前的助手思考单元

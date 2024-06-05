@@ -7,9 +7,9 @@ from extensions.ext_redis import redis_client
 
 
 class ProviderCredentialsCacheType(Enum):
-    # 提供者凭证缓存类型枚举
-    PROVIDER = "provider"  # 提供者级别缓存
-    MODEL = "provider_model"  # 提供者模型级别缓存
+    PROVIDER = "provider"
+    MODEL = "provider_model"
+    LOAD_BALANCING_MODEL = "load_balancing_provider_model"
 
 
 class ProviderCredentialsCache:
