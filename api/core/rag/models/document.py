@@ -52,7 +52,7 @@ class BaseDocumentTransformer(ABC):
                 ) -> Sequence[Document]:
                     raise NotImplementedError
 
-    """  # noqa: E501
+    """
 
     @abstractmethod
     def transform_documents(

@@ -1,3 +1,5 @@
+from typing import Optional
+
 from core.app.app_config.features.file_upload.manager import FileUploadConfigManager
 from core.file.message_file_parser import MessageFileParser
 from core.model_manager import ModelInstance
@@ -24,7 +26,7 @@ class TokenBufferMemory:
         self.model_instance = model_instance
 
     def get_history_prompt_messages(self, max_token_limit: int = 2000,
-                                    message_limit: int = 10) -> list[PromptMessage]:
+                                    message_limit: Optional[int] = None) -> list[PromptMessage]:
         """
         获取历史提示消息。
         :param max_token_limit: 最大令牌限制，用于控制消息数量以避免超出模型处理能力。
@@ -33,11 +35,16 @@ class TokenBufferMemory:
         """
         app_record = self.conversation.app
 
-        # 从数据库查询限定数量的非空消息，并按创建时间倒序处理
-        messages = db.session.query(Message).filter(
+        # fetch limited messages, and return reversed
+        query = db.session.query(Message).filter(
             Message.conversation_id == self.conversation.id,
             Message.answer != ''
-        ).order_by(Message.created_at.desc()).limit(message_limit).all()
+        ).order_by(Message.created_at.desc())
+
+        if message_limit and message_limit > 0:
+            messages = query.limit(message_limit).all()
+        else:
+            messages = query.all()
 
         messages = list(reversed(messages))
         message_file_parser = MessageFileParser(
@@ -103,7 +110,7 @@ class TokenBufferMemory:
     def get_history_prompt_text(self, human_prefix: str = "Human",
                                 ai_prefix: str = "Assistant",
                                 max_token_limit: int = 2000,
-                                message_limit: int = 10) -> str:
+                                message_limit: Optional[int] = None) -> str:
         """
         获取历史对话提示文本。
         :param human_prefix: 人类前缀，默认为 "Human"

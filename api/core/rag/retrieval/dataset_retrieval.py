@@ -390,7 +390,7 @@ class DatasetRetrieval:
         # 如果查询内容为空，则直接返回，不进行后续操作
         if not query:
             return
-        # 遍历数据集ID列表，为每个数据集创建一个查询记录
+        dataset_queries = []
         for dataset_id in dataset_ids:
             # 创建数据集查询记录对象，并填充相关信息
             dataset_query = DatasetQuery(
@@ -401,9 +401,9 @@ class DatasetRetrieval:
                 created_by_role=user_from,
                 created_by=user_id
             )
-            # 将查询记录对象添加到数据库会话中
-            db.session.add(dataset_query)
-        # 提交数据库会话，将所有添加的查询记录持久化到数据库
+            dataset_queries.append(dataset_query)
+        if dataset_queries:
+            db.session.add_all(dataset_queries)
         db.session.commit()
 
     def _retriever(self, flask_app: Flask, dataset_id: str, query: str, top_k: int, all_documents: list):

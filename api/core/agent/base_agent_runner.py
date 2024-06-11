@@ -657,4 +657,3 @@ class BaseAgentRunner(AppRunner):
         else:
             # 消息中无文件时，直接返回查询内容
             return UserPromptMessage(content=message.query)
-         

@@ -352,7 +352,7 @@ class ModelInstance:
             except Exception as e:
                 raise e
 
-    def get_tts_voices(self, language: str) -> list:
+    def get_tts_voices(self, language: Optional[str] = None) -> list:
         """
         调用大型语言TTS模型声音
 

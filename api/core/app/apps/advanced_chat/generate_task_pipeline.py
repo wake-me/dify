@@ -109,9 +109,8 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
             usage=LLMUsage.empty_usage()
         )
 
-        # 配置流式生成路由
-        self._stream_generate_routes = self._get_stream_generate_routes()
         self._iteration_nested_relations = self._get_iteration_nested_relations(self._workflow.graph_dict)
+        self._stream_generate_routes = self._get_stream_generate_routes()
         self._conversation_name_generate_thread = None
 
     def process(self) -> Union[ChatbotAppBlockingResponse, Generator[ChatbotAppStreamResponse, None, None]]:
@@ -450,7 +449,19 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
                 ingoing_edges.append(edge)
 
         if not ingoing_edges:
-            return []  # 如果目标节点没有入边，则直接返回空列表
+            # check if it's the first node in the iteration
+            target_node = next((node for node in nodes if node.get('id') == target_node_id), None)
+            if not target_node:
+                return []
+            
+            node_iteration_id = target_node.get('data', {}).get('iteration_id')
+            # get iteration start node id
+            for node in nodes:
+                if node.get('id') == node_iteration_id:
+                    if node.get('data', {}).get('start_node_id') == target_node_id:
+                        return [target_node_id]
+                    
+            return []
 
         start_node_ids = []
         for ingoing_edge in ingoing_edges:
@@ -563,6 +574,7 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
                 self._task_state.answer += route_chunk.text
                 yield self._message_to_stream_response(route_chunk.text, self._message.id)
             else:
+                value = None
                 route_chunk = cast(VarGenerateRouteChunk, route_chunk)
                 value_selector = route_chunk.value_selector
                 # 如果没有值选择器，则跳过当前路由块，继续处理下一个
@@ -576,6 +588,20 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
                 if route_chunk_node_id == 'sys':
                     # 系统变量
                     value = self._workflow_system_variables.get(SystemVariable.value_of(value_selector[1]))
+                elif route_chunk_node_id in self._iteration_nested_relations:
+                    # it's a iteration variable
+                    if not self._iteration_state or route_chunk_node_id not in self._iteration_state.current_iterations:
+                        continue
+                    iteration_state = self._iteration_state.current_iterations[route_chunk_node_id]
+                    iterator = iteration_state.inputs
+                    if not iterator:
+                        continue
+                    iterator_selector = iterator.get('iterator_selector', [])
+                    if value_selector[1] == 'index':
+                        value = iteration_state.current_index
+                    elif value_selector[1] == 'item':
+                        value = iterator_selector[iteration_state.current_index] if iteration_state.current_index < len(
+                            iterator_selector) else None
                 else:
                     # 检查路由块节点ID是否在已执行的节点信息中
                     if route_chunk_node_id not in self._task_state.ran_node_execution_infos:
@@ -605,8 +631,7 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
                         else:
                             value = value.get(key)
 
-                # 根据获取的值生成文本
-                if value:
+                if value is not None:
                     text = ''
                     if isinstance(value, str | int | float):
                         text = str(value)
