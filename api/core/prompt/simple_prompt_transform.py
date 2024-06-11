@@ -207,58 +207,58 @@ class SimplePromptTransform(PromptTransform):
                                             memory: Optional[TokenBufferMemory],
                                             model_config: ModelConfigWithCredentialsEntity) \
                 -> tuple[list[PromptMessage], Optional[list[str]]]:
-            """
-            获取聊天模型的提示消息。
+        """
+        获取聊天模型的提示消息。
 
-            参数:
-            app_mode - 应用模式。
-            pre_prompt - 预提示文本。
-            inputs - 输入字典。
-            query - 查询字符串。
-            context - 上下文信息，可选。
-            files - 文件列表。
-            memory - 令牌缓冲区记忆，可选。
-            model_config - 带有凭证的模型配置实体。
+        参数:
+        app_mode - 应用模式。
+        pre_prompt - 预提示文本。
+        inputs - 输入字典。
+        query - 查询字符串。
+        context - 上下文信息，可选。
+        files - 文件列表。
+        memory - 令牌缓冲区记忆，可选。
+        model_config - 带有凭证的模型配置实体。
 
-            返回值:
-            返回一个包含提示消息的元组，以及一个可选的字符串列表。
-            """
+        返回值:
+        返回一个包含提示消息的元组，以及一个可选的字符串列表。
+        """
 
-            prompt_messages = []
+        prompt_messages = []
 
-            # 获取提示信息
-            prompt, _ = self.get_prompt_str_and_rules(
-                app_mode=app_mode,
-                model_config=model_config,
-                pre_prompt=pre_prompt,
-                inputs=inputs,
-                query=None,
-                context=context
+        # 获取提示信息
+        prompt, _ = self.get_prompt_str_and_rules(
+            app_mode=app_mode,
+            model_config=model_config,
+            pre_prompt=pre_prompt,
+            inputs=inputs,
+            query=None,
+            context=context
+        )
+
+        if prompt and query:
+            prompt_messages.append(SystemPromptMessage(content=prompt))
+
+        # 如果存在记忆体，则追加聊天历史
+        if memory:
+            prompt_messages = self._append_chat_histories(
+                memory=memory,
+                memory_config=MemoryConfig(
+                    window=MemoryConfig.WindowConfig(
+                        enabled=False,
+                    )
+                ),
+                prompt_messages=prompt_messages,
+                model_config=model_config
             )
 
-            if prompt and query:
-                prompt_messages.append(SystemPromptMessage(content=prompt))
+        # 根据查询条件添加用户消息
+        if query:
+            prompt_messages.append(self.get_last_user_message(query, files))
+        else:
+            prompt_messages.append(self.get_last_user_message(prompt, files))
 
-            # 如果存在记忆体，则追加聊天历史
-            if memory:
-                prompt_messages = self._append_chat_histories(
-                    memory=memory,
-                    memory_config=MemoryConfig(
-                        window=MemoryConfig.WindowConfig(
-                            enabled=False,
-                        )
-                    ),
-                    prompt_messages=prompt_messages,
-                    model_config=model_config
-                )
-
-            # 根据查询条件添加用户消息
-            if query:
-                prompt_messages.append(self.get_last_user_message(query, files))
-            else:
-                prompt_messages.append(self.get_last_user_message(prompt, files))
-
-            return prompt_messages, None
+        return prompt_messages, None
 
     def _get_completion_model_prompt_messages(self, app_mode: AppMode,
                                                 pre_prompt: str,
@@ -269,69 +269,69 @@ class SimplePromptTransform(PromptTransform):
                                                 memory: Optional[TokenBufferMemory],
                                                 model_config: ModelConfigWithCredentialsEntity) \
                 -> tuple[list[PromptMessage], Optional[list[str]]]:
-            """
-            获取完成模型的提示信息和停止符。
+        """
+        获取完成模型的提示信息和停止符。
 
-            参数:
-            app_mode: 应用模式。
-            pre_prompt: 预提示文本。
-            inputs: 输入字典。
-            query: 查询字符串。
-            context: 上下文信息，可选。
-            files: 文件列表。
-            memory: 令牌缓冲区记忆，可选。
-            model_config: 带有凭证的模型配置实体。
+        参数:
+        app_mode: 应用模式。
+        pre_prompt: 预提示文本。
+        inputs: 输入字典。
+        query: 查询字符串。
+        context: 上下文信息，可选。
+        files: 文件列表。
+        memory: 令牌缓冲区记忆，可选。
+        model_config: 带有凭证的模型配置实体。
 
-            返回值:
-            提示信息列表和可选的停止符列表的元组。
-            """
-            # 获取初始提示和规则
+        返回值:
+        提示信息列表和可选的停止符列表的元组。
+        """
+        # 获取初始提示和规则
+        prompt, prompt_rules = self.get_prompt_str_and_rules(
+            app_mode=app_mode,
+            model_config=model_config,
+            pre_prompt=pre_prompt,
+            inputs=inputs,
+            query=query,
+            context=context
+        )
+
+        if memory:
+            # 利用记忆来调整提示信息
+            tmp_human_message = UserPromptMessage(
+                content=prompt
+            )
+
+            rest_tokens = self._calculate_rest_token([tmp_human_message], model_config)
+            # 从记忆中获取历史消息
+            histories = self._get_history_messages_from_memory(
+                memory=memory,
+                memory_config=MemoryConfig(
+                    window=MemoryConfig.WindowConfig(
+                        enabled=False,
+                    )
+                ),
+                max_token_limit=rest_tokens,
+                human_prefix=prompt_rules['human_prefix'] if 'human_prefix' in prompt_rules else 'Human',
+                ai_prefix=prompt_rules['assistant_prefix'] if 'assistant_prefix' in prompt_rules else 'Assistant'
+            )
+
+            # 基于历史消息重新获取提示和规则
             prompt, prompt_rules = self.get_prompt_str_and_rules(
                 app_mode=app_mode,
                 model_config=model_config,
                 pre_prompt=pre_prompt,
                 inputs=inputs,
                 query=query,
-                context=context
+                context=context,
+                histories=histories
             )
 
-            if memory:
-                # 利用记忆来调整提示信息
-                tmp_human_message = UserPromptMessage(
-                    content=prompt
-                )
+        # 处理停止符
+        stops = prompt_rules.get('stops')
+        if stops is not None and len(stops) == 0:
+            stops = None
 
-                rest_tokens = self._calculate_rest_token([tmp_human_message], model_config)
-                # 从记忆中获取历史消息
-                histories = self._get_history_messages_from_memory(
-                    memory=memory,
-                    memory_config=MemoryConfig(
-                        window=MemoryConfig.WindowConfig(
-                            enabled=False,
-                        )
-                    ),
-                    max_token_limit=rest_tokens,
-                    human_prefix=prompt_rules['human_prefix'] if 'human_prefix' in prompt_rules else 'Human',
-                    ai_prefix=prompt_rules['assistant_prefix'] if 'assistant_prefix' in prompt_rules else 'Assistant'
-                )
-
-                # 基于历史消息重新获取提示和规则
-                prompt, prompt_rules = self.get_prompt_str_and_rules(
-                    app_mode=app_mode,
-                    model_config=model_config,
-                    pre_prompt=pre_prompt,
-                    inputs=inputs,
-                    query=query,
-                    context=context,
-                    histories=histories
-                )
-
-            # 处理停止符
-            stops = prompt_rules.get('stops')
-            if stops is not None and len(stops) == 0:
-                stops = None
-
-            return [self.get_last_user_message(prompt, files)], stops
+        return [self.get_last_user_message(prompt, files)], stops
 
     def get_last_user_message(self, prompt: str, files: list[FileVar]) -> UserPromptMessage:
         """

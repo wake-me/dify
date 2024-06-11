@@ -261,31 +261,31 @@ class WorkflowAppGenerator(BaseAppGenerator):
             WorkflowAppBlockingResponse,
             Generator[WorkflowAppStreamResponse, None, None]
         ]:
-            """
-            处理响应。
-            :param application_generate_entity: 用于工作流应用生成的实体
-            :param workflow: 工作流实例
-            :param queue_manager: 队列管理器，用于管理任务队列
-            :param user: 账户或终端用户，标识请求的发起者
-            :param stream: 是否采用流式处理，默认为False
-            :return: 根据流式处理标志返回不同的响应类型，如果stream为True，则返回一个生成器对象；否则返回一个阻塞响应对象
-            """
-            # 初始化生成任务管道
-            generate_task_pipeline = WorkflowAppGenerateTaskPipeline(
-                application_generate_entity=application_generate_entity,
-                workflow=workflow,
-                queue_manager=queue_manager,
-                user=user,
-                stream=stream
-            )
+        """
+        处理响应。
+        :param application_generate_entity: 用于工作流应用生成的实体
+        :param workflow: 工作流实例
+        :param queue_manager: 队列管理器，用于管理任务队列
+        :param user: 账户或终端用户，标识请求的发起者
+        :param stream: 是否采用流式处理，默认为False
+        :return: 根据流式处理标志返回不同的响应类型，如果stream为True，则返回一个生成器对象；否则返回一个阻塞响应对象
+        """
+        # 初始化生成任务管道
+        generate_task_pipeline = WorkflowAppGenerateTaskPipeline(
+            application_generate_entity=application_generate_entity,
+            workflow=workflow,
+            queue_manager=queue_manager,
+            user=user,
+            stream=stream
+        )
 
-            try:
-                # 处理生成任务，并返回响应
-                return generate_task_pipeline.process()
-            except ValueError as e:
-                # 忽略"文件被关闭"的错误，其它错误记录日志并抛出
-                if e.args[0] == "I/O operation on closed file.":  # 忽略此错误
-                    raise GenerateTaskStoppedException()
-                else:
-                    logger.exception(e)
-                    raise e
+        try:
+            # 处理生成任务，并返回响应
+            return generate_task_pipeline.process()
+        except ValueError as e:
+            # 忽略"文件被关闭"的错误，其它错误记录日志并抛出
+            if e.args[0] == "I/O operation on closed file.":  # 忽略此错误
+                raise GenerateTaskStoppedException()
+            else:
+                logger.exception(e)
+                raise e

@@ -314,37 +314,37 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
                                         user: Union[Account, EndUser],
                                         stream: bool = False) \
                 -> Union[ChatbotAppBlockingResponse, Generator[ChatbotAppStreamResponse, None, None]]:
-            """
-            处理高级聊天响应。
-            
-            :param application_generate_entity: 应用生成实体，包含聊天应用的生成配置信息。
-            :param workflow: 工作流，定义了处理聊天请求的步骤序列。
-            :param queue_manager: 队列管理器，用于管理聊天请求的队列。
-            :param conversation: 对话，表示用户和聊天机器人之间的一次会话。
-            :param message: 消息，用户发送的消息或聊天机器人回复的消息。
-            :param user: 账户或终端用户，标识发起聊天请求的用户。
-            :param stream: 是否为流式响应，默认为False。如果为True，则响应将以流的形式返回。
-            :return: 返回一个聊天应用的阻塞响应或一个生成器，用于逐个返回流式响应。
-            """
-            # 初始化生成任务管道
-            generate_task_pipeline = AdvancedChatAppGenerateTaskPipeline(
-                application_generate_entity=application_generate_entity,
-                workflow=workflow,
-                queue_manager=queue_manager,
-                conversation=conversation,
-                message=message,
-                user=user,
-                stream=stream
-            )
+        """
+        处理高级聊天响应。
+        
+        :param application_generate_entity: 应用生成实体，包含聊天应用的生成配置信息。
+        :param workflow: 工作流，定义了处理聊天请求的步骤序列。
+        :param queue_manager: 队列管理器，用于管理聊天请求的队列。
+        :param conversation: 对话，表示用户和聊天机器人之间的一次会话。
+        :param message: 消息，用户发送的消息或聊天机器人回复的消息。
+        :param user: 账户或终端用户，标识发起聊天请求的用户。
+        :param stream: 是否为流式响应，默认为False。如果为True，则响应将以流的形式返回。
+        :return: 返回一个聊天应用的阻塞响应或一个生成器，用于逐个返回流式响应。
+        """
+        # 初始化生成任务管道
+        generate_task_pipeline = AdvancedChatAppGenerateTaskPipeline(
+            application_generate_entity=application_generate_entity,
+            workflow=workflow,
+            queue_manager=queue_manager,
+            conversation=conversation,
+            message=message,
+            user=user,
+            stream=stream
+        )
 
-            try:
-                # 处理生成任务，并返回结果
-                return generate_task_pipeline.process()
-            except ValueError as e:
-                # 忽略"文件被关闭"的错误
-                if e.args[0] == "I/O operation on closed file.":  
-                    raise GenerateTaskStoppedException()
-                else:
-                    # 记录其他异常，并抛出
-                    logger.exception(e)
-                    raise e
+        try:
+            # 处理生成任务，并返回结果
+            return generate_task_pipeline.process()
+        except ValueError as e:
+            # 忽略"文件被关闭"的错误
+            if e.args[0] == "I/O operation on closed file.":  
+                raise GenerateTaskStoppedException()
+            else:
+                # 记录其他异常，并抛出
+                logger.exception(e)
+                raise e

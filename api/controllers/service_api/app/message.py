@@ -57,7 +57,7 @@ class MessageListApi(Resource):
         'message_files': fields.List(fields.String, attribute='files')  # 消息关联的文件列表
     }
 
-        # 定义消息对象的字段
+    # 定义消息对象的字段
     message_fields = {
         'id': fields.String,
         'conversation_id': fields.String,

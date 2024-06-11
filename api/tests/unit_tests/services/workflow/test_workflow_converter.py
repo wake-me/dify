@@ -278,7 +278,7 @@ def test__convert_to_knowledge_retrieval_node_for_workflow_app():
         "top_k": dataset_config.retrieve_config.top_k,
         "score_threshold": dataset_config.retrieve_config.score_threshold,
         "reranking_model": dataset_config.retrieve_config.reranking_model
-    }
+        }
 
 
 def test__convert_to_llm_node_for_chatbot_simple_chat_model(default_variables):

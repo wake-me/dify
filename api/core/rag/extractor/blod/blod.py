@@ -32,8 +32,8 @@ class Blob(BaseModel):
     mimetype: Optional[str] = None  # 不要与文件扩展名混淆
     encoding: str = "utf-8"  # 默认使用utf-8编码，如果需要将数据解码为字符串
     path: Optional[PathLike] = None  # 原始内容所在的位置
-                                    # 代表本地文件系统上的位置
-                                    # 对于下游代码假设必须使用文件路径而不是内存中的内容的情况很有用
+    # 代表本地文件系统上的位置
+    # 对于下游代码假设必须使用文件路径而不是内存中的内容的情况很有用
 
     class Config:
         arbitrary_types_allowed = True

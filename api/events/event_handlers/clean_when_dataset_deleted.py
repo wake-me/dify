@@ -16,5 +16,4 @@ def handle(sender, **kwargs):
     dataset = sender  # 获取被删除的数据集对象
     
     # 异步调用清理数据集任务，传入数据集的相关信息
-    clean_dataset_task.delay(dataset.id, dataset.tenant_id, dataset.indexing_technique,
-                             dataset.index_struct, dataset.collection_binding_id, dataset.doc_form)
+    clean_dataset_task.delay(dataset.id, dataset.tenant_id, dataset.indexing_technique,dataset.index_struct, dataset.collection_binding_id, dataset.doc_form)

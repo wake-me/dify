@@ -41,62 +41,62 @@ class AgentChatAppConfigManager(BaseAppConfigManager):
                         app_model_config: AppModelConfig,
                         conversation: Optional[Conversation] = None,
                         override_config_dict: Optional[dict] = None) -> AgentChatAppConfig:
-            """
-            将应用模型配置转换为代理聊天应用配置。
-            :param app_model: 应用模型，包含应用的基本信息如模式、租户ID和应用ID。
-            :param app_model_config: 应用模型配置，具体应用的配置细节。
-            :param conversation: 对话信息，可选，如果提供，则配置可能会根据对话上下文进行调整。
-            :param override_config_dict: 覆盖配置字典，可选，提供时将使用此字典覆盖应用模型配置。
-            :return: 返回一个AgentChatAppConfig对象，包含应用的配置信息，如模型配置、提示模板等。
-            """
-            # 确定配置来源
-            if override_config_dict:
-                config_from = EasyUIBasedAppModelConfigFrom.ARGS
-            elif conversation:
-                config_from = EasyUIBasedAppModelConfigFrom.CONVERSATION_SPECIFIC_CONFIG
-            else:
-                config_from = EasyUIBasedAppModelConfigFrom.APP_LATEST_CONFIG
+        """
+        将应用模型配置转换为代理聊天应用配置。
+        :param app_model: 应用模型，包含应用的基本信息如模式、租户ID和应用ID。
+        :param app_model_config: 应用模型配置，具体应用的配置细节。
+        :param conversation: 对话信息，可选，如果提供，则配置可能会根据对话上下文进行调整。
+        :param override_config_dict: 覆盖配置字典，可选，提供时将使用此字典覆盖应用模型配置。
+        :return: 返回一个AgentChatAppConfig对象，包含应用的配置信息，如模型配置、提示模板等。
+        """
+        # 确定配置来源
+        if override_config_dict:
+            config_from = EasyUIBasedAppModelConfigFrom.ARGS
+        elif conversation:
+            config_from = EasyUIBasedAppModelConfigFrom.CONVERSATION_SPECIFIC_CONFIG
+        else:
+            config_from = EasyUIBasedAppModelConfigFrom.APP_LATEST_CONFIG
 
-            # 根据配置来源决定使用哪个配置字典
-            if config_from != EasyUIBasedAppModelConfigFrom.ARGS:
-                app_model_config_dict = app_model_config.to_dict()
-                config_dict = app_model_config_dict.copy()
-            else:
-                config_dict = override_config_dict
+        # 根据配置来源决定使用哪个配置字典
+        if config_from != EasyUIBasedAppModelConfigFrom.ARGS:
+            app_model_config_dict = app_model_config.to_dict()
+            config_dict = app_model_config_dict.copy()
+        else:
+            config_dict = override_config_dict
 
-            # 获取应用模式并根据配置创建AgentChatAppConfig实例
-            app_mode = AppMode.value_of(app_model.mode)
-            app_config = AgentChatAppConfig(
-                tenant_id=app_model.tenant_id,
-                app_id=app_model.id,
-                app_mode=app_mode,
-                app_model_config_from=config_from,
-                app_model_config_id=app_model_config.id,
-                app_model_config_dict=config_dict,
-                model=ModelConfigManager.convert(
-                    config=config_dict
-                ),
-                prompt_template=PromptTemplateConfigManager.convert(
-                    config=config_dict
-                ),
-                sensitive_word_avoidance=SensitiveWordAvoidanceConfigManager.convert(
-                    config=config_dict
-                ),
-                dataset=DatasetConfigManager.convert(
-                    config=config_dict
-                ),
-                agent=AgentConfigManager.convert(
-                    config=config_dict
-                ),
-                additional_features=cls.convert_features(config_dict, app_mode)
-            )
-
-            # 转换并设置变量及外部数据变量配置
-            app_config.variables, app_config.external_data_variables = BasicVariablesConfigManager.convert(
+        # 获取应用模式并根据配置创建AgentChatAppConfig实例
+        app_mode = AppMode.value_of(app_model.mode)
+        app_config = AgentChatAppConfig(
+            tenant_id=app_model.tenant_id,
+            app_id=app_model.id,
+            app_mode=app_mode,
+            app_model_config_from=config_from,
+            app_model_config_id=app_model_config.id,
+            app_model_config_dict=config_dict,
+            model=ModelConfigManager.convert(
                 config=config_dict
-            )
+            ),
+            prompt_template=PromptTemplateConfigManager.convert(
+                config=config_dict
+            ),
+            sensitive_word_avoidance=SensitiveWordAvoidanceConfigManager.convert(
+                config=config_dict
+            ),
+            dataset=DatasetConfigManager.convert(
+                config=config_dict
+            ),
+            agent=AgentConfigManager.convert(
+                config=config_dict
+            ),
+            additional_features=cls.convert_features(config_dict, app_mode)
+        )
 
-            return app_config
+        # 转换并设置变量及外部数据变量配置
+        app_config.variables, app_config.external_data_variables = BasicVariablesConfigManager.convert(
+            config=config_dict
+        )
+
+        return app_config
 
     @classmethod
     def config_validate(cls, tenant_id: str, config: dict) -> dict:

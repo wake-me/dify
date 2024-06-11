@@ -339,7 +339,7 @@ class WorkflowRun(db.Model):
         """
         from models.model import EndUser
         created_by_role = CreatedByRole.value_of(self.created_by_role)
-        return EndUser.query.get(self.created_by) \
+        return EndUser.query.get(self.created_by)  \
             if created_by_role == CreatedByRole.END_USER else None
 
     @property

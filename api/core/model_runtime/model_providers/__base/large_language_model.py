@@ -395,80 +395,80 @@ if you are not sure about the structure.
                                     tools: Optional[list[PromptMessageTool]] = None,
                                     stop: Optional[list[str]] = None, stream: bool = True,
                                     user: Optional[str] = None, callbacks: list[Callback] = None) -> Generator:
-            """
-            调用结果生成器。
+        """
+        调用结果生成器。
 
-            :param model: 使用的模型名称。
-            :param result: 结果生成器，用于迭代获取结果片段。
-            :param credentials: 用于模型调用的凭证信息。
-            :param prompt_messages: 与模型交互时的提示信息列表。
-            :param model_parameters: 模型调用时的参数。
-            :param tools: 辅助工具列表，用于在与模型交互时提供额外的功能。
-            :param stop: 停止信号列表，用于在满足特定条件时终止生成器的迭代。
-            :param stream: 是否流式处理结果，默认为True。
-            :param user: 用户标识，用于标识调用结果生成器的用户。
-            :param callbacks: 在处理结果时触发的回调列表。
-            :return: 返回一个生成器，该生成器迭代处理结果并触发相应的回调函数。
-            """
-            # 初始化提示消息和使用信息
-            prompt_message = AssistantPromptMessage(
-                content=""
-            )
-            usage = None
-            system_fingerprint = None
-            real_model = model
+        :param model: 使用的模型名称。
+        :param result: 结果生成器，用于迭代获取结果片段。
+        :param credentials: 用于模型调用的凭证信息。
+        :param prompt_messages: 与模型交互时的提示信息列表。
+        :param model_parameters: 模型调用时的参数。
+        :param tools: 辅助工具列表，用于在与模型交互时提供额外的功能。
+        :param stop: 停止信号列表，用于在满足特定条件时终止生成器的迭代。
+        :param stream: 是否流式处理结果，默认为True。
+        :param user: 用户标识，用于标识调用结果生成器的用户。
+        :param callbacks: 在处理结果时触发的回调列表。
+        :return: 返回一个生成器，该生成器迭代处理结果并触发相应的回调函数。
+        """
+        # 初始化提示消息和使用信息
+        prompt_message = AssistantPromptMessage(
+            content=""
+        )
+        usage = None
+        system_fingerprint = None
+        real_model = model
 
-            try:
-                # 迭代处理结果生成器中的每个片段
-                for chunk in result:
-                    yield chunk
+        try:
+            # 迭代处理结果生成器中的每个片段
+            for chunk in result:
+                yield chunk
 
-                    # 触发处理每个结果片段的回调
-                    self._trigger_new_chunk_callbacks(
-                        chunk=chunk,
-                        model=model,
-                        credentials=credentials,
-                        prompt_messages=prompt_messages,
-                        model_parameters=model_parameters,
-                        tools=tools,
-                        stop=stop,
-                        stream=stream,
-                        user=user,
-                        callbacks=callbacks
-                    )
-
-                    # 更新提示消息和追踪模型使用信息
-                    prompt_message.content += chunk.delta.message.content
-                    real_model = chunk.model
-                    if chunk.delta.usage:
-                        usage = chunk.delta.usage
-
-                    # 更新系统指纹信息
-                    if chunk.system_fingerprint:
-                        system_fingerprint = chunk.system_fingerprint
-            except Exception as e:
-                # 将捕获到的异常转换为适当的错误并抛出
-                raise self._transform_invoke_error(e)
-
-            # 触发调用结果处理完成后的回调
-            self._trigger_after_invoke_callbacks(
-                model=model,
-                result=LLMResult(
-                    model=real_model,
+                # 触发处理每个结果片段的回调
+                self._trigger_new_chunk_callbacks(
+                    chunk=chunk,
+                    model=model,
+                    credentials=credentials,
                     prompt_messages=prompt_messages,
-                    message=prompt_message,
-                    usage=usage if usage else LLMUsage.empty_usage(),
-                    system_fingerprint=system_fingerprint
-                ),
-                credentials=credentials,
+                    model_parameters=model_parameters,
+                    tools=tools,
+                    stop=stop,
+                    stream=stream,
+                    user=user,
+                    callbacks=callbacks
+                )
+
+                # 更新提示消息和追踪模型使用信息
+                prompt_message.content += chunk.delta.message.content
+                real_model = chunk.model
+                if chunk.delta.usage:
+                    usage = chunk.delta.usage
+
+                # 更新系统指纹信息
+                if chunk.system_fingerprint:
+                    system_fingerprint = chunk.system_fingerprint
+        except Exception as e:
+            # 将捕获到的异常转换为适当的错误并抛出
+            raise self._transform_invoke_error(e)
+
+        # 触发调用结果处理完成后的回调
+        self._trigger_after_invoke_callbacks(
+            model=model,
+            result=LLMResult(
+                model=real_model,
                 prompt_messages=prompt_messages,
-                model_parameters=model_parameters,
-                tools=tools,
-                stop=stop,
-                stream=stream,
-                user=user,
-                callbacks=callbacks
-            )
+                message=prompt_message,
+                usage=usage if usage else LLMUsage.empty_usage(),
+                system_fingerprint=system_fingerprint
+            ),
+            credentials=credentials,
+            prompt_messages=prompt_messages,
+            model_parameters=model_parameters,
+            tools=tools,
+            stop=stop,
+            stream=stream,
+            user=user,
+            callbacks=callbacks
+        )
 
     @abstractmethod
     def _invoke(self, model: str, credentials: dict,
@@ -723,89 +723,89 @@ if you are not sure about the structure.
                                             tools: Optional[list[PromptMessageTool]] = None,
                                             stop: Optional[list[str]] = None, stream: bool = True,
                                             user: Optional[str] = None, callbacks: list[Callback] = None) -> None:
-            """
-            触发调用后回调
+        """
+        触发调用后回调
 
-            :param model: 模型名称
-            :param result: 结果
-            :param credentials: 模型凭证
-            :param prompt_messages: 提示信息
-            :param model_parameters: 模型参数
-            :param tools: 工具调用支持
-            :param stop: 停止词
-            :param stream: 是否为流式响应
-            :param user: 唯一用户ID
-            :param callbacks: 回调列表
-            """
+        :param model: 模型名称
+        :param result: 结果
+        :param credentials: 模型凭证
+        :param prompt_messages: 提示信息
+        :param model_parameters: 模型参数
+        :param tools: 工具调用支持
+        :param stop: 停止词
+        :param stream: 是否为流式响应
+        :param user: 唯一用户ID
+        :param callbacks: 回调列表
+        """
 
-            # 如果存在回调列表，则遍历执行每个回调函数
-            if callbacks:
-                for callback in callbacks:
-                    try:
-                        # 执行回调函数的 on_after_invoke 方法，并传递相关参数
-                        callback.on_after_invoke(
-                            llm_instance=self,
-                            result=result,
-                            model=model,
-                            credentials=credentials,
-                            prompt_messages=prompt_messages,
-                            model_parameters=model_parameters,
-                            tools=tools,
-                            stop=stop,
-                            stream=stream,
-                            user=user
-                        )
-                    except Exception as e:
-                        # 根据回调函数的 raise_error 属性决定是否抛出异常
-                        if callback.raise_error:
-                            raise e
-                        else:
-                            # 如果不抛出异常，则记录警告信息
-                            logger.warning(f"Callback {callback.__class__.__name__} on_after_invoke failed with error {e}")
+        # 如果存在回调列表，则遍历执行每个回调函数
+        if callbacks:
+            for callback in callbacks:
+                try:
+                    # 执行回调函数的 on_after_invoke 方法，并传递相关参数
+                    callback.on_after_invoke(
+                        llm_instance=self,
+                        result=result,
+                        model=model,
+                        credentials=credentials,
+                        prompt_messages=prompt_messages,
+                        model_parameters=model_parameters,
+                        tools=tools,
+                        stop=stop,
+                        stream=stream,
+                        user=user
+                    )
+                except Exception as e:
+                    # 根据回调函数的 raise_error 属性决定是否抛出异常
+                    if callback.raise_error:
+                        raise e
+                    else:
+                        # 如果不抛出异常，则记录警告信息
+                        logger.warning(f"Callback {callback.__class__.__name__} on_after_invoke failed with error {e}")
 
     def _trigger_invoke_error_callbacks(self, model: str, ex: Exception, credentials: dict,
                                             prompt_messages: list[PromptMessage], model_parameters: dict,
                                             tools: Optional[list[PromptMessageTool]] = None,
                                             stop: Optional[list[str]] = None, stream: bool = True,
                                             user: Optional[str] = None, callbacks: list[Callback] = None) -> None:
-            """
-            触发调用错误回调函数
-            
-            :param model: 模型名称
-            :param ex: 异常对象
-            :param credentials: 模型认证信息
-            :param prompt_messages: 提示信息列表
-            :param model_parameters: 模型参数
-            :param tools: 工具列表，用于工具调用
-            :param stop: 停止词列表
-            :param stream: 是否为流式响应
-            :param user: 唯一用户ID
-            :param callbacks: 回调函数列表
-            """
+        """
+        触发调用错误回调函数
+        
+        :param model: 模型名称
+        :param ex: 异常对象
+        :param credentials: 模型认证信息
+        :param prompt_messages: 提示信息列表
+        :param model_parameters: 模型参数
+        :param tools: 工具列表，用于工具调用
+        :param stop: 停止词列表
+        :param stream: 是否为流式响应
+        :param user: 唯一用户ID
+        :param callbacks: 回调函数列表
+        """
 
-            # 如果存在回调函数，则遍历执行每个回调
-            if callbacks:
-                for callback in callbacks:
-                    try:
-                        # 执行回调函数的on_invoke_error方法，并传递相关参数
-                        callback.on_invoke_error(
-                            llm_instance=self,
-                            ex=ex,
-                            model=model,
-                            credentials=credentials,
-                            prompt_messages=prompt_messages,
-                            model_parameters=model_parameters,
-                            tools=tools,
-                            stop=stop,
-                            stream=stream,
-                            user=user
-                        )
-                    except Exception as e:
-                        # 如果回调函数设置为出现错误时抛出异常，则重新抛出错误；否则记录警告信息
-                        if callback.raise_error:
-                            raise e
-                        else:
-                            logger.warning(f"Callback {callback.__class__.__name__} on_invoke_error failed with error {e}")
+        # 如果存在回调函数，则遍历执行每个回调
+        if callbacks:
+            for callback in callbacks:
+                try:
+                    # 执行回调函数的on_invoke_error方法，并传递相关参数
+                    callback.on_invoke_error(
+                        llm_instance=self,
+                        ex=ex,
+                        model=model,
+                        credentials=credentials,
+                        prompt_messages=prompt_messages,
+                        model_parameters=model_parameters,
+                        tools=tools,
+                        stop=stop,
+                        stream=stream,
+                        user=user
+                    )
+                except Exception as e:
+                    # 如果回调函数设置为出现错误时抛出异常，则重新抛出错误；否则记录警告信息
+                    if callback.raise_error:
+                        raise e
+                    else:
+                        logger.warning(f"Callback {callback.__class__.__name__} on_invoke_error failed with error {e}")
 
     def _validate_and_filter_model_parameters(self, model: str, model_parameters: dict, credentials: dict) -> dict:
         """

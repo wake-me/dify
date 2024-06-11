@@ -205,39 +205,39 @@ class WorkflowConverter:
 
     def _convert_to_app_config(self, app_model: App,
                                 app_model_config: AppModelConfig) -> EasyUIBasedAppConfig:
-            """
-            将应用模型配置转换为对应的易于使用的应用配置。
-            
-            :param app_model: 应用模型，包含应用的配置和状态信息。
-            :param app_model_config: 应用模型配置，详细定义了应用的各种配置选项。
-            :return: 返回一个基于EasyUI的应用配置对象，根据应用的模式不同，返回的具体类型也不同。
-            """
-            # 根据应用模式获取对应的枚举值
-            app_mode = AppMode.value_of(app_model.mode)
-            if app_mode == AppMode.AGENT_CHAT or app_model.is_agent:
-                # 如果是代理聊天模式或设置为代理模式，则使用代理聊天应用配置
-                app_model.mode = AppMode.AGENT_CHAT.value
-                app_config = AgentChatAppConfigManager.get_app_config(
-                    app_model=app_model,
-                    app_model_config=app_model_config
-                )
-            elif app_mode == AppMode.CHAT:
-                # 如果是聊天模式，则使用聊天应用配置
-                app_config = ChatAppConfigManager.get_app_config(
-                    app_model=app_model,
-                    app_model_config=app_model_config
-                )
-            elif app_mode == AppMode.COMPLETION:
-                # 如果是完成模式，则使用完成应用配置
-                app_config = CompletionAppConfigManager.get_app_config(
-                    app_model=app_model,
-                    app_model_config=app_model_config
-                )
-            else:
-                # 如果没有有效的应用模式，则抛出异常
-                raise ValueError("Invalid app mode")
+        """
+        将应用模型配置转换为对应的易于使用的应用配置。
+        
+        :param app_model: 应用模型，包含应用的配置和状态信息。
+        :param app_model_config: 应用模型配置，详细定义了应用的各种配置选项。
+        :return: 返回一个基于EasyUI的应用配置对象，根据应用的模式不同，返回的具体类型也不同。
+        """
+        # 根据应用模式获取对应的枚举值
+        app_mode = AppMode.value_of(app_model.mode)
+        if app_mode == AppMode.AGENT_CHAT or app_model.is_agent:
+            # 如果是代理聊天模式或设置为代理模式，则使用代理聊天应用配置
+            app_model.mode = AppMode.AGENT_CHAT.value
+            app_config = AgentChatAppConfigManager.get_app_config(
+                app_model=app_model,
+                app_model_config=app_model_config
+            )
+        elif app_mode == AppMode.CHAT:
+            # 如果是聊天模式，则使用聊天应用配置
+            app_config = ChatAppConfigManager.get_app_config(
+                app_model=app_model,
+                app_model_config=app_model_config
+            )
+        elif app_mode == AppMode.COMPLETION:
+            # 如果是完成模式，则使用完成应用配置
+            app_config = CompletionAppConfigManager.get_app_config(
+                app_model=app_model,
+                app_model_config=app_model_config
+            )
+        else:
+            # 如果没有有效的应用模式，则抛出异常
+            raise ValueError("Invalid app mode")
 
-            return app_config
+        return app_config
 
     def _convert_to_start_node(self, variables: list[VariableEntity]) -> dict:
         """

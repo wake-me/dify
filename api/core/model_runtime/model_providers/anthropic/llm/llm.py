@@ -196,46 +196,46 @@ class AnthropicLargeLanguageModel(LargeLanguageModel):
                                     tools: list[PromptMessageTool] | None = None, stop: list[str] | None = None,
                                     stream: bool = True, user: str | None = None, response_format: str = 'JSON') \
                 -> None:
-            """
-            转换聊天的JSON提示信息
-            
-            该方法用于调整和转换与模型交互时的提示信息，确保消息格式符合指定的响应格式（如JSON）。
-            
-            :param model: 用于聊天的模型名称。
-            :param credentials: 访问模型所需的凭证信息。
-            :param prompt_messages: 待转换的提示消息列表。
-            :param model_parameters: 模型参数，用于调整模型的行为。
-            :param tools: 与提示信息一起使用的工具列表，可选。
-            :param stop: 用于终止聊天的信号词列表，可选。
-            :param stream: 是否以流的形式发送消息，True表示连续发送，False表示批量发送，默认为True。
-            :param user: 用户的标识信息，可选。
-            :param response_format: 希望接收的响应格式，默认为'JSON'。
-            :return: 无返回值。
-            """
-            
-            # 确保停止信号包含特定的markdown格式分隔符
-            if "```\n" not in stop:
-                stop.append("```\n")
-            if "\n```" not in stop:
-                stop.append("\n```")
+        """
+        转换聊天的JSON提示信息
+        
+        该方法用于调整和转换与模型交互时的提示信息，确保消息格式符合指定的响应格式（如JSON）。
+        
+        :param model: 用于聊天的模型名称。
+        :param credentials: 访问模型所需的凭证信息。
+        :param prompt_messages: 待转换的提示消息列表。
+        :param model_parameters: 模型参数，用于调整模型的行为。
+        :param tools: 与提示信息一起使用的工具列表，可选。
+        :param stop: 用于终止聊天的信号词列表，可选。
+        :param stream: 是否以流的形式发送消息，True表示连续发送，False表示批量发送，默认为True。
+        :param user: 用户的标识信息，可选。
+        :param response_format: 希望接收的响应格式，默认为'JSON'。
+        :return: 无返回值。
+        """
+        
+        # 确保停止信号包含特定的markdown格式分隔符
+        if "```\n" not in stop:
+            stop.append("```\n")
+        if "\n```" not in stop:
+            stop.append("\n```")
 
-            # 检查是否存在系统消息
-            if len(prompt_messages) > 0 and isinstance(prompt_messages[0], SystemPromptMessage):
-                # 如果存在系统消息，则覆盖系统消息内容，添加针对指定响应格式的指示
-                prompt_messages[0] = SystemPromptMessage(
-                    content=ANTHROPIC_BLOCK_MODE_PROMPT
-                    .replace("{{instructions}}", prompt_messages[0].content)
-                    .replace("{{block}}", response_format)
-                )
-                prompt_messages.append(AssistantPromptMessage(content=f"\n```{response_format}"))
-            else:
-                # 如果不存在系统消息，则插入一个系统消息，指示用户输出符合指定响应格式的对象
-                prompt_messages.insert(0, SystemPromptMessage(
-                    content=ANTHROPIC_BLOCK_MODE_PROMPT
-                    .replace("{{instructions}}", f"Please output a valid {response_format} object.")
-                    .replace("{{block}}", response_format)
-                ))
-                prompt_messages.append(AssistantPromptMessage(content=f"\n```{response_format}"))
+        # 检查是否存在系统消息
+        if len(prompt_messages) > 0 and isinstance(prompt_messages[0], SystemPromptMessage):
+            # 如果存在系统消息，则覆盖系统消息内容，添加针对指定响应格式的指示
+            prompt_messages[0] = SystemPromptMessage(
+                content=ANTHROPIC_BLOCK_MODE_PROMPT
+                .replace("{{instructions}}", prompt_messages[0].content)
+                .replace("{{block}}", response_format)
+            )
+            prompt_messages.append(AssistantPromptMessage(content=f"\n```{response_format}"))
+        else:
+            # 如果不存在系统消息，则插入一个系统消息，指示用户输出符合指定响应格式的对象
+            prompt_messages.insert(0, SystemPromptMessage(
+                content=ANTHROPIC_BLOCK_MODE_PROMPT
+                .replace("{{instructions}}", f"Please output a valid {response_format} object.")
+                .replace("{{block}}", response_format)
+            ))
+            prompt_messages.append(AssistantPromptMessage(content=f"\n```{response_format}"))
 
     def get_num_tokens(self, model: str, credentials: dict, prompt_messages: list[PromptMessage],
                        tools: Optional[list[PromptMessageTool]] = None) -> int:
@@ -421,7 +421,7 @@ class AnthropicLargeLanguageModel(LargeLanguageModel):
                 chunk_text = chunk.delta.text if chunk.delta.text else ''
                 full_assistant_content += chunk_text
 
-                    # 将助手消息转换为提示消息
+                # 将助手消息转换为提示消息
                 assistant_prompt_message = AssistantPromptMessage(
                     content=chunk_text
                 )

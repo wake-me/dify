@@ -163,40 +163,40 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
                                                 node_title: str,
                                                 node_run_index: int = 1,
                                                 predecessor_node_id: Optional[str] = None) -> WorkflowNodeExecution:
-            """
-            从工作流运行初始化工作流节点执行
-            :param workflow_run: 工作流运行实例
-            :param node_id: 节点ID
-            :param node_type: 节点类型
-            :param node_title: 节点标题
-            :param node_run_index: 执行索引，默认为1
-            :param predecessor_node_id: 前驱节点ID，如果存在
-            :return: 初始化后的工作流节点执行实例
-            """
-            # 初始化工作流节点执行信息
-            workflow_node_execution = WorkflowNodeExecution(
-                tenant_id=workflow_run.tenant_id,
-                app_id=workflow_run.app_id,
-                workflow_id=workflow_run.workflow_id,
-                triggered_from=WorkflowNodeExecutionTriggeredFrom.WORKFLOW_RUN.value,
-                workflow_run_id=workflow_run.id,
-                predecessor_node_id=predecessor_node_id,
-                index=node_run_index,
-                node_id=node_id,
-                node_type=node_type.value,
-                title=node_title,
-                status=WorkflowNodeExecutionStatus.RUNNING.value,
-                created_by_role=workflow_run.created_by_role,
-                created_by=workflow_run.created_by
-            )
+        """
+        从工作流运行初始化工作流节点执行
+        :param workflow_run: 工作流运行实例
+        :param node_id: 节点ID
+        :param node_type: 节点类型
+        :param node_title: 节点标题
+        :param node_run_index: 执行索引，默认为1
+        :param predecessor_node_id: 前驱节点ID，如果存在
+        :return: 初始化后的工作流节点执行实例
+        """
+        # 初始化工作流节点执行信息
+        workflow_node_execution = WorkflowNodeExecution(
+            tenant_id=workflow_run.tenant_id,
+            app_id=workflow_run.app_id,
+            workflow_id=workflow_run.workflow_id,
+            triggered_from=WorkflowNodeExecutionTriggeredFrom.WORKFLOW_RUN.value,
+            workflow_run_id=workflow_run.id,
+            predecessor_node_id=predecessor_node_id,
+            index=node_run_index,
+            node_id=node_id,
+            node_type=node_type.value,
+            title=node_title,
+            status=WorkflowNodeExecutionStatus.RUNNING.value,
+            created_by_role=workflow_run.created_by_role,
+            created_by=workflow_run.created_by
+        )
 
-            # 将节点执行实例添加到数据库会话并提交
-            db.session.add(workflow_node_execution)
-            db.session.commit()
-            db.session.refresh(workflow_node_execution)  # 刷新实体以获取刚插入的ID等信息
-            db.session.close()  # 关闭数据库会话
+        # 将节点执行实例添加到数据库会话并提交
+        db.session.add(workflow_node_execution)
+        db.session.commit()
+        db.session.refresh(workflow_node_execution)  # 刷新实体以获取刚插入的ID等信息
+        db.session.close()  # 关闭数据库会话
 
-            return workflow_node_execution  # 返回初始化的工作流节点执行实例
+        return workflow_node_execution  # 返回初始化的工作流节点执行实例
 
     def _workflow_node_execution_success(self, workflow_node_execution: WorkflowNodeExecution,
                                             start_at: float,
@@ -204,36 +204,36 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
                                             process_data: Optional[dict] = None,
                                             outputs: Optional[dict] = None,
                                             execution_metadata: Optional[dict] = None) -> WorkflowNodeExecution:
-            """
-            处理工作流节点执行成功的情况。
-            
-            :param workflow_node_execution: 工作流节点执行实例
-            :param start_at: 执行开始时间（秒）
-            :param inputs: 输入参数
-            :param process_data: 处理数据
-            :param outputs: 输出结果
-            :param execution_metadata: 执行元数据
-            :return: 更新后的工作流节点执行实例
-            """
-            # 处理输入和输出中的特殊值
-            inputs = WorkflowEngineManager.handle_special_values(inputs)
-            outputs = WorkflowEngineManager.handle_special_values(outputs)
+        """
+        处理工作流节点执行成功的情况。
+        
+        :param workflow_node_execution: 工作流节点执行实例
+        :param start_at: 执行开始时间（秒）
+        :param inputs: 输入参数
+        :param process_data: 处理数据
+        :param outputs: 输出结果
+        :param execution_metadata: 执行元数据
+        :return: 更新后的工作流节点执行实例
+        """
+        # 处理输入和输出中的特殊值
+        inputs = WorkflowEngineManager.handle_special_values(inputs)
+        outputs = WorkflowEngineManager.handle_special_values(outputs)
 
-            workflow_node_execution.status = WorkflowNodeExecutionStatus.SUCCEEDED.value
-            workflow_node_execution.elapsed_time = time.perf_counter() - start_at
-            workflow_node_execution.inputs = json.dumps(inputs) if inputs else None
-            workflow_node_execution.process_data = json.dumps(process_data) if process_data else None
-            workflow_node_execution.outputs = json.dumps(outputs) if outputs else None
-            workflow_node_execution.execution_metadata = json.dumps(jsonable_encoder(execution_metadata)) \
-                if execution_metadata else None 
-            workflow_node_execution.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        workflow_node_execution.status = WorkflowNodeExecutionStatus.SUCCEEDED.value
+        workflow_node_execution.elapsed_time = time.perf_counter() - start_at
+        workflow_node_execution.inputs = json.dumps(inputs) if inputs else None
+        workflow_node_execution.process_data = json.dumps(process_data) if process_data else None
+        workflow_node_execution.outputs = json.dumps(outputs) if outputs else None
+        workflow_node_execution.execution_metadata = json.dumps(jsonable_encoder(execution_metadata)) \
+            if execution_metadata else None 
+        workflow_node_execution.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-            # 提交数据库事务并关闭数据库会话
-            db.session.commit()
-            db.session.refresh(workflow_node_execution)
-            db.session.close()
+        # 提交数据库事务并关闭数据库会话
+        db.session.commit()
+        db.session.refresh(workflow_node_execution)
+        db.session.close()
 
-            return workflow_node_execution
+        return workflow_node_execution
 
     def _workflow_node_execution_failed(self, workflow_node_execution: WorkflowNodeExecution,
                                         start_at: float,
@@ -293,52 +293,52 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
 
     def _workflow_finish_to_stream_response(self, task_id: str,
                                                 workflow_run: WorkflowRun) -> WorkflowFinishStreamResponse:
-            """
-            将工作流完成信息转换为流响应。
-            :param task_id: 任务ID
-            :param workflow_run: 工作流运行实例
-            :return: 返回工作流完成的流响应实例
-            """
-            created_by = None
-            # 根据创建者角色，设置创建者信息
-            if workflow_run.created_by_role == CreatedByRole.ACCOUNT.value:
-                # 如果是由账户创建的工作流，提取账户创建者信息
-                created_by_account = workflow_run.created_by_account
-                if created_by_account:
-                    created_by = {
-                        "id": created_by_account.id,
-                        "name": created_by_account.name,
-                        "email": created_by_account.email,
-                    }
-            else:
-                # 如果是由终端用户创建的工作流，提取终端用户创建者信息
-                created_by_end_user = workflow_run.created_by_end_user
-                if created_by_end_user:
-                    created_by = {
-                        "id": created_by_end_user.id,
-                        "user": created_by_end_user.session_id,
-                    }
+        """
+        将工作流完成信息转换为流响应。
+        :param task_id: 任务ID
+        :param workflow_run: 工作流运行实例
+        :return: 返回工作流完成的流响应实例
+        """
+        created_by = None
+        # 根据创建者角色，设置创建者信息
+        if workflow_run.created_by_role == CreatedByRole.ACCOUNT.value:
+            # 如果是由账户创建的工作流，提取账户创建者信息
+            created_by_account = workflow_run.created_by_account
+            if created_by_account:
+                created_by = {
+                    "id": created_by_account.id,
+                    "name": created_by_account.name,
+                    "email": created_by_account.email,
+                }
+        else:
+            # 如果是由终端用户创建的工作流，提取终端用户创建者信息
+            created_by_end_user = workflow_run.created_by_end_user
+            if created_by_end_user:
+                created_by = {
+                    "id": created_by_end_user.id,
+                    "user": created_by_end_user.session_id,
+                }
 
-            # 构建并返回工作流完成的流响应实例
-            return WorkflowFinishStreamResponse(
-                task_id=task_id,
-                workflow_run_id=workflow_run.id,
-                data=WorkflowFinishStreamResponse.Data(
-                    id=workflow_run.id,
-                    workflow_id=workflow_run.workflow_id,
-                    sequence_number=workflow_run.sequence_number,
-                    status=workflow_run.status,
-                    outputs=workflow_run.outputs_dict,
-                    error=workflow_run.error,
-                    elapsed_time=workflow_run.elapsed_time,
-                    total_tokens=workflow_run.total_tokens,
-                    total_steps=workflow_run.total_steps,
-                    created_by=created_by,
-                    created_at=int(workflow_run.created_at.timestamp()),
-                    finished_at=int(workflow_run.finished_at.timestamp()),
-                    files=self._fetch_files_from_node_outputs(workflow_run.outputs_dict)
-                )
+        # 构建并返回工作流完成的流响应实例
+        return WorkflowFinishStreamResponse(
+            task_id=task_id,
+            workflow_run_id=workflow_run.id,
+            data=WorkflowFinishStreamResponse.Data(
+                id=workflow_run.id,
+                workflow_id=workflow_run.workflow_id,
+                sequence_number=workflow_run.sequence_number,
+                status=workflow_run.status,
+                outputs=workflow_run.outputs_dict,
+                error=workflow_run.error,
+                elapsed_time=workflow_run.elapsed_time,
+                total_tokens=workflow_run.total_tokens,
+                total_steps=workflow_run.total_steps,
+                created_by=created_by,
+                created_at=int(workflow_run.created_at.timestamp()),
+                finished_at=int(workflow_run.finished_at.timestamp()),
+                files=self._fetch_files_from_node_outputs(workflow_run.outputs_dict)
             )
+        )
 
     def _workflow_node_start_to_stream_response(self, event: QueueNodeStartedEvent,
                                                 task_id: str,
