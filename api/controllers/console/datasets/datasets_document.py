@@ -332,8 +332,8 @@ class DatasetDocumentListApi(Resource):
         if not dataset:
             raise NotFound('Dataset not found.')
 
-        # 检查当前用户是否具有在ta表中为管理员或所有者的角色
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
             raise Forbidden()
 
         try:
@@ -390,32 +390,8 @@ class DatasetInitApi(Resource):
     @marshal_with(dataset_and_document_fields)
     @cloud_edition_billing_resource_check('vector_space')
     def post(self):
-        """
-        创建一个新的数据集并上传文档。
-        
-        要求用户已登录、账号已初始化，且满足云版本的资源检查条件。用户必须是管理员或所有者。
-        
-        参数:
-        - indexing_technique: 索引技术类型，必须是预定义列表中的值。
-        - data_source: 数据源信息，为一个字典。
-        - process_rule: 处理规则，为一个字典。
-        - doc_form: 文档形式，默认为'text_model'。
-        - doc_language: 文档语言，默认为'English'。
-        - retrieval_model: 检索模型配置，为一个字典。
-        
-        返回:
-        - 'dataset': 创建的数据集信息。
-        - 'documents': 上传的文档信息。
-        - 'batch': 批处理信息。
-        
-        抛出:
-        - Forbidden: 如果当前用户不是管理员或所有者。
-        - ProviderNotInitializeError: 如果提供者未初始化。
-        - ProviderQuotaExceededError: 如果达到提供者的配额限制。
-        - ProviderModelCurrentlyNotSupportError: 如果当前模型不被支持。
-        """
-        # 检查当前用户是否具有管理员或所有者角色
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
             raise Forbidden()
 
         # 解析请求参数
@@ -659,6 +635,20 @@ class DocumentBatchIndexingEstimateApi(DocumentResource):
                         "notion_obj_id": data_source_info['notion_page_id'],
                         "notion_page_type": data_source_info['type'],
                         "tenant_id": current_user.current_tenant_id
+                    },
+                    document_model=document.doc_form
+                )
+                extract_settings.append(extract_setting)
+            elif document.data_source_type == 'website_crawl':
+                extract_setting = ExtractSetting(
+                    datasource_type="website_crawl",
+                    website_info={
+                        "provider": data_source_info['provider'],
+                        "job_id": data_source_info['job_id'],
+                        "url": data_source_info['url'],
+                        "tenant_id": current_user.current_tenant_id,
+                        "mode": data_source_info['mode'],
+                        "only_main_content": data_source_info['only_main_content']
                     },
                     document_model=document.doc_form
                 )
@@ -920,8 +910,8 @@ class DocumentProcessingApi(DocumentResource):
         document_id = str(document_id)
         document = self.get_document(dataset_id, document_id)
 
-        # 检查当前用户是否有权限（必须是管理员或所有者）
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
             raise Forbidden()
 
         # 根据传入的action执行相应的操作
@@ -1030,8 +1020,8 @@ class DocumentMetadataApi(DocumentResource):
         doc_type = req_data.get('doc_type')
         doc_metadata = req_data.get('doc_metadata')
 
-        # 检查当前用户是否有权限进行操作
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
             raise Forbidden()
 
         # 确保文档类型和元数据都已提供
@@ -1114,8 +1104,8 @@ class DocumentStatusApi(DocumentResource):
         # 获取文档对象
         document = self.get_document(dataset_id, document_id)
 
-        # 检查当前用户是否有权限操作文档
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
             raise Forbidden()
 
         # 检查文档是否正在被索引
@@ -1370,6 +1360,33 @@ class DocumentRenameApi(DocumentResource):
         return document
 
 
+class WebsiteDocumentSyncApi(DocumentResource):
+    @setup_required
+    @login_required
+    @account_initialization_required
+    def get(self, dataset_id, document_id):
+        """sync website document."""
+        dataset_id = str(dataset_id)
+        dataset = DatasetService.get_dataset(dataset_id)
+        if not dataset:
+            raise NotFound('Dataset not found.')
+        document_id = str(document_id)
+        document = DocumentService.get_document(dataset.id, document_id)
+        if not document:
+            raise NotFound('Document not found.')
+        if document.tenant_id != current_user.current_tenant_id:
+            raise Forbidden('No permission.')
+        if document.data_source_type != 'website_crawl':
+            raise ValueError('Document is not a website document.')
+        # 403 if document is archived
+        if DocumentService.check_archived(document):
+            raise ArchivedDocumentImmutableError()
+        # sync document
+        DocumentService.sync_website_document(dataset_id, document)
+
+        return {'result': 'success'}, 200
+
+
 api.add_resource(GetProcessRuleApi, '/datasets/process-rule')
 api.add_resource(DatasetDocumentListApi,
                  '/datasets/<uuid:dataset_id>/documents')
@@ -1398,3 +1415,5 @@ api.add_resource(DocumentRecoverApi, '/datasets/<uuid:dataset_id>/documents/<uui
 api.add_resource(DocumentRetryApi, '/datasets/<uuid:dataset_id>/retry')
 api.add_resource(DocumentRenameApi,
                  '/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/rename')
+
+api.add_resource(WebsiteDocumentSyncApi, '/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/website-sync')

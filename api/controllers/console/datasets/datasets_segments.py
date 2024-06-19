@@ -170,9 +170,8 @@ class DatasetDocumentSegmentApi(Resource):
 
         # 检查用户的数据集模型设置
         DatasetService.check_dataset_model_setting(dataset)
-
-        # 当前用户在ta表中的角色必须是admin或owner
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
             raise Forbidden()
 
         try:
@@ -402,8 +401,8 @@ class DatasetDocumentSegmentUpdateApi(Resource):
         ).first()
         if not segment:
             raise NotFound('Segment not found.')
-        # 验证当前用户是否有足够的权限
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
             raise Forbidden()
         try:
             DatasetService.check_dataset_permission(dataset, current_user)

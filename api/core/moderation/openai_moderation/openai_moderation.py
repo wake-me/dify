@@ -57,14 +57,8 @@ class OpenAIModeration(Moderation):
         return ModerationOutputsResult(flagged=flagged, action=ModerationAction.DIRECT_OUTPUT, preset_response=preset_response)
 
     def _is_violated(self, inputs: dict):
-        """
-        检查输入内容是否违规。
-
-        :param inputs: 待检查的输入字典
-        :return: 返回是否违规的判断结果
-        """
-        text = '\n'.join(inputs.values())  # 将输入字典的值合并为文本字符串
-        model_manager = ModelManager()  # 获取模型管理器实例
+        text = '\n'.join(str(inputs.values()))
+        model_manager = ModelManager()
         model_instance = model_manager.get_model_instance(
             tenant_id=self.tenant_id,
             provider="openai",

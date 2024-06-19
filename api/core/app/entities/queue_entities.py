@@ -1,14 +1,14 @@
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel, validator
+from pydantic import BaseModel, field_validator
 
 from core.model_runtime.entities.llm_entities import LLMResult, LLMResultChunk
 from core.workflow.entities.base_node_data_entities import BaseNodeData
 from core.workflow.entities.node_entities import NodeType
 
 
-class QueueEvent(Enum):
+class QueueEvent(str, Enum):
     """
     队列事件枚举类，用于定义不同类型的队列事件。
 
@@ -66,14 +66,14 @@ class QueueLLMChunkEvent(AppQueueEvent):
     """
     LLM数据块队列事件实体类
     """
-    event = QueueEvent.LLM_CHUNK
+    event: QueueEvent = QueueEvent.LLM_CHUNK
     chunk: LLMResultChunk
 
 class QueueIterationStartEvent(AppQueueEvent):
     """
     QueueIterationStartEvent entity
     """
-    event = QueueEvent.ITERATION_START
+    event: QueueEvent = QueueEvent.ITERATION_START
     node_id: str
     node_type: NodeType
     node_data: BaseNodeData
@@ -87,16 +87,17 @@ class QueueIterationNextEvent(AppQueueEvent):
     """
     QueueIterationNextEvent entity
     """
-    event = QueueEvent.ITERATION_NEXT
+    event: QueueEvent = QueueEvent.ITERATION_NEXT
 
     index: int
     node_id: str
     node_type: NodeType
 
     node_run_index: int
-    output: Optional[Any] # output for the current iteration
+    output: Optional[Any] = None # output for the current iteration
 
-    @validator('output', pre=True, always=True)
+    @field_validator('output', mode='before')
+    @classmethod
     def set_output(cls, v):
         """
         Set output
@@ -111,7 +112,7 @@ class QueueIterationCompletedEvent(AppQueueEvent):
     """
     QueueIterationCompletedEvent entity
     """
-    event = QueueEvent.ITERATION_COMPLETED
+    event:QueueEvent = QueueEvent.ITERATION_COMPLETED
 
     node_id: str
     node_type: NodeType
@@ -123,16 +124,17 @@ class QueueTextChunkEvent(AppQueueEvent):
     """
     文本数据块队列事件实体类
     """
-    event = QueueEvent.TEXT_CHUNK  # 定义事件类型为文本数据块
-    text: str  # 包含的文本数据
-    metadata: Optional[dict] = None  # 可选的元数据信息
+    event: QueueEvent = QueueEvent.TEXT_CHUNK
+    text: str
+    metadata: Optional[dict] = None
+
 
 class QueueAgentMessageEvent(AppQueueEvent):
     """
     代理消息队列事件实体类
     """
-    event = QueueEvent.AGENT_MESSAGE  # 定义事件类型为代理消息
-    chunk: LLMResultChunk  # 包含的LLM结果数据块
+    event: QueueEvent = QueueEvent.AGENT_MESSAGE
+    chunk: LLMResultChunk
 
     
 class QueueMessageReplaceEvent(AppQueueEvent):
@@ -143,8 +145,7 @@ class QueueMessageReplaceEvent(AppQueueEvent):
     属性:
     text: str - 要替换的消息文本
     """
-
-    event = QueueEvent.MESSAGE_REPLACE
+    event: QueueEvent = QueueEvent.MESSAGE_REPLACE
     text: str
 
 
@@ -156,8 +157,7 @@ class QueueRetrieverResourcesEvent(AppQueueEvent):
     属性:
     retriever_resources: list[dict] - 检索到的资源列表，每个资源为一个字典
     """
-
-    event = QueueEvent.RETRIEVER_RESOURCES
+    event: QueueEvent = QueueEvent.RETRIEVER_RESOURCES
     retriever_resources: list[dict]
 
 
@@ -169,8 +169,7 @@ class QueueAnnotationReplyEvent(AppQueueEvent):
     属性:
     message_annotation_id: str - 消息注解的ID
     """
-
-    event = QueueEvent.ANNOTATION_REPLY
+    event: QueueEvent = QueueEvent.ANNOTATION_REPLY
     message_annotation_id: str
 
 
@@ -182,8 +181,7 @@ class QueueMessageEndEvent(AppQueueEvent):
     属性:
     llm_result: Optional[LLMResult] - LLM（Large Language Model）处理结果，可能为空
     """
-
-    event = QueueEvent.MESSAGE_END
+    event: QueueEvent = QueueEvent.MESSAGE_END
     llm_result: Optional[LLMResult] = None
 
 
@@ -195,29 +193,32 @@ class QueueAdvancedChatMessageEndEvent(AppQueueEvent):
     属性:
         event (QueueEvent): 事件类型，此处为QueueEvent.ADVANCED_CHAT_MESSAGE_END。
     """
-    event = QueueEvent.ADVANCED_CHAT_MESSAGE_END
+    event: QueueEvent = QueueEvent.ADVANCED_CHAT_MESSAGE_END
+
 
 class QueueWorkflowStartedEvent(AppQueueEvent):
     """
     QueueWorkflowStartedEvent 实体类
     代表队列工作流开始事件
     """
-    event = QueueEvent.WORKFLOW_STARTED  # 指定事件类型为工作流开始
+    event: QueueEvent = QueueEvent.WORKFLOW_STARTED
+
 
 class QueueWorkflowSucceededEvent(AppQueueEvent):
     """
     QueueWorkflowSucceededEvent 实体类
     代表队列工作流成功完成事件
     """
-    event = QueueEvent.WORKFLOW_SUCCEEDED  # 指定事件类型为工作流成功
+    event: QueueEvent = QueueEvent.WORKFLOW_SUCCEEDED
+
 
 class QueueWorkflowFailedEvent(AppQueueEvent):
     """
     QueueWorkflowFailedEvent 实体类
     代表队列工作流失败事件
     """
-    event = QueueEvent.WORKFLOW_FAILED  # 指定事件类型为工作流失败
-    error: str  # 错误信息，记录工作流失败的具体原因
+    event: QueueEvent = QueueEvent.WORKFLOW_FAILED
+    error: str
 
 
 class QueueNodeStartedEvent(AppQueueEvent):
@@ -232,7 +233,7 @@ class QueueNodeStartedEvent(AppQueueEvent):
     - node_run_index: 节点运行的索引，默认为 1，表示第一次运行。
     - predecessor_node_id: 前驱节点的ID，可选，默认为 None。
     """
-    event = QueueEvent.NODE_STARTED  # 指定事件类型为节点开始事件
+    event: QueueEvent = QueueEvent.NODE_STARTED
 
     node_id: str
     node_type: NodeType
@@ -256,7 +257,7 @@ class QueueNodeSucceededEvent(AppQueueEvent):
     - execution_metadata: 执行元数据字典，记录了节点执行的相关元数据，如执行时间、执行者等（可选）。
     - error: 错误信息，如果在节点执行过程中发生错误，则会记录错误信息（可选）。
     """
-    event = QueueEvent.NODE_SUCCEEDED  # 事件类型，表示节点成功
+    event: QueueEvent = QueueEvent.NODE_SUCCEEDED
 
     node_id: str
     node_type: NodeType
@@ -284,7 +285,7 @@ class QueueNodeFailedEvent(AppQueueEvent):
     - process_data: 节点处理过程中的数据，为字典类型，可为空。
     - error: 错误信息，描述节点失败的原因。
     """
-    event = QueueEvent.NODE_FAILED  # 事件类型：节点失败
+    event: QueueEvent = QueueEvent.NODE_FAILED
 
     node_id: str
     node_type: NodeType
@@ -306,7 +307,7 @@ class QueueAgentThoughtEvent(AppQueueEvent):
     event (QueueEvent): 事件类型，此处为 AGENT_THOUGHT
     agent_thought_id (str): 代理思考事件的唯一标识符
     """
-    event = QueueEvent.AGENT_THOUGHT
+    event: QueueEvent = QueueEvent.AGENT_THOUGHT
     agent_thought_id: str
 
 
@@ -319,7 +320,7 @@ class QueueMessageFileEvent(AppQueueEvent):
     event (QueueEvent): 事件类型，此处为 MESSAGE_FILE
     message_file_id (str): 消息文件的唯一标识符
     """
-    event = QueueEvent.MESSAGE_FILE
+    event: QueueEvent = QueueEvent.MESSAGE_FILE
     message_file_id: str
 
 
@@ -332,15 +333,16 @@ class QueueErrorEvent(AppQueueEvent):
     event (QueueEvent): 事件类型，此处为 ERROR
     error (Any): 错误信息或异常对象
     """
-    event = QueueEvent.ERROR
-    error: Any
+    event: QueueEvent = QueueEvent.ERROR
+    error: Any = None
 
 
 class QueuePingEvent(AppQueueEvent):
     """
     QueuePingEvent 实体类，用于表示队列中的 Ping 事件。
     """
-    event = QueueEvent.PING  # 事件类型为 Ping
+    event: QueueEvent = QueueEvent.PING
+
 
 class QueueStopEvent(AppQueueEvent):
     """
@@ -355,8 +357,9 @@ class QueueStopEvent(AppQueueEvent):
         OUTPUT_MODERATION = "output-moderation"  # 输出审核停止
         INPUT_MODERATION = "input-moderation"  # 输入审核停止
 
-    event = QueueEvent.STOP  # 事件类型为停止
-    stopped_by: StopBy  # 停止原因枚举
+    event: QueueEvent = QueueEvent.STOP
+    stopped_by: StopBy
+
 
 class QueueMessage(BaseModel):
     """

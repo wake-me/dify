@@ -14,7 +14,7 @@ from io import BufferedReader, BytesIO
 from pathlib import PurePath
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 PathLike = Union[str, PurePath]
 
@@ -28,16 +28,15 @@ class Blob(BaseModel):
     受启发于：https://developer.mozilla.org/en-US/docs/Web/API/Blob
     """
 
-    data: Union[bytes, str, None]  # 原始数据
-    mimetype: Optional[str] = None  # 不要与文件扩展名混淆
-    encoding: str = "utf-8"  # 默认使用utf-8编码，如果需要将数据解码为字符串
-    path: Optional[PathLike] = None  # 原始内容所在的位置
-    # 代表本地文件系统上的位置
-    # 对于下游代码假设必须使用文件路径而不是内存中的内容的情况很有用
-
-    class Config:
-        arbitrary_types_allowed = True
-        frozen = True  # 禁止模型实例修改
+    data: Union[bytes, str, None] = None  # Raw data
+    mimetype: Optional[str] = None  # Not to be confused with a file extension
+    encoding: str = "utf-8"  # Use utf-8 as default encoding, if decoding to string
+    # Location where the original content was found
+    # Represent location on the local file system
+    # Useful for situations where downstream code assumes it must work with file paths
+    # rather than in-memory content.
+    path: Optional[PathLike] = None
+    model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
     @property
     def source(self) -> Optional[str]:
@@ -46,7 +45,8 @@ class Blob(BaseModel):
         """
         return str(self.path) if self.path else None
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def check_blob_is_valid(cls, values: Mapping[str, Any]) -> Mapping[str, Any]:
         """
         验证是否提供了data或path。

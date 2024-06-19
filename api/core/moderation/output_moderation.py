@@ -4,7 +4,7 @@ import time
 from typing import Any, Optional
 
 from flask import Flask, current_app
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from core.app.apps.base_app_queue_manager import AppQueueManager, PublishFrom
 from core.app.entities.queue_entities import QueueMessageReplaceEvent
@@ -29,14 +29,12 @@ class OutputModeration(BaseModel):
     rule: ModerationRule  # 中介规则
     queue_manager: AppQueueManager  # 队列管理器
 
-    thread: Optional[threading.Thread] = None  # 工作线程
-    thread_running: bool = True  # 线程运行标志
-    buffer: str = ''  # 缓冲区字符串
-    is_final_chunk: bool = False  # 是否为最终数据块标志
-    final_output: Optional[str] = None  # 最终输出结果
-
-    class Config:
-        arbitrary_types_allowed = True  # 允许任意类型配置
+    thread: Optional[threading.Thread] = None
+    thread_running: bool = True
+    buffer: str = ''
+    is_final_chunk: bool = False
+    final_output: Optional[str] = None
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def should_direct_output(self):
         """

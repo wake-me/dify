@@ -401,17 +401,10 @@ class IndexingRunner:
             "preview": preview_texts
         }
 
-    def _extract(self, index_processor: BaseIndexProcessor, dataset_document: DatasetDocument, process_rule: dict) -> list[Document]:
-        """
-        根据提供的数据集文档和处理规则，提取文本信息并返回文档列表。
-        
-        :param index_processor: 用于提取数据的索引处理器，必须是 BaseIndexProcessor 的子类。
-        :param dataset_document: 包含数据集信息的文档对象。
-        :param process_rule: 包含处理规则的字典，用于指导文本的提取。
-        :return: 文本提取后的文档列表，每个文档是 Document 类型。
-        """
-        # 加载文件，根据数据源类型处理
-        if dataset_document.data_source_type not in ["upload_file", "notion_import"]:
+    def _extract(self, index_processor: BaseIndexProcessor, dataset_document: DatasetDocument, process_rule: dict) \
+            -> list[Document]:
+        # load file
+        if dataset_document.data_source_type not in ["upload_file", "notion_import", "website_crawl"]:
             return []
 
         data_source_info = dataset_document.data_source_info_dict
@@ -449,8 +442,24 @@ class IndexingRunner:
                 document_model=dataset_document.doc_form
             )
             text_docs = index_processor.extract(extract_setting, process_rule_mode=process_rule['mode'])
-
-        # 更新文档索引状态为正在分割
+        elif dataset_document.data_source_type == 'website_crawl':
+            if (not data_source_info or 'provider' not in data_source_info
+                    or 'url' not in data_source_info or 'job_id' not in data_source_info):
+                raise ValueError("no website import info found")
+            extract_setting = ExtractSetting(
+                datasource_type="website_crawl",
+                website_info={
+                    "provider": data_source_info['provider'],
+                    "job_id": data_source_info['job_id'],
+                    "tenant_id": dataset_document.tenant_id,
+                    "url": data_source_info['url'],
+                    "mode": data_source_info['mode'],
+                    "only_main_content": data_source_info['only_main_content']
+                },
+                document_model=dataset_document.doc_form
+            )
+            text_docs = index_processor.extract(extract_setting, process_rule_mode=process_rule['mode'])
+        # update document status to splitting
         self._update_document_index_status(
             document_id=dataset_document.id,
             after_indexing_status="splitting",
@@ -684,8 +693,7 @@ class IndexingRunner:
                 document_qa_list = self.format_split_text(response)
                 qa_documents = []
                 for result in document_qa_list:
-                    # 创建问答文档对象并填充数据
-                    qa_document = Document(page_content=result['question'], metadata=document_node.metadata.copy())
+                    qa_document = Document(page_content=result['question'], metadata=document_node.metadata.model_copy())
                     doc_id = str(uuid.uuid4())
                     hash = helper.generate_text_hash(result['question'])
                     qa_document.metadata['answer'] = result['answer']

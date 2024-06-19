@@ -55,7 +55,7 @@ class AgentChatAppRunner(AppRunner):
 
         self.get_pre_calculate_rest_tokens(
             app_record=app_record,
-            model_config=application_generate_entity.model_config,
+            model_config=application_generate_entity.model_conf,
             prompt_template_entity=app_config.prompt_template,
             inputs=inputs,
             files=files,
@@ -66,8 +66,8 @@ class AgentChatAppRunner(AppRunner):
         memory = None
         if application_generate_entity.conversation_id:
             model_instance = ModelInstance(
-                provider_model_bundle=application_generate_entity.model_config.provider_model_bundle,
-                model=application_generate_entity.model_config.model
+                provider_model_bundle=application_generate_entity.model_conf.provider_model_bundle,
+                model=application_generate_entity.model_conf.model
             )
 
             memory = TokenBufferMemory(
@@ -78,7 +78,7 @@ class AgentChatAppRunner(AppRunner):
         # 组织输入和模板到提示消息中
         prompt_messages, _ = self.organize_prompt_messages(
             app_record=app_record,
-            model_config=application_generate_entity.model_config,
+            model_config=application_generate_entity.model_conf,
             prompt_template_entity=app_config.prompt_template,
             inputs=inputs,
             files=files,
@@ -144,7 +144,7 @@ class AgentChatAppRunner(AppRunner):
         # 重新组织输入和模板到提示消息中，包括外部数据和数据集上下文
         prompt_messages, _ = self.organize_prompt_messages(
             app_record=app_record,
-            model_config=application_generate_entity.model_config,
+            model_config=application_generate_entity.model_conf,
             prompt_template_entity=app_config.prompt_template,
             inputs=inputs,
             files=files,
@@ -173,12 +173,12 @@ class AgentChatAppRunner(AppRunner):
 
         # 初始化模型实例
         model_instance = ModelInstance(
-            provider_model_bundle=application_generate_entity.model_config.provider_model_bundle,
-            model=application_generate_entity.model_config.model
+            provider_model_bundle=application_generate_entity.model_conf.provider_model_bundle,
+            model=application_generate_entity.model_conf.model
         )
         prompt_message, _ = self.organize_prompt_messages(
             app_record=app_record,
-            model_config=application_generate_entity.model_config,
+            model_config=application_generate_entity.model_conf,
             prompt_template_entity=app_config.prompt_template,
             inputs=inputs,
             files=files,
@@ -217,7 +217,7 @@ class AgentChatAppRunner(AppRunner):
             application_generate_entity=application_generate_entity,
             conversation=conversation,
             app_config=app_config,
-            model_config=application_generate_entity.model_config,
+            model_config=application_generate_entity.model_conf,
             config=agent_entity,
             queue_manager=queue_manager,
             message=message,

@@ -16,7 +16,7 @@ from extensions.ext_database import db
 from fields.data_source_fields import integrate_list_fields, integrate_notion_info_list_fields
 from libs.login import login_required
 from models.dataset import Document
-from models.source import DataSourceBinding
+from models.source import DataSourceOauthBinding
 from services.dataset_service import DatasetService, DocumentService
 from tasks.document_indexing_sync_task import document_indexing_sync_task
 
@@ -31,19 +31,10 @@ class DataSourceApi(Resource):
     @account_initialization_required
     @marshal_with(integrate_list_fields)
     def get(self):
-        """
-        获取当前工作空间的数据源集成信息。
-        
-        要求用户已登录、账号已设置且需要进行权限验证。
-        返回数据源集成的列表，包括已绑定和未绑定的提供者信息。
-        
-        返回值:
-            - 一个包含数据源集成信息的字典列表，以及HTTP状态码200。
-        """
-        # 从数据库查询当前工作空间未被禁用的数据源集成信息
-        data_source_integrates = db.session.query(DataSourceBinding).filter(
-            DataSourceBinding.tenant_id == current_user.current_tenant_id,
-            DataSourceBinding.disabled == False
+        # get workspace data source integrates
+        data_source_integrates = db.session.query(DataSourceOauthBinding).filter(
+            DataSourceOauthBinding.tenant_id == current_user.current_tenant_id,
+            DataSourceOauthBinding.disabled == False
         ).all()
 
         # 构造基础URL和数据源OAuth路径
@@ -84,17 +75,9 @@ class DataSourceApi(Resource):
     @login_required
     @account_initialization_required
     def patch(self, binding_id, action):
-        """
-        根据提供的绑定ID和操作类型，更新数据源绑定的状态（启用或禁用）。
-        
-        :param binding_id: 数据源绑定的唯一标识符。
-        :param action: 操作类型，支持'enable'启用和'disable'禁用。
-        :return: 操作成功的响应，包含结果信息和HTTP状态码。
-        """
-        binding_id = str(binding_id)  # 确保binding_id为字符串类型
-        action = str(action)  # 确保action为字符串类型
-        # 根据绑定ID查询数据源绑定信息
-        data_source_binding = DataSourceBinding.query.filter_by(
+        binding_id = str(binding_id)
+        action = str(action)
+        data_source_binding = DataSourceOauthBinding.query.filter_by(
             id=binding_id
         ).first()
         if data_source_binding is None:
@@ -166,9 +149,8 @@ class DataSourceNotionListApi(Resource):
                 for document in documents:
                     data_source_info = json.loads(document.data_source_info)
                     exist_page_ids.append(data_source_info['notion_page_id'])
-        
-        # 查询所有未绑定的Notion页面
-        data_source_bindings = DataSourceBinding.query.filter_by(
+        # get all authorized pages
+        data_source_bindings = DataSourceOauthBinding.query.filter_by(
             tenant_id=current_user.current_tenant_id,
             provider='notion',
             disabled=False
@@ -224,14 +206,12 @@ class DataSourceNotionApi(Resource):
         # 将输入的ID转换为字符串格式
         workspace_id = str(workspace_id)
         page_id = str(page_id)
-
-        # 查询与当前用户、Notion提供者、未禁用且指定工作空间ID匹配的数据源绑定
-        data_source_binding = DataSourceBinding.query.filter(
+        data_source_binding = DataSourceOauthBinding.query.filter(
             db.and_(
-                DataSourceBinding.tenant_id == current_user.current_tenant_id,
-                DataSourceBinding.provider == 'notion',
-                DataSourceBinding.disabled == False,
-                DataSourceBinding.source_info['workspace_id'] == f'"{workspace_id}"'
+                DataSourceOauthBinding.tenant_id == current_user.current_tenant_id,
+                DataSourceOauthBinding.provider == 'notion',
+                DataSourceOauthBinding.disabled == False,
+                DataSourceOauthBinding.source_info['workspace_id'] == f'"{workspace_id}"'
             )
         ).first()
         

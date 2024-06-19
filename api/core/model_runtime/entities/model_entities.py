@@ -2,7 +2,7 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from core.model_runtime.entities.common_entities import I18nObject
 
@@ -197,16 +197,15 @@ class ProviderModel(BaseModel):
     model_properties - 模型的附加属性，键为ModelPropertyKey枚举成员 
     deprecated - 模型是否已弃用
     """
-    model: str  # 模型标识符
-    label: I18nObject  # 模型的国际化标签
-    model_type: ModelType  # 模型类型
-    features: Optional[list[ModelFeature]] = None  # 模型特性列表
-    fetch_from: FetchFrom  # 数据获取方式
-    model_properties: dict[ModelPropertyKey, Any]  # 模型的附加属性，键为ModelPropertyKey枚举成员
-    deprecated: bool = False  # 模型是否已弃用
+    model: str
+    label: I18nObject
+    model_type: ModelType
+    features: Optional[list[ModelFeature]] = None
+    fetch_from: FetchFrom
+    model_properties: dict[ModelPropertyKey, Any]
+    deprecated: bool = False
+    model_config = ConfigDict(protected_namespaces=())
 
-    class Config:
-        protected_namespaces = ()  # 保护的命名空间列表，用于配置验证时忽略特定字段
 
 class ParameterRule(BaseModel):
     """

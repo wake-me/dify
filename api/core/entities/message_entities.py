@@ -43,7 +43,7 @@ class PromptMessageFile(BaseModel):
     """
 
     type: PromptMessageFileType
-    data: Any
+    data: Any = None
 
 class ImagePromptMessageFile(PromptMessageFile):
     """

@@ -249,7 +249,7 @@ class ToolManager:
         # 对于选择类型参数，检查参数值是否在选项列表中
         if parameter_rule.type == ToolParameter.ToolParameterType.SELECT:
             options = list(map(lambda x: x.value, parameter_rule.options))
-            if parameter_value not in options:
+            if parameter_value is not None and parameter_value not in options:
                 raise ValueError(
                     f"tool parameter {parameter_rule.name} value {parameter_value} not in options {options}")
 

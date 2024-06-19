@@ -2,7 +2,7 @@ from abc import ABC
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class PromptMessageRole(Enum):
@@ -142,8 +142,16 @@ class AssistantPromptMessage(PromptMessage):
         type: str  # 工具调用的类型
         function: ToolCallFunction  # 工具调用的函数信息
 
-    role: PromptMessageRole = PromptMessageRole.ASSISTANT  # 消息角色，默认为助理
-    tool_calls: list[ToolCall] = []  # 工具调用列表
+        @field_validator('id', mode='before')
+        @classmethod
+        def transform_id_to_str(cls, value) -> str:
+            if not isinstance(value, str):
+                return str(value)
+            else:
+                return value
+
+    role: PromptMessageRole = PromptMessageRole.ASSISTANT
+    tool_calls: list[ToolCall] = []
 
     def is_empty(self) -> bool:
         """

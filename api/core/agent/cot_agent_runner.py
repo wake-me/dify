@@ -46,7 +46,7 @@ class CotAgentRunner(BaseAgentRunner, ABC):
     def run(self, message: Message,
             query: str,
             inputs: dict[str, str],
-        ) -> Union[Generator, LLMResult]:
+            ) -> Union[Generator, LLMResult]:
         """
         运行Cot代理应用程序。
 
@@ -63,17 +63,18 @@ class CotAgentRunner(BaseAgentRunner, ABC):
         self._repack_app_generate_entity(app_generate_entity)
         self._init_react_state(query)
 
-        # 检查模型模式配置
-        if 'Observation' not in app_generate_entity.model_config.stop:
-            if app_generate_entity.model_config.provider not in self._ignore_observation_providers:
-                app_generate_entity.model_config.stop.append('Observation')
+        # check model mode
+        if 'Observation' not in app_generate_entity.model_conf.stop:
+            if app_generate_entity.model_conf.provider not in self._ignore_observation_providers:
+                app_generate_entity.model_conf.stop.append('Observation')
 
         app_config = self.app_config
 
         # 初始化指令
         inputs = inputs or {}
         instruction = app_config.prompt_template.simple_prompt_template
-        self._instruction = self._fill_in_inputs_from_external_data_tools(instruction, inputs)
+        self._instruction = self._fill_in_inputs_from_external_data_tools(
+            instruction, inputs)
 
         # 设置迭代步骤和最大迭代次数
         iteration_step = 1
@@ -82,10 +83,6 @@ class CotAgentRunner(BaseAgentRunner, ABC):
         # 将工具转换为ModelRuntime Tool格式
         tool_instances, self._prompt_messages_tools = self._init_prompt_tools()
 
-        # 组织提示消息
-        prompt_messages = self._organize_prompt_messages()
-        
-        # 初始化函数调用状态和LLM使用情况
         function_call_state = True
         llm_usage = {
             'usage': None
@@ -136,9 +133,9 @@ class CotAgentRunner(BaseAgentRunner, ABC):
             # 调用模型
             chunks: Generator[LLMResultChunk, None, None] = model_instance.invoke_llm(
                 prompt_messages=prompt_messages,
-                model_parameters=app_generate_entity.model_config.parameters,
+                model_parameters=app_generate_entity.model_conf.parameters,
                 tools=[],
-                stop=app_generate_entity.model_config.stop,
+                stop=app_generate_entity.model_conf.stop,
                 stream=True,
                 user=self.user_id,
                 callbacks=[],
@@ -147,9 +144,10 @@ class CotAgentRunner(BaseAgentRunner, ABC):
             # 检查LLM结果
             if not chunks:
                 raise ValueError("failed to invoke llm")
-            
+
             usage_dict = {}
-            react_chunks = CotAgentOutputParser.handle_react_stream_output(chunks, usage_dict)
+            react_chunks = CotAgentOutputParser.handle_react_stream_output(
+                chunks, usage_dict)
             scratchpad = AgentScratchpadUnit(
                 agent_response='',
                 thought='',
@@ -168,9 +166,9 @@ class CotAgentRunner(BaseAgentRunner, ABC):
             for chunk in react_chunks:
                 if isinstance(chunk, AgentScratchpadUnit.Action):
                     action = chunk
-                    # 检测动作
-                    scratchpad.agent_response += json.dumps(chunk.dict())
-                    scratchpad.action_str = json.dumps(chunk.dict())
+                    # detect action
+                    scratchpad.agent_response += json.dumps(chunk.model_dump())
+                    scratchpad.action_str = json.dumps(chunk.model_dump())
                     scratchpad.action = action
                 else:
                     scratchpad.agent_response += chunk
@@ -188,17 +186,16 @@ class CotAgentRunner(BaseAgentRunner, ABC):
                         )
                     )
 
-            # 更新思考内容和回答
-            scratchpad.thought = scratchpad.thought.strip() or 'I am thinking about how to help you'
+            scratchpad.thought = scratchpad.thought.strip(
+            ) or 'I am thinking about how to help you'
             self._agent_scratchpad.append(scratchpad)
-            
-            # 获取LLM使用情况
+
+            # get llm usage
             if 'usage' in usage_dict:
                 increase_usage(llm_usage, usage_dict['usage'])
             else:
                 usage_dict['usage'] = LLMUsage.empty_usage()
-            
-            # 保存代理思考记录
+
             self.save_agent_thought(
                 agent_thought=agent_thought,
                 tool_name=scratchpad.action.action_name if scratchpad.action else '',
@@ -212,8 +209,7 @@ class CotAgentRunner(BaseAgentRunner, ABC):
                 messages_ids=[],
                 llm_usage=usage_dict['usage']
             )
-            
-            # 如果思考未结束，则发布代理思考事件
+
             if not scratchpad.is_final():
                 self.queue_manager.publish(QueueAgentThoughtEvent(
                     agent_thought_id=agent_thought.id
@@ -228,7 +224,8 @@ class CotAgentRunner(BaseAgentRunner, ABC):
                     # 如果动作是最终回答，则直接返回回答
                     try:
                         if isinstance(scratchpad.action.action_input, dict):
-                            final_answer = json.dumps(scratchpad.action.action_input)
+                            final_answer = json.dumps(
+                                scratchpad.action.action_input)
                         elif isinstance(scratchpad.action.action_input, str):
                             final_answer = scratchpad.action.action_input
                         else:
@@ -239,7 +236,7 @@ class CotAgentRunner(BaseAgentRunner, ABC):
                     # 如果动作是工具调用，则调用工具并更新状态
                     function_call_state = True
                     tool_invoke_response, tool_invoke_meta = self._handle_invoke_action(
-                        action=scratchpad.action, 
+                        action=scratchpad.action,
                         tool_instances=tool_instances,
                         message_file_ids=message_file_ids
                     )
@@ -249,10 +246,13 @@ class CotAgentRunner(BaseAgentRunner, ABC):
                     self.save_agent_thought(
                         agent_thought=agent_thought,
                         tool_name=scratchpad.action.action_name,
-                        tool_input={scratchpad.action.action_name: scratchpad.action.action_input},
+                        tool_input={
+                            scratchpad.action.action_name: scratchpad.action.action_input},
                         thought=scratchpad.thought,
-                        observation={scratchpad.action.action_name: tool_invoke_response},
-                        tool_invoke_meta={scratchpad.action.action_name: tool_invoke_meta.to_dict()},
+                        observation={
+                            scratchpad.action.action_name: tool_invoke_response},
+                        tool_invoke_meta={
+                            scratchpad.action.action_name: tool_invoke_meta.to_dict()},
                         answer=scratchpad.agent_response,
                         messages_ids=message_file_ids,
                         llm_usage=usage_dict['usage']
@@ -264,7 +264,8 @@ class CotAgentRunner(BaseAgentRunner, ABC):
 
                 # 更新提示工具消息
                 for prompt_tool in self._prompt_messages_tools:
-                    self.update_prompt_message_tool(tool_instances[prompt_tool.name], prompt_tool)
+                    self.update_prompt_message_tool(
+                        tool_instances[prompt_tool.name], prompt_tool)
 
             iteration_step += 1
 
@@ -283,12 +284,12 @@ class CotAgentRunner(BaseAgentRunner, ABC):
         )
 
         self.save_agent_thought(
-            agent_thought=agent_thought, 
+            agent_thought=agent_thought,
             tool_name='',
             tool_input={},
             tool_invoke_meta={},
             thought=final_answer,
-            observation={}, 
+            observation={},
             answer=final_answer,
             messages_ids=[]
         )
@@ -301,13 +302,14 @@ class CotAgentRunner(BaseAgentRunner, ABC):
             message=AssistantPromptMessage(
                 content=final_answer
             ),
-            usage=llm_usage['usage'] if llm_usage['usage'] else LLMUsage.empty_usage(),
+            usage=llm_usage['usage'] if llm_usage['usage'] else LLMUsage.empty_usage(
+            ),
             system_fingerprint=''
         )), PublishFrom.APPLICATION_MANAGER)
 
-    def _handle_invoke_action(self, action: AgentScratchpadUnit.Action, 
-                            tool_instances: dict[str, Tool],
-                            message_file_ids: list[str]) -> tuple[str, ToolInvokeMeta]:
+    def _handle_invoke_action(self, action: AgentScratchpadUnit.Action,
+                              tool_instances: dict[str, Tool],
+                              message_file_ids: list[str]) -> tuple[str, ToolInvokeMeta]:
         """
         处理调用工具的动作。
         :param action: 动作对象，包含要执行的动作名称和参数。
@@ -323,8 +325,7 @@ class CotAgentRunner(BaseAgentRunner, ABC):
             # 如果找不到对应的工具实例，返回错误信息
             answer = f"there is not a tool named {tool_call_name}"
             return answer, ToolInvokeMeta.error_instance(answer)
-        
-        # 尝试将动作参数从字符串转换为 JSON 对象，如果失败则保持原样
+
         if isinstance(tool_call_args, str):
             try:
                 tool_call_args = json.loads(tool_call_args)
@@ -345,7 +346,8 @@ class CotAgentRunner(BaseAgentRunner, ABC):
         # 发布文件，将文件保存至变量池并发布消息文件事件
         for message_file, save_as in message_files:
             if save_as:
-                self.variables_pool.set_file(tool_name=tool_call_name, value=message_file.id, name=save_as)
+                self.variables_pool.set_file(
+                    tool_name=tool_call_name, value=message_file.id, name=save_as)
 
             # 发布消息文件
             self.queue_manager.publish(QueueMessageFileEvent(
@@ -391,7 +393,7 @@ class CotAgentRunner(BaseAgentRunner, ABC):
                 continue
 
         return instruction
-    
+
     def _init_react_state(self, query) -> None:
         """
         初始化反应状态。
@@ -404,10 +406,10 @@ class CotAgentRunner(BaseAgentRunner, ABC):
         返回值:
         - 无
         """
-        self._query = query  # 存储查询信息
-        self._agent_scratchpad = []  # 初始化代理的临时工作区
-        self._historic_prompt_messages = self._organize_historic_prompt_messages()  # 组织历史提示消息
-    
+        self._query = query
+        self._agent_scratchpad = []
+        self._historic_prompt_messages = self._organize_historic_prompt_messages()
+
     @abstractmethod
     def _organize_prompt_messages(self) -> list[PromptMessage]:
         """
@@ -457,59 +459,55 @@ class CotAgentRunner(BaseAgentRunner, ABC):
             list[PromptMessage]: 经过组织整理后的提示消息列表。
         """
         result: list[PromptMessage] = []
-        scratchpad: list[AgentScratchpadUnit] = []
+        scratchpads: list[AgentScratchpadUnit] = []
         current_scratchpad: AgentScratchpadUnit = None
-
-        self.history_prompt_messages = AgentHistoryPromptTransform(
-            model_config=self.model_config,
-            prompt_messages=current_session_messages or [],
-            history_messages=self.history_prompt_messages,
-            memory=self.memory
-        ).get_prompt()
 
         for message in self.history_prompt_messages:
             if isinstance(message, AssistantPromptMessage):
-                # 如果是助手提示消息，更新当前的助手思考单元
-                current_scratchpad = AgentScratchpadUnit(
-                    agent_response=message.content,
-                    thought=message.content or 'I am thinking about how to help you',
-                    action_str='',
-                    action=None,
-                    observation=None,
-                )
-                # 如果存在工具调用，设置助手思考单元的动作
+                if not current_scratchpad:
+                    current_scratchpad = AgentScratchpadUnit(
+                        agent_response=message.content,
+                        thought=message.content or 'I am thinking about how to help you',
+                        action_str='',
+                        action=None,
+                        observation=None,
+                    )
+                    scratchpads.append(current_scratchpad)
                 if message.tool_calls:
                     try:
                         current_scratchpad.action = AgentScratchpadUnit.Action(
                             action_name=message.tool_calls[0].function.name,
-                            action_input=json.loads(message.tool_calls[0].function.arguments)
+                            action_input=json.loads(
+                                message.tool_calls[0].function.arguments)
                         )
                         current_scratchpad.action_str = json.dumps(
                             current_scratchpad.action.to_dict()
                         )
                     except:
-                        pass  # 忽略任何在处理工具调用时发生的错误
-                
-                scratchpad.append(current_scratchpad)  # 将当前思考单元加入临时列表
+                        pass
             elif isinstance(message, ToolPromptMessage):
                 # 如果是工具提示消息，将其观察结果加入当前的助手思考单元
                 if current_scratchpad:
                     current_scratchpad.observation = message.content
             elif isinstance(message, UserPromptMessage):
-                # 如果是用户提示消息，将其加入结果列表，并可能加入当前的助手思考单元
+                if scratchpads:
+                    result.append(AssistantPromptMessage(
+                        content=self._format_assistant_message(scratchpads)
+                    ))
+                    scratchpads = []
+                    current_scratchpad = None
+
                 result.append(message)
 
-                if scratchpad:
-                    result.append(AssistantPromptMessage(
-                        content=self._format_assistant_message(scratchpad)
-                    ))
-
-                scratchpad = []  # 清空临时思考过程列表
-
-        # 如果存在未处理的助手思考单元，将其加入结果列表
-        if scratchpad:
+        if scratchpads:
             result.append(AssistantPromptMessage(
-                content=self._format_assistant_message(scratchpad)
+                content=self._format_assistant_message(scratchpads)
             ))
-        
-        return result  # 返回经过组织整理后的提示消息列表
+
+        historic_prompts = AgentHistoryPromptTransform(
+            model_config=self.model_config,
+            prompt_messages=current_session_messages or [],
+            history_messages=result,
+            memory=self.memory
+        ).get_prompt()
+        return historic_prompts

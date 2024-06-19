@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from core.model_runtime.entities.common_entities import I18nObject
 from core.model_runtime.entities.model_entities import ModelType, ProviderModel
@@ -78,6 +78,9 @@ class DefaultModelEntity(BaseModel):
     默认模型实体类。
     用于表示一个具体模型及其默认提供者的详细信息。
     """
-    model: str  # 模型标识符
-    model_type: ModelType  # 模型类型
-    provider: DefaultModelProviderEntity  # 默认模型提供者实体
+    model: str
+    model_type: ModelType
+    provider: DefaultModelProviderEntity
+
+    # pydantic configs
+    model_config = ConfigDict(protected_namespaces=())

@@ -31,24 +31,10 @@ class FileService:
 
     @staticmethod
     def upload_file(file: FileStorage, user: Union[Account, EndUser], only_image: bool = False) -> UploadFile:
-        """
-        上传文件到服务器并保存到数据库。
-
-        参数:
-        - file: FileStorage对象，待上传的文件。
-        - user: Account或EndUser对象，上传文件的用户。
-        - only_image: 布尔值，默认为False，如果为True，则只允许上传图片。
-
-        返回值:
-        - UploadFile对象，包含上传文件的信息。
-
-        抛出:
-        - UnsupportedFileTypeError: 如果文件类型不受支持。
-        - FileTooLargeError: 如果文件大小超过限制。
-        """
-        # 获取文件扩展名
+        filename = file.filename
         extension = file.filename.split('.')[-1]
-        # 获取应用配置中的ETL类型
+        if len(filename) > 200:
+            filename = filename.split('.')[0][:200] + '.' + extension
         etl_type = current_app.config['ETL_TYPE']
         # 根据ETL类型确定允许的文件扩展名列表
         allowed_extensions = UNSTRUSTURED_ALLOWED_EXTENSIONS + IMAGE_EXTENSIONS if etl_type == 'Unstructured' \
@@ -98,7 +84,7 @@ class FileService:
             tenant_id=current_tenant_id,
             storage_type=config['STORAGE_TYPE'],
             key=file_key,
-            name=file.filename,
+            name=filename,
             size=file_size,
             extension=extension,
             mime_type=file.mimetype,
@@ -116,17 +102,9 @@ class FileService:
 
     @staticmethod
     def upload_text(text: str, text_name: str) -> UploadFile:
-        """
-        上传文本到服务器的存储系统，并在数据库中记录文件信息。
-        
-        参数:
-        text: str - 要上传的文本内容。
-        text_name: str - 文本的原始名称。
-        
-        返回值:
-        UploadFile - 包含上传文件信息的对象。
-        """
-        # 使用UUID作为文件名
+        if len(text_name) > 200:
+            text_name = text_name[:200]
+        # user uuid as file name
         file_uuid = str(uuid.uuid4())
         # 构建文件在存储系统中的键值
         file_key = 'upload_files/' + current_user.current_tenant_id + '/' + file_uuid + '.txt'

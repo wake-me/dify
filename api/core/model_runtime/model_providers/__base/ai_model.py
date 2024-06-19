@@ -3,6 +3,8 @@ import os
 from abc import ABC, abstractmethod
 from typing import Optional
 
+from pydantic import ConfigDict
+
 from core.helper.position_helper import get_position_map, sort_by_position_map
 from core.model_runtime.entities.common_entities import I18nObject
 from core.model_runtime.entities.defaults import PARAMETER_RULE_TEMPLATE
@@ -27,6 +29,9 @@ class AIModel(ABC):
     model_type: ModelType  # 模型类型
     model_schemas: list[AIModelEntity] = None  # 模型架构列表
     started_at: float = 0  # 模型启动时间（秒）
+
+    # pydantic configs
+    model_config = ConfigDict(protected_namespaces=())
 
     @abstractmethod
     def validate_credentials(self, model: str, credentials: dict) -> None:

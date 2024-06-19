@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from core.app.app_config.entities import AppConfig, EasyUIBasedAppConfig, WorkflowUIBasedAppConfig
 from core.entities.provider_configuration import ProviderModelBundle
@@ -83,6 +83,10 @@ class ModelConfigWithCredentialsEntity(BaseModel):
     parameters: dict[str, Any] = {}
     stop: list[str] = []
 
+    # pydantic configs
+    model_config = ConfigDict(protected_namespaces=())
+
+
 class AppGenerateEntity(BaseModel):
     """
     App Generate Entity 类。
@@ -125,9 +129,12 @@ class EasyUIBasedAppGenerateEntity(AppGenerateEntity):
     """
     # 应用配置
     app_config: EasyUIBasedAppConfig
-    model_config: ModelConfigWithCredentialsEntity  # 模型配置，包含认证信息
+    model_conf: ModelConfigWithCredentialsEntity
 
-    query: Optional[str] = None  # 查询字符串，可能为空
+    query: Optional[str] = None
+
+    # pydantic configs
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class ChatAppGenerateEntity(EasyUIBasedAppGenerateEntity):

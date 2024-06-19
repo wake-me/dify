@@ -5,6 +5,7 @@ from collections.abc import Generator
 from enum import Enum
 from typing import Any
 
+from flask import current_app
 from sqlalchemy.orm import DeclarativeMeta
 
 from core.app.entities.app_invoke_entities import InvokeFrom
@@ -70,8 +71,8 @@ class AppQueueManager:
         监听队列
         :return: 生成器，逐个返回队列中的消息
         """
-        # 等待10分钟以停止监听
-        listen_timeout = 600
+        # wait for APP_MAX_EXECUTION_TIME seconds to stop listen
+        listen_timeout = current_app.config.get("APP_MAX_EXECUTION_TIME")
         start_time = time.time()
         last_ping_time = 0
 
@@ -128,9 +129,7 @@ class AppQueueManager:
         :param pub_from: 发布事件的来源，使用PublishFrom枚举类型标识。
         :return: 无返回值。
         """
-        # 检查event中是否包含SQLAlchemy模型，确保其可以被正确序列化
-        self._check_for_sqlalchemy_models(event.dict())
-        # 实际发布事件到队列
+        self._check_for_sqlalchemy_models(event.model_dump())
         self._publish(event, pub_from)
 
     @abstractmethod

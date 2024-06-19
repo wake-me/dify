@@ -15,8 +15,7 @@ class HostingModerationFeature:
         :param prompt_messages: 提示信息列表，每个提示信息可能包含需要审核的文本内容
         :return: 审核结果，True表示通过，False表示不通过
         """
-        # 获取应用的模型配置
-        model_config = application_generate_entity.model_config
+        model_config = application_generate_entity.model_conf
 
         # 组合所有提示信息中的文本内容
         text = ""

@@ -5,6 +5,7 @@ from core.model_runtime.entities.message_entities import (
     AssistantPromptMessage,
     PromptMessage,
     SystemPromptMessage,
+    TextPromptMessageContent,
     UserPromptMessage,
 )
 from core.model_runtime.utils.encoders import jsonable_encoder
@@ -33,6 +34,21 @@ class CotChatAgentRunner(CotAgentRunner):
 
         # 返回组织好的系统提示信息
         return SystemPromptMessage(content=system_prompt)
+
+    def _organize_user_query(self, query,  prompt_messages: list[PromptMessage] = None) -> list[PromptMessage]:
+        """
+        Organize user query
+        """
+        if self.files:
+            prompt_message_contents = [TextPromptMessageContent(data=query)]
+            for file_obj in self.files:
+                prompt_message_contents.append(file_obj.prompt_message_content)
+
+            prompt_messages.append(UserPromptMessage(content=prompt_message_contents))
+        else:
+            prompt_messages.append(UserPromptMessage(content=query))
+
+        return prompt_messages
 
     def _organize_prompt_messages(self) -> list[PromptMessage]:
         """
@@ -63,29 +79,29 @@ class CotChatAgentRunner(CotAgentRunner):
             # 初始化助手回复消息列表
             assistant_messages = [assistant_message]
 
-        # 查询消息
-        query_messages = UserPromptMessage(content=self._query)
+        # query messages
+        query_messages = self._organize_user_query(self._query, [])
 
         # 根据是否存在助手回复消息，组织消息列表
         if assistant_messages:
             # organize historic prompt messages
             historic_messages = self._organize_historic_prompt_messages([
                 system_message,
-                query_messages,
+                *query_messages,
                 *assistant_messages,
                 UserPromptMessage(content='continue')
-            ])            
+            ])
             messages = [
                 system_message,
-                *historic_messages,# 历史消息
-                query_messages, # 查询消息
-                *assistant_messages,# 助手回复消息
-                UserPromptMessage(content='continue') # 继续提示
+                *historic_messages,
+                *query_messages,
+                *assistant_messages,
+                UserPromptMessage(content='continue')
             ]
         else:
             # organize historic prompt messages
-            historic_messages = self._organize_historic_prompt_messages([system_message, query_messages])
-            messages = [system_message, *historic_messages, query_messages]
+            historic_messages = self._organize_historic_prompt_messages([system_message, *query_messages])
+            messages = [system_message, *historic_messages, *query_messages]
 
         # 将所有消息合并并返回
         return messages

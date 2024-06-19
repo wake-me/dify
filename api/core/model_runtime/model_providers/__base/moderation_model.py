@@ -2,6 +2,8 @@ import time
 from abc import abstractmethod
 from typing import Optional
 
+from pydantic import ConfigDict
+
 from core.model_runtime.entities.model_entities import ModelType
 from core.model_runtime.model_providers.__base.ai_model import AIModel
 
@@ -11,6 +13,9 @@ class ModerationModel(AIModel):
     中介模型类，用于提供中介服务的模型。
     """
     model_type: ModelType = ModelType.MODERATION  # 指定模型类型为中介模型
+
+    # pydantic configs
+    model_config = ConfigDict(protected_namespaces=())
 
     def invoke(self, model: str, credentials: dict,
                text: str, user: Optional[str] = None) \

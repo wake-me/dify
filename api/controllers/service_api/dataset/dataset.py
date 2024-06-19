@@ -1,9 +1,10 @@
 from flask import request
 from flask_restful import marshal, reqparse
+from werkzeug.exceptions import NotFound
 
 import services.dataset_service
 from controllers.service_api import api
-from controllers.service_api.dataset.error import DatasetNameDuplicateError
+from controllers.service_api.dataset.error import DatasetInUseError, DatasetNameDuplicateError
 from controllers.service_api.wraps import DatasetApiResource
 from core.model_runtime.entities.model_entities import ModelType
 from core.provider_manager import ProviderManager
@@ -32,23 +33,12 @@ def _validate_name(name):
     return name
 
 
-class DatasetApi(DatasetApiResource):
-    """Resource for get datasets."""
+class DatasetListApi(DatasetApiResource):
+    """Resource for datasets."""
 
     def get(self, tenant_id):
-        """
-        根据提供的租户ID，获取数据集列表。
-        
-        参数:
-        - self: 方法对象
-        - tenant_id: 租户ID，用于获取特定租户的数据集。
-        
-        返回值:
-        - response: 包含数据集信息的响应字典，包括数据、是否还有更多数据、限制数、总数据数和页码。
-        - 200: HTTP状态码，表示成功。
-        """
-        
-        # 获取请求参数
+        """Resource for getting datasets."""
+
         page = request.args.get('page', default=1, type=int)
         limit = request.args.get('limit', default=20, type=int)
         provider = request.args.get('provider', default="vendor")
@@ -96,20 +86,9 @@ class DatasetApi(DatasetApiResource):
         }
         return response, 200
 
-    """Resource for datasets."""
 
     def post(self, tenant_id):
-        """
-        创建一个新的数据集。
-        
-        参数:
-        - tenant_id: 租户ID，用于标识数据集所属的租户。
-        
-        返回值:
-        - 200: 成功创建数据集时返回的数据集详情。
-        - 其他: 在创建过程中遇到错误时返回的相应错误信息。
-        """
-        # 初始化请求解析器，并设置数据集名称的参数
+        """Resource for creating datasets."""
         parser = reqparse.RequestParser()
         parser.add_argument('name', nullable=False, required=True,
                             help='type is required. Name must be between 1 to 40 characters.',
@@ -135,6 +114,34 @@ class DatasetApi(DatasetApiResource):
         # 返回成功创建的数据集详情
         return marshal(dataset, dataset_detail_fields), 200
 
+class DatasetApi(DatasetApiResource):
+    """Resource for dataset."""
 
-api.add_resource(DatasetApi, '/datasets')
+    def delete(self, _, dataset_id):
+        """
+        Deletes a dataset given its ID.
 
+        Args:
+            dataset_id (UUID): The ID of the dataset to be deleted.
+
+        Returns:
+            dict: A dictionary with a key 'result' and a value 'success' 
+                  if the dataset was successfully deleted. Omitted in HTTP response.
+            int: HTTP status code 204 indicating that the operation was successful.
+
+        Raises:
+            NotFound: If the dataset with the given ID does not exist.
+        """
+
+        dataset_id_str = str(dataset_id)
+
+        try:
+            if DatasetService.delete_dataset(dataset_id_str, current_user):
+                return {'result': 'success'}, 204
+            else:
+                raise NotFound("Dataset not found.")
+        except services.errors.dataset.DatasetInUseError:
+            raise DatasetInUseError()
+
+api.add_resource(DatasetListApi, '/datasets')
+api.add_resource(DatasetApi, '/datasets/<uuid:dataset_id>')

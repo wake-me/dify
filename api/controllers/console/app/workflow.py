@@ -3,7 +3,7 @@ import logging
 
 from flask import abort, request
 from flask_restful import Resource, marshal_with, reqparse
-from werkzeug.exceptions import InternalServerError, NotFound
+from werkzeug.exceptions import Forbidden, InternalServerError, NotFound
 
 import services
 from controllers.console import api
@@ -44,7 +44,11 @@ class DraftWorkflowApi(Resource):
         返回值:
         返回工作流对象，如果未找到，则抛出DraftWorkflowNotExist异常。
         """
-        # 通过应用模型获取草稿工作流
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
+        # fetch draft workflow by app_model
         workflow_service = WorkflowService()
         workflow = workflow_service.get_draft_workflow(app_model=app_model)
 
@@ -72,7 +76,10 @@ class DraftWorkflowApi(Resource):
         返回值:
         - 一个包含操作结果和更新时间的字典。若操作失败，则返回相应的错误信息。
         """
-
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
         content_type = request.headers.get('Content-Type')
 
         # 根据请求头部的Content-Type解析请求体
@@ -151,7 +158,10 @@ class AdvancedChatDraftWorkflowRunApi(Resource):
         - ValueError: 参数值无效时抛出
         - InternalServerError: 内部服务器错误时抛出
         """
-        # 解析请求参数
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
         parser = reqparse.RequestParser()
         parser.add_argument('inputs', type=dict, location='json')
         parser.add_argument('query', type=str, required=True, location='json', default='')
@@ -191,6 +201,10 @@ class AdvancedChatDraftRunIterationNodeApi(Resource):
         """
         Run draft workflow iteration node
         """
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
         parser = reqparse.RequestParser()
         parser.add_argument('inputs', type=dict, location='json')
         args = parser.parse_args()
@@ -224,6 +238,10 @@ class WorkflowDraftRunIterationNodeApi(Resource):
         """
         Run draft workflow iteration node
         """
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
         parser = reqparse.RequestParser()
         parser.add_argument('inputs', type=dict, location='json')
         args = parser.parse_args()
@@ -256,16 +274,12 @@ class DraftWorkflowRunApi(Resource):
     @get_app_model(mode=[AppMode.WORKFLOW])
     def post(self, app_model: App):
         """
-        运行草稿工作流
-        
-        参数:
-        - app_model: App模型实例，代表要运行的工作流应用
-        
-        返回值:
-        - 返回一个紧凑的生成响应，包含工作流运行的结果信息
+        Run draft workflow
         """
-
-        # 解析请求参数
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
         parser = reqparse.RequestParser()
         parser.add_argument('inputs', type=dict, required=True, nullable=False, location='json')
         parser.add_argument('files', type=list, required=False, location='json')
@@ -301,16 +315,12 @@ class WorkflowTaskStopApi(Resource):
     @get_app_model(mode=[AppMode.ADVANCED_CHAT, AppMode.WORKFLOW])
     def post(self, app_model: App, task_id: str):
         """
-        停止工作流任务
-        
-        :param app_model: 应用模型，指定了应用的配置和模式
-        :type app_model: App
-        :param task_id: 任务的唯一标识符
-        :type task_id: str
-        :return: 停止任务操作的结果信息
-        :rtype: dict
+        Stop workflow task
         """
-        # 设置停止标志，以通知任务应该停止
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
         AppQueueManager.set_stop_flag(task_id, InvokeFrom.DEBUGGER, current_user.id)
 
         return {
@@ -327,18 +337,12 @@ class DraftWorkflowNodeRunApi(Resource):
     @marshal_with(workflow_run_node_execution_fields)
     def post(self, app_model: App, node_id: str):
         """
-        执行草稿工作流节点
-        
-        该方法用于触发指定应用模型和节点ID的工作流节点的草稿版本执行。
-        需要用户登录、账户初始化且应用模式为高级聊天或工作流。
-        
-        参数:
-        - app_model: App, 表示应用模型实例，定义了应用的配置和行为。
-        - node_id: str, 表示要执行的工作流节点的ID。
-        
-        返回值:
-        - 返回工作流节点执行的详细信息。
+        Run draft workflow node
         """
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
         parser = reqparse.RequestParser()
         # 解析请求中的输入参数
         parser.add_argument('inputs', type=dict, required=True, nullable=False, location='json')
@@ -380,7 +384,11 @@ class PublishedWorkflowApi(Resource):
         返回值:
         - 返回找到的工作流对象，如果未找到则返回None。
         """
-        # 通过应用模型获取发布的工作流
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
+        # fetch published workflow by app_model
         workflow_service = WorkflowService()
         workflow = workflow_service.get_published_workflow(app_model=app_model)
 
@@ -401,7 +409,10 @@ class PublishedWorkflowApi(Resource):
         返回值:
         - 包含发布结果和创建时间的字典。
         """
-        # 为指定应用模型和当前用户发布工作流
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
         workflow_service = WorkflowService()
         workflow = workflow_service.publish_workflow(app_model=app_model, account=current_user)
 
@@ -421,18 +432,13 @@ class DefaultBlockConfigsApi(Resource):
     @get_app_model(mode=[AppMode.ADVANCED_CHAT, AppMode.WORKFLOW])
     def get(self, app_model: App):
         """
-        获取默认区块配置
-        
-        该方法用于根据应用模式获取默认的区块配置信息。
-        
-        参数:
-        - app_model: App - 表示当前应用的模型实例，用于确定应用的模式。
-        
-        返回值:
-        - 返回一个包含默认区块配置信息的响应。
+        Get default block config
         """
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
         
-        # 初始化工作流服务并获取默认区块配置
+        # Get default block configs
         workflow_service = WorkflowService()
         return workflow_service.get_default_block_configs()
 
@@ -457,6 +463,9 @@ class DefaultBlockConfigApi(Resource):
         返回值:
         - 返回一个包含默认区块配置的数据。
         """
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
         
         parser = reqparse.RequestParser()
         parser.add_argument('q', type=str, location='args')  # 解析查询参数q，用于指定过滤条件
@@ -484,13 +493,14 @@ class ConvertToWorkflowApi(Resource):
     @get_app_model(mode=[AppMode.CHAT, AppMode.COMPLETION])
     def post(self, app_model: App):
         """
-        将聊天机器人应用的基本模式转换为工作流模式；
-        将聊天机器人应用的专家模式转换为工作流模式；
-        将完成应用转换为工作流应用。
-
-        :param app_model: App模型，表示当前要转换的应用。
-        :return: 包含新应用ID的字典。
+        Convert basic mode of chatbot app to workflow mode
+        Convert expert mode of chatbot app to workflow mode
+        Convert Completion App to Workflow App
         """
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
+            raise Forbidden()
+        
         if request.data:
             # 解析请求中携带的参数
             parser = reqparse.RequestParser()

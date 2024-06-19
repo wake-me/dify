@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from core.model_runtime.entities.common_entities import I18nObject
 from core.model_runtime.entities.model_entities import AIModelEntity, ModelType, ProviderModel
@@ -160,8 +160,8 @@ class ProviderEntity(BaseModel):
     provider_credential_schema: Optional[ProviderCredentialSchema] = None  # 供应商凭证模式，可选
     model_credential_schema: Optional[ModelCredentialSchema] = None  # 模型凭证模式，可选
 
-    class Config:
-        protected_namespaces = ()  # 保护的命名空间，防止外部修改
+    # pydantic configs
+    model_config = ConfigDict(protected_namespaces=())
 
     def to_simple_provider(self) -> SimpleProviderEntity:
         """

@@ -1,7 +1,8 @@
 # 导入必要的模块和库
 import os
 
-# 如果不是在调试模式下，对一些库进行特殊配置，以提高性能
+from configs.app_configs import DifyConfigs
+
 if not os.environ.get("DEBUG") or os.environ.get("DEBUG").lower() != 'true':
     from gevent import monkey
 
@@ -78,15 +79,19 @@ config_type = os.getenv('EDITION', default='SELF_HOSTED')  # ce edition first
 # Application Factory Function
 # ----------------------------
 
+def create_flask_app_with_configs() -> Flask:
+    """
+    create a raw flask app
+    with configs loaded from .env file
+    """
+    dify_app = DifyApp(__name__)
+    dify_app.config.from_object(Config())
+    dify_app.config.from_mapping(DifyConfigs().model_dump())
+    return dify_app
+
 
 def create_app() -> Flask:
-    """
-    创建并初始化应用实例。
-    
-    :return: 初始化后的Flask应用实例。
-    """
-    app = DifyApp(__name__)  # 创建应用实例
-    app.config.from_object(Config())  # 从Config类加载配置
+    app = create_flask_app_with_configs()
 
     app.secret_key = app.config['SECRET_KEY']  # 设置应用的密钥
 

@@ -33,21 +33,9 @@ class TimestampField(fields.Raw):
 
 
 def email(email):
-    """
-    验证提供的电子邮件地址是否符合标准格式。
-    
-    参数:
-    - email: 待验证的电子邮件地址字符串。
-    
-    返回:
-    - 验证通过的电子邮件地址。
-    
-    异常:
-    - ValueError: 如果电子邮件地址格式不正确，则抛出。
-    """
-    # 定义电子邮件地址的正则表达式模式
-    pattern = r"^[\w\.-]+@([\w-]+\.)+[\w-]{2,}$"
-    # 检查电子邮件地址是否匹配模式
+    # Define a regex pattern for email addresses
+    pattern = r"^[\w\.!#$%&'*+\-/=?^_`{|}~]+@([\w-]+\.)+[\w-]{2,}$"
+    # Check if the email matches the pattern
     if re.match(pattern, email) is not None:
         return email
 

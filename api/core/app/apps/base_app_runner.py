@@ -236,8 +236,8 @@ class AppRunner:
             index = 0  # 用于追踪当前发送到哪个字符
             for token in text:  # 拆分文本为单个字符
                 chunk = LLMResultChunk(
-                    model=app_generate_entity.model_config.model,  # 模型配置
-                    prompt_messages=prompt_messages,  # 提示信息列表
+                    model=app_generate_entity.model_conf.model,
+                    prompt_messages=prompt_messages,
                     delta=LLMResultChunkDelta(
                         index=index,  # 当前字符位置
                         message=AssistantPromptMessage(content=token)  # 当前字符内容
@@ -256,7 +256,7 @@ class AppRunner:
         queue_manager.publish(
             QueueMessageEndEvent(
                 llm_result=LLMResult(
-                    model=app_generate_entity.model_config.model,
+                    model=app_generate_entity.model_conf.model,
                     prompt_messages=prompt_messages,
                     message=AssistantPromptMessage(content=text),
                     usage=usage if usage else LLMUsage.empty_usage()  # 如果提供了使用情况则使用，否则使用空使用情况

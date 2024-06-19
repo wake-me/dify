@@ -64,9 +64,9 @@ class AppSite(Resource):
     def post(self, app_model):
         args = parse_app_site_args()
 
-        # The role of the current user in the ta table must be admin or owner
-        if not current_user.is_admin_or_owner:
-            raise Forbidden()  # 如果不是管理员或所有者，则抛出权限异常
+        # The role of the current user in the ta table must be editor, admin, or owner
+        if not current_user.is_editor:
+            raise Forbidden()
 
         # 从数据库中获取对应的站点信息
         site = db.session.query(Site). \
@@ -89,16 +89,9 @@ class AppSite(Resource):
         ]:
             value = args.get(attr_name)
             if value is not None:
-                setattr(site, attr_name, value)  # 更新站点信息
-                # 根据属性名称更新应用信息
-                if attr_name == 'title':
-                    app_model.name = value
-                elif attr_name == 'icon':
-                    app_model.icon = value
-                elif attr_name == 'icon_background':
-                    app_model.icon_background = value
+                setattr(site, attr_name, value)
 
-        db.session.commit()  # 提交数据库事务
+        db.session.commit()
 
         return site  # 返回更新后的站点信息
 

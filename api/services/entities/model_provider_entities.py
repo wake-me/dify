@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Optional
 
 from flask import current_app
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from core.entities.model_entities import ModelWithProviderEntity, ProviderModelWithStatusEntity
 from core.entities.provider_entities import QuotaConfiguration
@@ -48,26 +48,26 @@ class SystemConfigurationResponse(BaseModel):
 
 class ProviderResponse(BaseModel):
     """
-    供应商响应模型类。
-    该类描述了供应商返回响应的数据结构。
-    属性:
-    - provider: 供应商名称。
-    - label: 本地化标签对象。
-    - description: 可选的本地化描述对象，默认为None。
-    - icon_small: 可选的小图标本地化对象，默认为None。
-    - icon_large: 可选的大图标本地化对象，默认为None。
-    - background: 可选的背景颜色，默认为None。
-    - help: 可选的供应商帮助信息对象，默认为None。
-    - supported_model_types: 支持的模型类型列表。
-    - configurate_methods: 配置方法列表。
-    - provider_credential_schema: 可选的供应商凭证模式对象，默认为None。
-    - model_credential_schema: 可选的模型凭证模式对象，默认为None。
-    - preferred_provider_type: 优选的供应商类型。
-    - custom_configuration: 自定义配置响应对象。
-    - system_configuration: 系统配置响应对象。
+    Model class for provider response.
     """
+    provider: str
+    label: I18nObject
+    description: Optional[I18nObject] = None
+    icon_small: Optional[I18nObject] = None
+    icon_large: Optional[I18nObject] = None
+    background: Optional[str] = None
+    help: Optional[ProviderHelpEntity] = None
+    supported_model_types: list[ModelType]
+    configurate_methods: list[ConfigurateMethod]
+    provider_credential_schema: Optional[ProviderCredentialSchema] = None
+    model_credential_schema: Optional[ModelCredentialSchema] = None
+    preferred_provider_type: ProviderType
+    custom_configuration: CustomConfigurationResponse
+    system_configuration: SystemConfigurationResponse
 
-    # 初始化函数，构造ProviderResponse实例。
+    # pydantic configs
+    model_config = ConfigDict(protected_namespaces=())
+
     def __init__(self, **data) -> None:
         super().__init__(**data)
 
@@ -157,6 +157,10 @@ class DefaultModelResponse(BaseModel):
     model_type: ModelType
     provider: SimpleProviderEntityResponse
 
+    # pydantic configs
+    model_config = ConfigDict(protected_namespaces=())
+
+
 class ModelWithProviderEntityResponse(ModelWithProviderEntity):
     """
     带提供者实体的模型类。
@@ -170,13 +174,4 @@ class ModelWithProviderEntityResponse(ModelWithProviderEntity):
     provider: SimpleProviderEntityResponse
 
     def __init__(self, model: ModelWithProviderEntity) -> None:
-        """
-        初始化ModelWithProviderEntityResponse实例。
-        
-        参数:
-            model (ModelWithProviderEntity): 包含模型和提供者信息的对象。
-            
-        返回值:
-            None
-        """
-        super().__init__(**model.dict())  # 使用model对象的字典形式初始化当前对象
+        super().__init__(**model.model_dump())

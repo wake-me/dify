@@ -11,7 +11,6 @@ from core.model_runtime.entities.model_entities import ModelType
 from core.model_runtime.errors.validate import CredentialsValidateFailedError
 from core.model_runtime.utils.encoders import jsonable_encoder
 from libs.login import login_required
-from models.account import TenantAccountRole
 from services.model_load_balancing_service import ModelLoadBalancingService
 from services.model_provider_service import ModelProviderService
 
@@ -57,15 +56,9 @@ class DefaultModelApi(Resource):
     @login_required
     @account_initialization_required
     def post(self):
-        """
-        更新默认模型设置。
+        if not current_user.is_admin_or_owner:
+            raise Forbidden()
         
-        参数:
-        - model_settings: 模型设置列表，每个设置项包含模型类型、提供者和模型名称。
-        
-        返回值:
-        - 字典，包含结果信息。
-        """
         parser = reqparse.RequestParser()
         # 解析请求体中的模型设置列表
         parser.add_argument('model_settings', type=list, required=True, nullable=False, location='json')
@@ -138,7 +131,7 @@ class ModelProviderModelApi(Resource):
     @login_required
     @account_initialization_required
     def post(self, provider: str):
-        if not TenantAccountRole.is_privileged_role(current_user.current_tenant.current_role):
+        if not current_user.is_admin_or_owner:
             raise Forbidden()
 
         tenant_id = current_user.current_tenant_id  # 获取当前租户ID
@@ -205,7 +198,7 @@ class ModelProviderModelApi(Resource):
     @login_required
     @account_initialization_required
     def delete(self, provider: str):
-        if not TenantAccountRole.is_privileged_role(current_user.current_tenant.current_role):
+        if not current_user.is_admin_or_owner:
             raise Forbidden()
 
         tenant_id = current_user.current_tenant_id  # 获取当前租户ID

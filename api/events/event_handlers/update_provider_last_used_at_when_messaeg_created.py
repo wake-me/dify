@@ -26,6 +26,6 @@ def handle(sender, **kwargs):
     # 更新数据库中对应的Provider记录的last_used字段为当前时间
     db.session.query(Provider).filter(
         Provider.tenant_id == application_generate_entity.app_config.tenant_id,
-        Provider.provider_name == application_generate_entity.model_config.provider
+        Provider.provider_name == application_generate_entity.model_conf.provider
     ).update({'last_used': datetime.now(timezone.utc).replace(tzinfo=None)})
     db.session.commit()

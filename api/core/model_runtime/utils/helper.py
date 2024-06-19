@@ -16,5 +16,4 @@ def dump_model(model: BaseModel) -> dict:
         # 如果 pydantic 库支持 model_dump 方法，则使用该方法转换模型
         return pydantic.model_dump(model)
     else:
-        # 否则，回退到使用模型的 dict 方法进行转换
-        return model.dict()
+        return model.model_dump()

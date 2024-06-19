@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from json import JSONDecodeError
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from core.entities.model_entities import ModelStatus, ModelWithProviderEntity, SimpleModelProviderEntity
 from core.entities.provider_entities import (
@@ -55,6 +55,9 @@ class ProviderConfiguration(BaseModel):
     system_configuration: SystemConfiguration
     custom_configuration: CustomConfiguration
     model_settings: list[ModelSettings]
+
+    # pydantic configs
+    model_config = ConfigDict(protected_namespaces=())
 
     def __init__(self, **data):
         """
@@ -1132,11 +1135,6 @@ class ProviderModelBundle(BaseModel):
     provider_instance: ModelProvider
     model_type_instance: AIModel
 
-    class Config:
-        """此 pydantic 对象的配置。
-
-        属性:
-            arbitrary_types_allowed (bool): 允许任意类型，使得 pydantic 模型可以接受未预先定义的类型。
-        """
-        
-        arbitrary_types_allowed = True
+    # pydantic configs
+    model_config = ConfigDict(arbitrary_types_allowed=True,
+                              protected_namespaces=())

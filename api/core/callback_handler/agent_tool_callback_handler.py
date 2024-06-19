@@ -55,7 +55,7 @@ class DifyAgentCallbackHandler(BaseModel):
     current_loop: int - 当前循环次数。
     """
     color: Optional[str] = ''
-    current_loop = 1
+    current_loop: int = 1
 
     def __init__(self, color: Optional[str] = None) -> None:
         """

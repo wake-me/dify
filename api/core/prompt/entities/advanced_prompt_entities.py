@@ -16,7 +16,7 @@ class ChatModelMessage(BaseModel):
     """
     text: str
     role: PromptMessageRole
-    edition_type: Optional[Literal['basic', 'jinja2']]
+    edition_type: Optional[Literal['basic', 'jinja2']] = None
 
 class CompletionModelPromptTemplate(BaseModel):
     """
@@ -27,7 +27,7 @@ class CompletionModelPromptTemplate(BaseModel):
     - text: str - 提示文本。
     """
     text: str
-    edition_type: Optional[Literal['basic', 'jinja2']]
+    edition_type: Optional[Literal['basic', 'jinja2']] = None
 
 class MemoryConfig(BaseModel):
     """

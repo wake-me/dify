@@ -55,7 +55,7 @@ class ChatAppRunner(AppRunner):
         # 如果剩余令牌数不足，则抛出异常。
         self.get_pre_calculate_rest_tokens(
             app_record=app_record,
-            model_config=application_generate_entity.model_config,
+            model_config=application_generate_entity.model_conf,
             prompt_template_entity=app_config.prompt_template,
             inputs=inputs,
             files=files,
@@ -66,8 +66,8 @@ class ChatAppRunner(AppRunner):
         if application_generate_entity.conversation_id:
             # 获取会话内存（只读）
             model_instance = ModelInstance(
-                provider_model_bundle=application_generate_entity.model_config.provider_model_bundle,
-                model=application_generate_entity.model_config.model
+                provider_model_bundle=application_generate_entity.model_conf.provider_model_bundle,
+                model=application_generate_entity.model_conf.model
             )
 
             memory = TokenBufferMemory(
@@ -78,7 +78,7 @@ class ChatAppRunner(AppRunner):
         # 组织所有输入和模板到提示消息中
         prompt_messages, stop = self.organize_prompt_messages(
             app_record=app_record,
-            model_config=application_generate_entity.model_config,
+            model_config=application_generate_entity.model_conf,
             prompt_template_entity=app_config.prompt_template,
             inputs=inputs,
             files=files,
@@ -158,7 +158,7 @@ class ChatAppRunner(AppRunner):
                 app_id=app_record.id,
                 user_id=application_generate_entity.user_id,
                 tenant_id=app_record.tenant_id,
-                model_config=application_generate_entity.model_config,
+                model_config=application_generate_entity.model_conf,
                 config=app_config.dataset,
                 query=query,
                 invoke_from=application_generate_entity.invoke_from,
@@ -170,7 +170,7 @@ class ChatAppRunner(AppRunner):
         # 重新组织所有输入和模板到提示消息中，包括外部数据和数据集上下文（如果存在）
         prompt_messages, stop = self.organize_prompt_messages(
             app_record=app_record,
-            model_config=application_generate_entity.model_config,
+            model_config=application_generate_entity.model_conf,
             prompt_template_entity=app_config.prompt_template,
             inputs=inputs,
             files=files,
@@ -191,14 +191,14 @@ class ChatAppRunner(AppRunner):
 
         # 重新计算最大令牌数，如果提示令牌数加上最大令牌数超过模型令牌限制
         self.recalc_llm_max_tokens(
-            model_config=application_generate_entity.model_config,
+            model_config=application_generate_entity.model_conf,
             prompt_messages=prompt_messages
         )
 
         # 调用模型
         model_instance = ModelInstance(
-            provider_model_bundle=application_generate_entity.model_config.provider_model_bundle,
-            model=application_generate_entity.model_config.model
+            provider_model_bundle=application_generate_entity.model_conf.provider_model_bundle,
+            model=application_generate_entity.model_conf.model
         )
 
         db.session.close()
@@ -206,7 +206,7 @@ class ChatAppRunner(AppRunner):
         # 模型调用结果处理
         invoke_result = model_instance.invoke_llm(
             prompt_messages=prompt_messages,
-            model_parameters=application_generate_entity.model_config.parameters,
+            model_parameters=application_generate_entity.model_conf.parameters,
             stop=stop,
             stream=application_generate_entity.stream,
             user=application_generate_entity.user_id,

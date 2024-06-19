@@ -4,7 +4,7 @@ import requests
 from flask_login import current_user
 
 from extensions.ext_database import db
-from models.source import DataSourceBinding
+from models.source import DataSourceOauthBinding
 
 
 class OAuthDataSource:
@@ -123,12 +123,12 @@ class NotionOAuth(OAuthDataSource):
             'pages': pages,
             'total': len(pages)
         }
-        # 处理数据源绑定
-        data_source_binding = DataSourceBinding.query.filter(
+        # save data source binding
+        data_source_binding = DataSourceOauthBinding.query.filter(
             db.and_(
-                DataSourceBinding.tenant_id == current_user.current_tenant_id,
-                DataSourceBinding.provider == 'notion',
-                DataSourceBinding.access_token == access_token
+                DataSourceOauthBinding.tenant_id == current_user.current_tenant_id,
+                DataSourceOauthBinding.provider == 'notion',
+                DataSourceOauthBinding.access_token == access_token
             )
         ).first()
         if data_source_binding:
@@ -137,8 +137,7 @@ class NotionOAuth(OAuthDataSource):
             data_source_binding.disabled = False
             db.session.commit()
         else:
-            # 新增数据源绑定
-            new_data_source_binding = DataSourceBinding(
+            new_data_source_binding = DataSourceOauthBinding(
                 tenant_id=current_user.current_tenant_id,
                 access_token=access_token,
                 source_info=source_info,
@@ -170,12 +169,12 @@ class NotionOAuth(OAuthDataSource):
             'pages': pages,
             'total': len(pages)
         }
-        # 保存数据源绑定
-        data_source_binding = DataSourceBinding.query.filter(
+        # save data source binding
+        data_source_binding = DataSourceOauthBinding.query.filter(
             db.and_(
-                DataSourceBinding.tenant_id == current_user.current_tenant_id,
-                DataSourceBinding.provider == 'notion',
-                DataSourceBinding.access_token == access_token
+                DataSourceOauthBinding.tenant_id == current_user.current_tenant_id,
+                DataSourceOauthBinding.provider == 'notion',
+                DataSourceOauthBinding.access_token == access_token
             )
         ).first()
         if data_source_binding:
@@ -184,8 +183,7 @@ class NotionOAuth(OAuthDataSource):
             data_source_binding.disabled = False
             db.session.commit()
         else:
-            # 如果不存在，则创建新的数据源绑定并保存
-            new_data_source_binding = DataSourceBinding(
+            new_data_source_binding = DataSourceOauthBinding(
                 tenant_id=current_user.current_tenant_id,
                 access_token=access_token,
                 source_info=source_info,
@@ -195,22 +193,13 @@ class NotionOAuth(OAuthDataSource):
             db.session.commit()
 
     def sync_data_source(self, binding_id: str):
-        """
-        同步数据源信息。该方法通过绑定ID查找数据源绑定信息，并根据授权页面更新数据源的详细信息。
-
-        参数:
-        - binding_id (str): 数据源绑定的唯一标识符。
-
-        返回值:
-        - 无返回值。如果找不到对应的数据源绑定，则抛出 ValueError。
-        """
-        # 根据条件查询数据源绑定信息
-        data_source_binding = DataSourceBinding.query.filter(
+        # save data source binding
+        data_source_binding = DataSourceOauthBinding.query.filter(
             db.and_(
-                DataSourceBinding.tenant_id == current_user.current_tenant_id,
-                DataSourceBinding.provider == 'notion',
-                DataSourceBinding.id == binding_id,
-                DataSourceBinding.disabled == False
+                DataSourceOauthBinding.tenant_id == current_user.current_tenant_id,
+                DataSourceOauthBinding.provider == 'notion',
+                DataSourceOauthBinding.id == binding_id,
+                DataSourceOauthBinding.disabled == False
             )
         ).first()
         if data_source_binding:

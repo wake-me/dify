@@ -85,11 +85,10 @@ class EasyUIBasedGenerateTaskPipeline(BasedGenerateTaskPipeline, MessageCycleMan
         :param stream: 是否为流式
         """
         super().__init__(application_generate_entity, queue_manager, user, stream)
-        self._model_config = application_generate_entity.model_config  # 模型配置
-        self._conversation = conversation  # 对话
-        self._message = message  # 消息
+        self._model_config = application_generate_entity.model_conf
+        self._conversation = conversation
+        self._message = message
 
-        # 初始化任务状态
         self._task_state = EasyUITaskState(
             llm_result=LLMResult(
                 model=self._model_config.model,  # 模型

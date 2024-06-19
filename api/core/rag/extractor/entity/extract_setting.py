@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
 
 from models.dataset import Document
 from models.model import UploadFile
@@ -10,12 +12,27 @@ class NotionInfo(BaseModel):
     
     用于存储从Notion导入的相关信息，包括工作区ID、对象ID、页面类型和文档信息。
     """
+    notion_workspace_id: str
+    notion_obj_id: str
+    notion_page_type: str
+    document: Document = None
+    tenant_id: str
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    notion_workspace_id: str  # Notion工作区ID
-    notion_obj_id: str  # Notion对象ID
-    notion_page_type: str  # Notion页面类型
-    document: Document = None  # 关联的文档对象
-    tenant_id: str  # 租户ID
+    def __init__(self, **data) -> None:
+        super().__init__(**data)
+
+
+class WebsiteInfo(BaseModel):
+    """
+    website import info.
+    """
+    provider: str
+    job_id: str
+    url: str
+    mode: str
+    tenant_id: str
+    only_main_content: bool = False
 
     class Config:
         arbitrary_types_allowed = True  # 允许任意类型的数据
@@ -35,14 +52,12 @@ class ExtractSetting(BaseModel):
     
     用于存储数据提取相关的设置信息，包括数据源类型、上传文件和Notion信息。
     """
-
-    datasource_type: str  # 数据源类型
-    upload_file: UploadFile = None  # 上传的文件
-    notion_info: NotionInfo = None  # Notion信息
-    document_model: str = None  # 文档模型
-
-    class Config:
-        arbitrary_types_allowed = True  # 允许任意类型的数据
+    datasource_type: str
+    upload_file: Optional[UploadFile] = None
+    notion_info: Optional[NotionInfo] = None
+    website_info: Optional[WebsiteInfo] = None
+    document_model: Optional[str] = None
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def __init__(self, **data) -> None:
         """

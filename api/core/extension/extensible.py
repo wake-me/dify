@@ -22,17 +22,7 @@ class ExtensionModule(enum.Enum):
 
 
 class ModuleExtension(BaseModel):
-    """
-    模块扩展类，定义了一个模块扩展的基本结构。
-
-    extension_class: 扩展类的引用，可以是任何类型。
-    name: 扩展的名称，字符串类型。
-    label: 扩展的标签，是一个字典，可以是可选的。
-    form_schema: 表单结构定义，以列表形式表示，是可选的。
-    builtin: 标记是否为内置扩展，布尔类型，默认为True。
-    position: 扩展的位置，整数类型，是可选的。
-    """
-    extension_class: Any
+    extension_class: Any = None
     name: str
     label: Optional[dict] = None
     form_schema: Optional[list] = None

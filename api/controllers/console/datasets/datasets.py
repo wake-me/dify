@@ -8,7 +8,7 @@ import services
 from controllers.console import api
 from controllers.console.apikey import api_key_fields, api_key_list
 from controllers.console.app.error import ProviderNotInitializeError
-from controllers.console.datasets.error import DatasetNameDuplicateError
+from controllers.console.datasets.error import DatasetInUseError, DatasetNameDuplicateError
 from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required
 from core.errors.error import LLMBadRequestError, ProviderTokenNotInitError
@@ -167,8 +167,8 @@ class DatasetListApi(Resource):
                             help='Invalid indexing technique.')
         args = parser.parse_args()
 
-        # 检查用户角色是否为管理员或所有者
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
             raise Forbidden()
 
         try:
@@ -287,8 +287,8 @@ class DatasetApi(Resource):
         parser.add_argument('retrieval_model', type=dict, location='json', help='Invalid retrieval model.')
         args = parser.parse_args()  # 解析传入的参数
 
-        # 检查当前用户是否有权限更新数据集
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
             raise Forbidden()
 
         dataset = DatasetService.update_dataset(
@@ -319,15 +319,17 @@ class DatasetApi(Resource):
         """
         dataset_id_str = str(dataset_id)
 
-        # 检查当前用户是否有权限删除数据集
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, or editor
+        if not current_user.is_editor:
             raise Forbidden()
 
-        # 尝试删除数据集，并根据结果进行处理
-        if DatasetService.delete_dataset(dataset_id_str, current_user):
-            return {'result': 'success'}, 204
-        else:
-            raise NotFound("Dataset not found.")
+        try:
+            if DatasetService.delete_dataset(dataset_id_str, current_user):
+                return {'result': 'success'}, 204
+            else:
+                raise NotFound("Dataset not found.")
+        except services.errors.dataset.DatasetInUseError:
+            raise DatasetInUseError()
 
 
 class DatasetQueryApi(Resource):
@@ -470,6 +472,22 @@ class DatasetIndexingEstimateApi(Resource):
                         document_model=args['doc_form']
                     )
                     extract_settings.append(extract_setting)
+        elif args['info_list']['data_source_type'] == 'website_crawl':
+            website_info_list = args['info_list']['website_info_list']
+            for url in website_info_list['urls']:
+                extract_setting = ExtractSetting(
+                    datasource_type="website_crawl",
+                    website_info={
+                        "provider": website_info_list['provider'],
+                        "job_id": website_info_list['job_id'],
+                        "url": url,
+                        "tenant_id": current_user.current_tenant_id,
+                        "mode": 'crawl',
+                        "only_main_content": website_info_list['only_main_content']
+                    },
+                    document_model=args['doc_form']
+                )
+                extract_settings.append(extract_setting)
         else:
             raise ValueError('Data source type not support')
         
@@ -750,15 +768,14 @@ class DatasetRetrievalSettingApi(Resource):
             dict: 包含一个名为'retrieval_method'的列表键，列表中包含支持的检索方法。
         """
         vector_type = current_app.config['VECTOR_STORE']
-
         match vector_type:
-            case VectorType.MILVUS | VectorType.RELYT | VectorType.PGVECTOR | VectorType.TIDB_VECTOR:
+            case VectorType.MILVUS | VectorType.RELYT | VectorType.PGVECTOR | VectorType.TIDB_VECTOR | VectorType.CHROMA | VectorType.TENCENT:
                 return {
                     'retrieval_method': [
                         'semantic_search'
                     ]
                 }
-            case VectorType.QDRANT | VectorType.WEAVIATE:
+            case VectorType.QDRANT | VectorType.WEAVIATE | VectorType.OPENSEARCH:
                 return {
                     'retrieval_method': [
                         'semantic_search', 'full_text_search', 'hybrid_search'
@@ -787,13 +804,13 @@ class DatasetRetrievalSettingMockApi(Resource):
     @account_initialization_required
     def get(self, vector_type):
         match vector_type:
-            case VectorType.MILVUS | VectorType.RELYT | VectorType.PGVECTOR | VectorType.TIDB_VECTOR:
+            case VectorType.MILVUS | VectorType.RELYT | VectorType.PGVECTOR | VectorType.TIDB_VECTOR | VectorType.CHROMA | VectorType.TENCEN:
                 return {
                     'retrieval_method': [
                         'semantic_search'
                     ]
                 }
-            case VectorType.QDRANT | VectorType.WEAVIATE:
+            case VectorType.QDRANT | VectorType.WEAVIATE | VectorType.OPENSEARCH:
                 return {
                     'retrieval_method': [
                         'semantic_search', 'full_text_search', 'hybrid_search'
@@ -801,6 +818,7 @@ class DatasetRetrievalSettingMockApi(Resource):
                 }
             case _:
                 raise ValueError(f"Unsupported vector db type {vector_type}.")
+
 
 
 class DatasetErrorDocs(Resource):

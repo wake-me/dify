@@ -28,8 +28,8 @@ class CodeExecutionException(Exception):
 
 class CodeExecutionResponse(BaseModel):
     class Data(BaseModel):
-        stdout: Optional[str]  # 标准输出，如果有的话
-        error: Optional[str]  # 错误信息，如果执行过程中有错误的话
+        stdout: Optional[str] = None
+        error: Optional[str] = None
 
     code: int
     message: str
@@ -91,7 +91,7 @@ class CodeExecutor:
         }
 
         if dependencies:
-            data['dependencies'] = [dependency.dict() for dependency in dependencies]
+            data['dependencies'] = [dependency.model_dump() for dependency in dependencies]
 
         try:
             response = post(str(url), json=data, headers=headers, timeout=CODE_EXECUTION_TIMEOUT)
