@@ -1,8 +1,8 @@
 """Abstract interface for document loader implementations."""
+import os
 from typing import Optional
 
 import pandas as pd
-import xlrd
 
 from core.rag.extractor.extractor_base import BaseExtractor
 from core.rag.models.document import Document
@@ -33,79 +33,26 @@ class ExcelExtractor(BaseExtractor):
         self._autodetect_encoding = autodetect_encoding
 
     def extract(self) -> list[Document]:
-        """解析Excel文件并返回Document对象列表。
-
-        Returns:
-            从Excel文件解析得到的Document对象列表。
-        """
-        # 根据文件扩展名确定文件类型，并调用相应的提取方法
-        if self._file_path.endswith('.xls'):
-            return self._extract4xls()
-        elif self._file_path.endswith('.xlsx'):
-            return self._extract4xlsx()
-
-    def _extract4xls(self) -> list[Document]:
-        """从.xls文件中提取数据并返回Document对象列表。
-
-        Returns:
-            包含从.xls文件中提取数据的Document对象列表。
-        """
-        wb = xlrd.open_workbook(filename=self._file_path)
+        """ Load from Excel file in xls or xlsx format using Pandas."""
         documents = []
-        # 遍历工作簿中的所有表单
-        for sheet in wb.sheets():
-            row_header = None
-            for row_index, row in enumerate(sheet.get_rows(), start=1):                
-                if self.is_blank_row(row):
-                    continue
-                if row_header is None:
-                    row_header = row
-                    continue
-                # 从每一行中提取数据并创建Document对象
-                item_arr = []
-                for index, cell in enumerate(row):
-                    txt_value = str(cell.value)
-                    item_arr.append(f'"{row_header[index].value}":"{txt_value}"')
-                item_str = ",".join(item_arr)
-                document = Document(page_content=item_str, metadata={'source': self._file_path})
-                documents.append(document)
-        return documents
-
-    def _extract4xlsx(self) -> list[Document]:
-        """从.xlsx文件中提取数据并返回Document对象列表。
-
-        Returns:
-            包含从.xlsx文件中提取数据的Document对象列表。
-        """
-        data = []
-        # 使用Pandas读取Excel文件中的每个工作表
-        xls = pd.ExcelFile(self._file_path)
-        for sheet_name in xls.sheet_names:
-            df = pd.read_excel(xls, sheet_name=sheet_name)
+        # Determine the file extension
+        file_extension = os.path.splitext(self._file_path)[-1].lower()
+        # Read each worksheet of an Excel file using Pandas
+        if file_extension == '.xlsx':
+            excel_file = pd.ExcelFile(self._file_path, engine='openpyxl')
+        elif file_extension == '.xls':
+            excel_file = pd.ExcelFile(self._file_path, engine='xlrd')
+        else:
+            raise ValueError(f"Unsupported file extension: {file_extension}")
+        for sheet_name in excel_file.sheet_names:
+            df: pd.DataFrame = excel_file.parse(sheet_name=sheet_name)
 
             # 移除全为空值的行
             df.dropna(how='all', inplace=True)
 
-            # 为每行数据创建一个Document对象
-            for _, row in df.iterrows():
-                item = ';'.join(f'"{k}":"{v}"' for k, v in row.items() if pd.notna(v))
-                document = Document(page_content=item, metadata={'source': self._file_path})
-                data.append(document)
-        return data
+            # transform each row into a Document
+            documents += [Document(page_content=';'.join(f'"{k}":"{v}"' for k, v in row.items() if pd.notna(v)),
+                                   metadata={'source': self._file_path},
+                                   ) for _, row in df.iterrows()]
 
-    @staticmethod
-    def is_blank_row(row):
-        """
-        判断给定行是否为空行。
-
-        Args:
-            row: 待检查的行。
-
-        Returns:
-            若行为空则返回True，否则返回False。
-        """
-        # 检查行中是否有非空值的单元格
-        for cell in row:
-            if cell.value is not None and cell.value != '':
-                return False
-        return True
+        return documents

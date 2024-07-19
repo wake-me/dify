@@ -9,9 +9,9 @@ from mimetypes import guess_extension, guess_type
 from typing import Optional, Union
 from uuid import uuid4
 
-from flask import current_app
 from httpx import get
 
+from configs import dify_config
 from extensions.ext_database import db
 from extensions.ext_storage import storage
 from models.model import MessageFile
@@ -24,35 +24,22 @@ class ToolFileManager:
     @staticmethod
     def sign_file(tool_file_id: str, extension: str) -> str:
         """
-        对文件进行签名，以获取一个临时URL。
-        
-        参数:
-        - tool_file_id: str - 工具文件的ID
-        - extension: str - 文件的扩展名
-        
-        返回值:
-        - str: 签名后的文件预览URL
+        sign file to get a temporary url
         """
-        # 获取基础URL
-        base_url = current_app.config.get('FILES_URL')
-        # 构建文件预览URL
+        base_url = dify_config.FILES_URL
         file_preview_url = f'{base_url}/files/tools/{tool_file_id}{extension}'
 
         # 生成时间戳
         timestamp = str(int(time.time()))
         # 生成随机数
         nonce = os.urandom(16).hex()
-        # 准备待签名的数据
-        data_to_sign = f"file-preview|{tool_file_id}|{timestamp}|{nonce}"
-        # 获取密钥
-        secret_key = current_app.config['SECRET_KEY'].encode()
-        # 计算签名
+        data_to_sign = f'file-preview|{tool_file_id}|{timestamp}|{nonce}'
+        secret_key = dify_config.SECRET_KEY.encode() if dify_config.SECRET_KEY else b''
         sign = hmac.new(secret_key, data_to_sign.encode(), hashlib.sha256).digest()
         # 对签名进行编码
         encoded_sign = base64.urlsafe_b64encode(sign).decode()
 
-        # 返回带签名的文件预览URL
-        return f"{file_preview_url}?timestamp={timestamp}&nonce={nonce}&sign={encoded_sign}"
+        return f'{file_preview_url}?timestamp={timestamp}&nonce={nonce}&sign={encoded_sign}'
 
     @staticmethod
     def verify_file(file_id: str, timestamp: str, nonce: str, sign: str) -> bool:
@@ -68,11 +55,8 @@ class ToolFileManager:
         返回值:
         - 返回一个布尔值，True表示签名验证通过，False表示验证失败。
         """
-        # 构造待签名字符串
-        data_to_sign = f"file-preview|{file_id}|{timestamp}|{nonce}"
-        # 获取应用的密钥
-        secret_key = current_app.config['SECRET_KEY'].encode()
-        # 计算签名
+        data_to_sign = f'file-preview|{file_id}|{timestamp}|{nonce}'
+        secret_key = dify_config.SECRET_KEY.encode() if dify_config.SECRET_KEY else b''
         recalculated_sign = hmac.new(secret_key, data_to_sign.encode(), hashlib.sha256).digest()
         # 对计算得到的签名进行Base64编码
         recalculated_encoded_sign = base64.urlsafe_b64encode(recalculated_sign).decode()
@@ -83,13 +67,12 @@ class ToolFileManager:
 
         # 检查时间戳是否过期，过期时间为5分钟
         current_time = int(time.time())
-        return current_time - int(timestamp) <= current_app.config.get('FILES_ACCESS_TIMEOUT')
+        return current_time - int(timestamp) <= dify_config.FILES_ACCESS_TIMEOUT
 
     @staticmethod
-    def create_file_by_raw(user_id: str, tenant_id: str,
-                        conversation_id: Optional[str], file_binary: bytes,
-                        mimetype: str
-                        ) -> ToolFile:
+    def create_file_by_raw(
+        user_id: str, tenant_id: str, conversation_id: Optional[str], file_binary: bytes, mimetype: str
+    ) -> ToolFile:
         """
         创建文件。
 
@@ -108,12 +91,12 @@ class ToolFileManager:
         extension = guess_extension(mimetype) or '.bin'
         # 生成唯一的文件名
         unique_name = uuid4().hex
-        filename = f"tools/{tenant_id}/{unique_name}{extension}"
+        filename = f'tools/{tenant_id}/{unique_name}{extension}'
         storage.save(filename, file_binary)
 
-        # 创建ToolFile对象，关联用户、租户、会话和文件信息
-        tool_file = ToolFile(user_id=user_id, tenant_id=tenant_id,
-                            conversation_id=conversation_id, file_key=filename, mimetype=mimetype)
+        tool_file = ToolFile(
+            user_id=user_id, tenant_id=tenant_id, conversation_id=conversation_id, file_key=filename, mimetype=mimetype
+        )
 
         # 将ToolFile对象添加到数据库会话并提交
         db.session.add(tool_file)
@@ -122,9 +105,12 @@ class ToolFileManager:
         return tool_file
 
     @staticmethod
-    def create_file_by_url(user_id: str, tenant_id: str,
-                        conversation_id: str, file_url: str,
-                        ) -> ToolFile:
+    def create_file_by_url(
+        user_id: str,
+        tenant_id: str,
+        conversation_id: str,
+        file_url: str,
+    ) -> ToolFile:
         """
         根据提供的URL创建文件。
 
@@ -146,13 +132,17 @@ class ToolFileManager:
         extension = guess_extension(mimetype) or '.bin'
         # 生成唯一文件名
         unique_name = uuid4().hex
-        filename = f"tools/{tenant_id}/{unique_name}{extension}"
+        filename = f'tools/{tenant_id}/{unique_name}{extension}'
         storage.save(filename, blob)
 
-        # 创建ToolFile对象并加入数据库会话
-        tool_file = ToolFile(user_id=user_id, tenant_id=tenant_id,
-                            conversation_id=conversation_id, file_key=filename,
-                            mimetype=mimetype, original_url=file_url)
+        tool_file = ToolFile(
+            user_id=user_id,
+            tenant_id=tenant_id,
+            conversation_id=conversation_id,
+            file_key=filename,
+            mimetype=mimetype,
+            original_url=file_url,
+        )
 
         db.session.add(tool_file)
         db.session.commit()
@@ -160,10 +150,9 @@ class ToolFileManager:
         return tool_file
 
     @staticmethod
-    def create_file_by_key(user_id: str, tenant_id: str,
-                        conversation_id: str, file_key: str,
-                        mimetype: str
-                        ) -> ToolFile:
+    def create_file_by_key(
+        user_id: str, tenant_id: str, conversation_id: str, file_key: str, mimetype: str
+    ) -> ToolFile:
         """
         创建文件对象。
 
@@ -177,9 +166,9 @@ class ToolFileManager:
         返回:
         ToolFile: 文件对象。
         """
-        # 创建ToolFile实例
-        tool_file = ToolFile(user_id=user_id, tenant_id=tenant_id,
-                            conversation_id=conversation_id, file_key=file_key, mimetype=mimetype)
+        tool_file = ToolFile(
+            user_id=user_id, tenant_id=tenant_id, conversation_id=conversation_id, file_key=file_key, mimetype=mimetype
+        )
         return tool_file
 
     @staticmethod
@@ -195,10 +184,13 @@ class ToolFileManager:
         2. 如果查询到ToolFile对象存在，则从存储系统中加载一次该文件的二进制数据。
         3. 返回文件的二进制数据和MIME类型作为元组；如果文件不存在，则返回None。
         """
-        # 从数据库中查询指定ID的ToolFile对象
-        tool_file: ToolFile = db.session.query(ToolFile).filter(
-            ToolFile.id == id,
-        ).first()
+        tool_file: ToolFile = (
+            db.session.query(ToolFile)
+            .filter(
+                ToolFile.id == id,
+            )
+            .first()
+        )
 
         if not tool_file:
             return None  # 如果找不到对应的文件，直接返回None
@@ -218,20 +210,31 @@ class ToolFileManager:
         :return: 返回一个包含文件二进制数据和MIME类型的元组，如果找不到文件则返回None。
 
         """
-        # 从数据库中查询对应文件id的消息文件
-        message_file: MessageFile = db.session.query(MessageFile).filter(
-            MessageFile.id == id,
-        ).first()
+        message_file: MessageFile = (
+            db.session.query(MessageFile)
+            .filter(
+                MessageFile.id == id,
+            )
+            .first()
+        )
 
-        # 从消息文件的URL中提取工具文件ID
-        tool_file_id = message_file.url.split('/')[-1]
-        # 去除文件扩展名获取纯ID
-        tool_file_id = tool_file_id.split('.')[0]
+        # Check if message_file is not None
+        if message_file is not None:
+            # get tool file id
+            tool_file_id = message_file.url.split('/')[-1]
+            # trim extension
+            tool_file_id = tool_file_id.split('.')[0]
+        else:
+            tool_file_id = None
 
-        # 查询工具文件信息
-        tool_file: ToolFile = db.session.query(ToolFile).filter(
-            ToolFile.id == tool_file_id,
-        ).first()
+
+        tool_file: ToolFile = (
+            db.session.query(ToolFile)
+            .filter(
+                ToolFile.id == tool_file_id,
+            )
+            .first()
+        )
 
         # 如果工具文件不存在，则直接返回None
         if not tool_file:
@@ -254,10 +257,13 @@ class ToolFileManager:
         :return: 返回一个包含文件二进制流的生成器和文件MIME类型的元组，如果文件不存在则返回None
         :rtype: Union[tuple[Generator, str], None]
         """
-        # 从数据库中查询对应ID的工具文件
-        tool_file: ToolFile = db.session.query(ToolFile).filter(
-            ToolFile.id == tool_file_id,
-        ).first()
+        tool_file: ToolFile = (
+            db.session.query(ToolFile)
+            .filter(
+                ToolFile.id == tool_file_id,
+            )
+            .first()
+        )
 
         # 如果工具文件不存在，则直接返回None
         if not tool_file:

@@ -127,15 +127,19 @@ class VariableEntity(BaseModel):
                     return mode
             raise ValueError(f'invalid variable type value {value}')  # 若找不到匹配的类型，则抛出异常
 
-    variable: str  # 变量名
-    label: str  # 标签，用于前端展示
-    description: Optional[str] = None  # 描述信息，可选
-    type: Type  # 变量的输入类型
-    required: bool = False  # 是否必填
-    max_length: Optional[int] = None  # 最大长度，针对文本类型
-    options: Optional[list[str]] = None  # 可选项列表，针对下拉选择类型
-    default: Optional[str] = None  # 默认值，可选
-    hint: Optional[str] = None  # 提示信息，可选
+    variable: str
+    label: str
+    description: Optional[str] = None
+    type: Type
+    required: bool = False
+    max_length: Optional[int] = None
+    options: Optional[list[str]] = None
+    default: Optional[str] = None
+    hint: Optional[str] = None
+
+    @property
+    def name(self) -> str:
+        return self.variable
 
 
 class ExternalDataVariableEntity(BaseModel):
@@ -228,6 +232,14 @@ class TextToSpeechEntity(BaseModel):
     language: Optional[str] = None
 
 
+class TracingConfigEntity(BaseModel):
+    """
+    Tracing Config Entity.
+    """
+    enabled: bool
+    tracing_provider: str
+
+
 class FileExtraConfig(BaseModel):
     """
     文件上传额外配置实体类。
@@ -261,6 +273,7 @@ class AppAdditionalFeatures(BaseModel):
     more_like_this: bool = False
     speech_to_text: bool = False
     text_to_speech: Optional[TextToSpeechEntity] = None
+    trace_config: Optional[TracingConfigEntity] = None
 
 class AppConfig(BaseModel):
     """

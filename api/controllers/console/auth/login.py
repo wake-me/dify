@@ -1,12 +1,15 @@
+from typing import cast
+
 import flask_login
-from flask import current_app, request
+from flask import request
 from flask_restful import Resource, reqparse
 
 import services
 from controllers.console import api
 from controllers.console.setup import setup_required
-from libs.helper import email
+from libs.helper import email, get_remote_ip
 from libs.password import valid_password
+from models.account import Account
 from services.account_service import AccountService, TenantService
 
 
@@ -45,11 +48,7 @@ class LoginApi(Resource):
         if len(tenants) == 0:
             return {'result': 'fail', 'data': 'workspace not found, please contact system admin to invite you to join in a workspace'}
 
-        # 更新用户上次登录信息
-        AccountService.update_last_login(account, request)
-
-        # 生成并返回用户JWT令牌
-        token = AccountService.get_account_jwt_token(account)
+        token = AccountService.login(account, ip_address=get_remote_ip(request))
 
         return {'result': 'success', 'data': token}
 
@@ -61,64 +60,47 @@ class LogoutApi(Resource):
 
     @setup_required
     def get(self):
-        """
-        处理用户登出的GET请求。
-
-        无需参数。
-
-        返回值:
-            返回一个包含登出结果的字典，如{'result': 'success'}。
-        """
-        flask_login.logout_user()  # 执行用户登出操作
-        return {'result': 'success'}  # 返回登出成功的提示
+        account = cast(Account, flask_login.current_user)
+        token = request.headers.get('Authorization', '').split(' ')[1]
+        AccountService.logout(account=account, token=token)
+        flask_login.logout_user()
+        return {'result': 'success'}
 
 
 class ResetPasswordApi(Resource):
     @setup_required
     def get(self):
-        """
-        处理重置密码的GET请求。
-        
-        要求提供电子邮件地址，然后向该地址发送一封包含新密码的邮件。
-        
-        参数:
-        - 无（通过GET请求的JSON体中获取email参数）
-        
-        返回值:
-        - {'result': 'success'}: 表示发送重置密码邮件操作成功
-        """
-        parser = reqparse.RequestParser()
-        parser.add_argument('email', type=email, required=True, location='json')
-        args = parser.parse_args()
+        # parser = reqparse.RequestParser()
+        # parser.add_argument('email', type=email, required=True, location='json')
+        # args = parser.parse_args()
 
         # import mailchimp_transactional as MailchimpTransactional
         # from mailchimp_transactional.api_client import ApiClientError
-        
-        # 准备发送密码重置邮件所需的账户信息
-        account = {'email': args['email']}
+
+        # account = {'email': args['email']}
         # account = AccountService.get_by_email(args['email'])
         # if account is None:
         #     raise ValueError('Email not found')
         # new_password = AccountService.generate_password()
         # AccountService.update_password(account, new_password)
 
-        # TODO: 发送邮件通知用户新密码
-        MAILCHIMP_API_KEY = current_app.config['MAILCHIMP_TRANSACTIONAL_API_KEY']
+        # todo: Send email
+        # MAILCHIMP_API_KEY = current_app.config['MAILCHIMP_TRANSACTIONAL_API_KEY']
         # mailchimp = MailchimpTransactional(MAILCHIMP_API_KEY)
 
-        message = {
-            'from_email': 'noreply@example.com',
-            'to': [{'email': account.email}],
-            'subject': 'Reset your Dify password',
-            'html': """
-                <p>Dear User,</p>
-                <p>The Dify team has generated a new password for you, details as follows:</p> 
-                <p><strong>{new_password}</strong></p>
-                <p>Please change your password to log in as soon as possible.</p>
-                <p>Regards,</p>
-                <p>The Dify Team</p> 
-            """
-        }
+        # message = {
+        #     'from_email': 'noreply@example.com',
+        #     'to': [{'email': account['email']}],
+        #     'subject': 'Reset your Dify password',
+        #     'html': """
+        #         <p>Dear User,</p>
+        #         <p>The Dify team has generated a new password for you, details as follows:</p> 
+        #         <p><strong>{new_password}</strong></p>
+        #         <p>Please change your password to log in as soon as possible.</p>
+        #         <p>Regards,</p>
+        #         <p>The Dify Team</p> 
+        #     """
+        # }
 
         # response = mailchimp.messages.send({
         #     'message': message,

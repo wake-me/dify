@@ -73,6 +73,7 @@ class WorkflowTaskState(TaskState):
 
     iteration_nested_node_ids: list[str] = None
 
+
 class AdvancedChatTaskState(WorkflowTaskState):
     """
     AdvancedChatTaskState 实体类，用于表示高级聊天任务的状态。
@@ -110,6 +111,8 @@ class StreamEvent(Enum):
     ERROR = "error"
     MESSAGE = "message"
     MESSAGE_END = "message_end"
+    TTS_MESSAGE = "tts_message"
+    TTS_MESSAGE_END = "tts_message_end"
     MESSAGE_FILE = "message_file"
     MESSAGE_REPLACE = "message_replace"
     AGENT_THOUGHT = "agent_thought"
@@ -176,6 +179,22 @@ class MessageStreamResponse(StreamResponse):
     event: StreamEvent = StreamEvent.MESSAGE
     id: str
     answer: str
+
+
+class MessageAudioStreamResponse(StreamResponse):
+    """
+    MessageStreamResponse entity
+    """
+    event: StreamEvent = StreamEvent.TTS_MESSAGE
+    audio: str
+
+
+class MessageAudioEndStreamResponse(StreamResponse):
+    """
+    MessageStreamResponse entity
+    """
+    event: StreamEvent = StreamEvent.TTS_MESSAGE_END
+    audio: str
 
 
 class MessageEndStreamResponse(StreamResponse):
@@ -311,7 +330,7 @@ class WorkflowFinishStreamResponse(StreamResponse):
     - workflow_run_id: str，工作流运行的唯一标识符。
     - data: Data，包含工作流完成的详细数据。
     """
-    
+
     class Data(BaseModel):
         """
         Data 实体类，包含工作流完成的具体信息。
@@ -354,6 +373,7 @@ class NodeStartStreamResponse(StreamResponse):
     """
     NodeStartStreamResponse 实体类，用于表示节点启动流响应。
     """
+
     class Data(BaseModel):
         """
         Data 实体类，用于包含节点启动流响应中的数据信息。
@@ -395,6 +415,7 @@ class NodeFinishStreamResponse(StreamResponse):
     """
     NodeFinishStreamResponse实体类，用于表示节点完成流式响应。
     """
+
     class Data(BaseModel):
         """
         数据实体类，包含有关完成的节点的详细信息。
@@ -445,10 +466,12 @@ class NodeFinishStreamResponse(StreamResponse):
             }
         }
 
+
 class IterationNodeStartStreamResponse(StreamResponse):
     """
     NodeStartStreamResponse entity
     """
+
     class Data(BaseModel):
         """
         Data entity
@@ -466,10 +489,12 @@ class IterationNodeStartStreamResponse(StreamResponse):
     workflow_run_id: str
     data: Data
 
+
 class IterationNodeNextStreamResponse(StreamResponse):
     """
     NodeStartStreamResponse entity
     """
+
     class Data(BaseModel):
         """
         Data entity
@@ -487,10 +512,12 @@ class IterationNodeNextStreamResponse(StreamResponse):
     workflow_run_id: str
     data: Data
 
+
 class IterationNodeCompletedStreamResponse(StreamResponse):
     """
     NodeCompletedStreamResponse entity
     """
+
     class Data(BaseModel):
         """
         Data entity
@@ -515,11 +542,13 @@ class IterationNodeCompletedStreamResponse(StreamResponse):
     workflow_run_id: str
     data: Data
 
+
 class TextChunkStreamResponse(StreamResponse):
     """
     TextChunkStreamResponse 实体类
     用于处理文本块流式响应的实体类。
     """
+
     class Data(BaseModel):
         """
         Data 实体类
@@ -536,6 +565,7 @@ class TextReplaceStreamResponse(StreamResponse):
     TextReplaceStreamResponse 实体类
     用于处理文本替换流式响应的实体类。
     """
+
     class Data(BaseModel):
         """
         Data 实体类
@@ -634,6 +664,7 @@ class ChatbotAppBlockingResponse(AppBlockingResponse):
     ChatbotAppBlockingResponse实体类，继承自AppBlockingResponse。
     用于表示聊天机器人的一种阻塞响应，包含与会话相关的数据。
     """
+
     class Data(BaseModel):
         """
         Data实体类，是ChatbotAppBlockingResponse的一部分，用于存储具体的数据信息。
@@ -724,10 +755,12 @@ class WorkflowAppBlockingResponse(AppBlockingResponse):
     workflow_run_id: str
     data: Data
 
+
 class WorkflowIterationState(BaseModel):
     """
     WorkflowIterationState entity
     """
+
     class Data(BaseModel):
         """
         Data entity

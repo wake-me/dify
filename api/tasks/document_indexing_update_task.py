@@ -54,15 +54,15 @@ def document_indexing_update_task(dataset_id: str, document_id: str):
 
         # 查询并获取文档的所有段落，进而获取段落对应的索引节点ID
         segments = db.session.query(DocumentSegment).filter(DocumentSegment.document_id == document_id).all()
-        index_node_ids = [segment.index_node_id for segment in segments]
+        if segments:
+            index_node_ids = [segment.index_node_id for segment in segments]
 
-        # 从向量索引中删除文档
-        index_processor.clean(dataset, index_node_ids)
+            # delete from vector index
+            index_processor.clean(dataset, index_node_ids)
 
-        # 删除数据库中的所有段落记录
-        for segment in segments:
-            db.session.delete(segment)
-        db.session.commit()
+            for segment in segments:
+                db.session.delete(segment)
+            db.session.commit()
         end_at = time.perf_counter()
         # 记录删除文档段落和索引的日志
         logging.info(

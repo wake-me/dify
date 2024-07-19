@@ -48,7 +48,7 @@ class AgentConfigManager:
                         'provider_type': tool['provider_type'],
                         'provider_id': tool['provider_id'],
                         'tool_name': tool['tool_name'],
-                        'tool_parameters': tool['tool_parameters'] if 'tool_parameters' in tool else {}
+                        'tool_parameters': tool.get('tool_parameters', {})
                     }
 
                     # 添加代理工具实体到列表

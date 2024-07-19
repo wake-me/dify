@@ -1,6 +1,7 @@
 import decimal
 import os
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import Optional
 
 from pydantic import ConfigDict
@@ -26,15 +27,16 @@ class AIModel(ABC):
     """
     所有模型的基类。
     """
-    model_type: ModelType  # 模型类型
-    model_schemas: list[AIModelEntity] = None  # 模型架构列表
-    started_at: float = 0  # 模型启动时间（秒）
+
+    model_type: ModelType
+    model_schemas: Optional[list[AIModelEntity]] = None
+    started_at: float = 0
 
     # pydantic configs
     model_config = ConfigDict(protected_namespaces=())
 
     @abstractmethod
-    def validate_credentials(self, model: str, credentials: dict) -> None:
+    def validate_credentials(self, model: str, credentials: Mapping) -> None:
         """
         验证模型凭证的正确性。
         
@@ -97,8 +99,8 @@ class AIModel(ABC):
 
         # 从预定义的模型架构中获取价格配置
         price_config: Optional[PriceConfig] = None
-        if model_schema:
-            price_config: PriceConfig = model_schema.pricing
+        if model_schema and model_schema.pricing:
+            price_config = model_schema.pricing
 
         # 获取单位价格
         unit_price = None
@@ -111,13 +113,15 @@ class AIModel(ABC):
         # 若未获取到单位价格，则返回默认价格信息
         if unit_price is None:
             return PriceInfo(
-                unit_price=decimal.Decimal('0.0'),
-                unit=decimal.Decimal('0.0'),
-                total_amount=decimal.Decimal('0.0'),
+                unit_price=decimal.Decimal("0.0"),
+                unit=decimal.Decimal("0.0"),
+                total_amount=decimal.Decimal("0.0"),
                 currency="USD",
             )
 
-        # 计算总价
+        # calculate total amount
+        if not price_config:
+            raise ValueError(f"Price config not found for model {model}")
         total_amount = tokens * unit_price * price_config.unit
         total_amount = total_amount.quantize(decimal.Decimal('0.0000001'), rounding=decimal.ROUND_HALF_UP)
 
@@ -221,7 +225,7 @@ class AIModel(ABC):
 
         return model_schemas
 
-    def get_model_schema(self, model: str, credentials: Optional[dict] = None) -> Optional[AIModelEntity]:
+    def get_model_schema(self, model: str, credentials: Optional[Mapping] = None) -> Optional[AIModelEntity]:
         """
         通过模型名称和凭证获取模型架构
 
@@ -245,7 +249,7 @@ class AIModel(ABC):
 
         return None
 
-    def get_customizable_model_schema_from_credentials(self, model: str, credentials: dict) -> Optional[AIModelEntity]:
+    def get_customizable_model_schema_from_credentials(self, model: str, credentials: Mapping) -> Optional[AIModelEntity]:
         """
         从凭证中获取可定制的模型架构
         
@@ -255,8 +259,8 @@ class AIModel(ABC):
         """
         # 根据模型名称和凭证获取可定制的模型架构
         return self._get_customizable_model_schema(model, credentials)
-        
-    def _get_customizable_model_schema(self, model: str, credentials: dict) -> Optional[AIModelEntity]:
+
+    def _get_customizable_model_schema(self, model: str, credentials: Mapping) -> Optional[AIModelEntity]:
         """
         获取可定制模型的架构，并填充模板。
 
@@ -272,8 +276,8 @@ class AIModel(ABC):
 
         if not schema:
             return None
-        
-        # 根据模板填充架构参数规则
+
+        # fill in the template
         new_parameter_rules = []
         for parameter_rule in schema.parameter_rules:
             if parameter_rule.use_template:
@@ -297,11 +301,20 @@ class AIModel(ABC):
                         parameter_rule.help = I18nObject(
                             en_US=default_parameter_rule['help']['en_US'],
                         )
-                    # 国际化帮助信息
-                    if not parameter_rule.help.en_US and ('help' in default_parameter_rule and 'en_US' in default_parameter_rule['help']):
-                        parameter_rule.help.en_US = default_parameter_rule['help']['en_US']
-                    if not parameter_rule.help.zh_Hans and ('help' in default_parameter_rule and 'zh_Hans' in default_parameter_rule['help']):
-                        parameter_rule.help.zh_Hans = default_parameter_rule['help'].get('zh_Hans', default_parameter_rule['help']['en_US'])
+                    if (
+                        parameter_rule.help
+                        and not parameter_rule.help.en_US
+                        and ("help" in default_parameter_rule and "en_US" in default_parameter_rule["help"])
+                    ):
+                        parameter_rule.help.en_US = default_parameter_rule["help"]["en_US"]
+                    if (
+                        parameter_rule.help
+                        and not parameter_rule.help.zh_Hans
+                        and ("help" in default_parameter_rule and "zh_Hans" in default_parameter_rule["help"])
+                    ):
+                        parameter_rule.help.zh_Hans = default_parameter_rule["help"].get(
+                            "zh_Hans", default_parameter_rule["help"]["en_US"]
+                        )
                 except ValueError:
                     # 忽略无效的模板名称
                     pass
@@ -312,7 +325,7 @@ class AIModel(ABC):
 
         return schema
 
-    def get_customizable_model_schema(self, model: str, credentials: dict) -> Optional[AIModelEntity]:
+    def get_customizable_model_schema(self, model: str, credentials: Mapping) -> Optional[AIModelEntity]:
         """
         获取可定制模型的架构
 
@@ -334,7 +347,7 @@ class AIModel(ABC):
 
         # 如果未找到指定的参数规则，则抛出异常
         if not default_parameter_rule:
-            raise Exception(f'Invalid model parameter rule name {name}')
+            raise Exception(f"Invalid model parameter rule name {name}")
 
         return default_parameter_rule
 

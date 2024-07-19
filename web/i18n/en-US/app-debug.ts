@@ -51,7 +51,7 @@ const translation = {
       title: 'Experience enhance',
     },
     conversationOpener: {
-      title: 'Conversation remakers',
+      title: 'Conversation Opener',
       description: 'In a chat app, the first sentence that the AI actively speaks to the user is usually used as a welcome.',
     },
     suggestedQuestionsAfterAnswer: {
@@ -323,6 +323,9 @@ const translation = {
       language: 'Language',
       resolutionTooltip: 'Text-to-speech voice support language。',
       voice: 'Voice',
+      autoPlay: 'Auto Play',
+      autoPlayEnabled: 'Turn On',
+      autoPlayDisabled: 'Turn Off',
     },
   },
   openingStatement: {

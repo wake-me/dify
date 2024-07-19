@@ -3,8 +3,9 @@ from functools import wraps
 from hashlib import sha1
 from hmac import new as hmac_new
 
-from flask import abort, current_app, request
+from flask import abort, request
 
+from configs import dify_config
 from extensions.ext_database import db
 from models.model import EndUser
 
@@ -21,13 +22,12 @@ def inner_api_only(view):
     """
     @wraps(view)
     def decorated(*args, **kwargs):
-        # 检查是否启用了内部API
-        if not current_app.config['INNER_API']:
+        if not dify_config.INNER_API:
             abort(404)
 
         # 验证请求头中的'X-Inner-Api-Key'
         inner_api_key = request.headers.get('X-Inner-Api-Key')
-        if not inner_api_key or inner_api_key != current_app.config['INNER_API_KEY']:
+        if not inner_api_key or inner_api_key != dify_config.INNER_API_KEY:
             abort(404)
 
         return view(*args, **kwargs)
@@ -47,8 +47,7 @@ def inner_api_user_auth(view):
     """
     @wraps(view)
     def decorated(*args, **kwargs):
-        # 检查是否启用了内部API，未启用则直接访问视图
-        if not current_app.config['INNER_API']:
+        if not dify_config.INNER_API:
             return view(*args, **kwargs)
 
         # 获取请求头中的'Authorization'字段

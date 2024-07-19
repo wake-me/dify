@@ -170,8 +170,11 @@ class MessageCycleManage:
                     extension = '.bin'
             else:
                 extension = '.bin'
-            # 为文件生成签名URL
-            url = ToolFileManager.sign_file(tool_file_id=tool_file_id, extension=extension)
+            # add sign url to local file
+            if message_file.url.startswith('http'):
+                url = message_file.url
+            else:
+                url = ToolFileManager.sign_file(tool_file_id=tool_file_id, extension=extension)
 
             # 构建并返回消息流式响应对象
             return MessageFileStreamResponse(

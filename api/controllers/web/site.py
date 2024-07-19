@@ -1,8 +1,8 @@
 
-from flask import current_app
 from flask_restful import fields, marshal_with
 from werkzeug.exceptions import Forbidden
 
+from configs import dify_config
 from controllers.web import api
 from controllers.web.wraps import WebApiResource
 from extensions.ext_database import db
@@ -29,6 +29,8 @@ class AppSiteApi(WebApiResource):
     # 该字典定义了站点信息的各种字段及其类型，用于构建站点的元数据。
     site_fields = {
         'title': fields.String,
+        'chat_color_theme': fields.String,
+        'chat_color_theme_inverted': fields.Boolean,
         'icon': fields.String,
         'icon_background': fields.String,
         'description': fields.String,
@@ -36,7 +38,8 @@ class AppSiteApi(WebApiResource):
         'privacy_policy': fields.String,
         'custom_disclaimer': fields.String,
         'default_language': fields.String,
-        'prompt_public': fields.Boolean
+        'prompt_public': fields.Boolean,
+        'show_workflow_steps': fields.Boolean,
     }
 
     # 定义应用信息字段，包含嵌套的站点和模型配置信息
@@ -102,9 +105,9 @@ class AppSiteInfo:
 
         # 如果允许替换Logo，则配置自定义参数
         if can_replace_logo:
-            base_url = current_app.config.get('FILES_URL')  # 获取文件服务的基础URL
-            remove_webapp_brand = tenant.custom_config_dict.get('remove_webapp_brand', False)  # 是否移除Web应用的品牌标识
-            replace_webapp_logo = f'{base_url}/files/workspaces/{tenant.id}/webapp-logo' if tenant.custom_config_dict.get('replace_webapp_logo') else None  # 替换Web应用Logo的URL
+            base_url = dify_config.FILES_URL
+            remove_webapp_brand = tenant.custom_config_dict.get('remove_webapp_brand', False)
+            replace_webapp_logo = f'{base_url}/files/workspaces/{tenant.id}/webapp-logo' if tenant.custom_config_dict.get('replace_webapp_logo') else None
             self.custom_config = {
                 'remove_webapp_brand': remove_webapp_brand,
                 'replace_webapp_logo': replace_webapp_logo,

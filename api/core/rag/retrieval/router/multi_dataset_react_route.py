@@ -248,9 +248,7 @@ class ReactMultiDatasetRouter:
                 f"{tool.name}: {tool.description}, args: {{'query': {{'title': 'Query', 'description': 'Query for the dataset to be used to retrieve the dataset.', 'type': 'string'}}}}")
         # 将工具字符串格式化为一个段落
         formatted_tools = "\n".join(tool_strings)
-        # 获取唯一的工具名称集合
-        unique_tool_names = set(tool.name for tool in tools)
-        # 将唯一工具名称格式化为字符串，用于指令中
+        unique_tool_names = {tool.name for tool in tools}
         tool_names = ", ".join('"' + name + '"' for name in unique_tool_names)
         # 使用工具名称更新格式化说明
         format_instructions = format_instructions.format(tool_names=tool_names)

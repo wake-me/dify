@@ -14,7 +14,7 @@ from controllers.console.setup import setup_required
 from controllers.console.wraps import account_initialization_required, cloud_edition_billing_resource_check
 from fields.file_fields import file_fields, upload_config_fields
 from libs.login import login_required
-from services.file_service import ALLOWED_EXTENSIONS, UNSTRUSTURED_ALLOWED_EXTENSIONS, FileService
+from services.file_service import ALLOWED_EXTENSIONS, UNSTRUCTURED_ALLOWED_EXTENSIONS, FileService
 
 # 定义预览模式下可显示文本的最大字数限制。
 PREVIEW_WORDS_LIMIT = 3000
@@ -123,16 +123,9 @@ class FileSupportTypeApi(Resource):
     @login_required
     @account_initialization_required
     def get(self):
-        """
-        获取当前支持的文件扩展名列表。
-        
-        返回值:
-        - 一个包含允许的文件扩展名列表的字典。
-        """
-        etl_type = current_app.config['ETL_TYPE']  # 从应用配置中获取ETL类型
-        # 根据ETL类型选择允许的文件扩展名列表
-        allowed_extensions = UNSTRUSTURED_ALLOWED_EXTENSIONS if etl_type == 'Unstructured' else ALLOWED_EXTENSIONS
-        return {'allowed_extensions': allowed_extensions}  # 返回包含允许扩展名列表的字典
+        etl_type = current_app.config['ETL_TYPE']
+        allowed_extensions = UNSTRUCTURED_ALLOWED_EXTENSIONS if etl_type == 'Unstructured' else ALLOWED_EXTENSIONS
+        return {'allowed_extensions': allowed_extensions}
 
 
 api.add_resource(FileApi, '/files/upload')

@@ -1,5 +1,6 @@
 import os
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from core.helper.module_import_helper import get_subclasses_from_module, import_module_from_source
 from core.model_runtime.entities.model_entities import AIModelEntity, ModelType
@@ -9,11 +10,8 @@ from core.tools.utils.yaml_utils import load_yaml_file
 
 
 class ModelProvider(ABC):
-    # 类ModelProvider的注释：抽象基类，用于提供模型实例和验证提供者凭证。
-    
-    provider_schema: ProviderEntity = None  # 提供者模式属性，用于存储提供者的模式信息。
-    model_instance_map: dict[str, AIModel] = {}  # 模型实例映射，键是模型类型的字符串表示，值是AIModel的实例。
-
+    provider_schema: Optional[ProviderEntity] = None
+    model_instance_map: dict[str, AIModel] = {}
 
     @abstractmethod
     def validate_provider_credentials(self, credentials: dict) -> None:
@@ -29,24 +27,24 @@ class ModelProvider(ABC):
 
     def get_provider_schema(self) -> ProviderEntity:
         """
-        获取提供者模式。
-
-        :return: 返回提供者模式。
+        Get provider schema
+    
+        :return: provider schema
         """
         if self.provider_schema:
             return self.provider_schema
-
-        # 获取当前类所在的模块名
+    
+        # get dirname of the current path
         provider_name = self.__class__.__module__.split('.')[-1]
 
         # 获取模型提供者类所在的路径
         base_path = os.path.abspath(__file__)
         current_path = os.path.join(os.path.dirname(os.path.dirname(base_path)), provider_name)
-
-        # 从yaml文件中读取提供者模式
+    
+        # read provider schema from yaml file
         yaml_path = os.path.join(current_path, f'{provider_name}.yaml')
         yaml_data = load_yaml_file(yaml_path, ignore_error=True)
-
+    
         try:
             # 将yaml数据转换为实体
             provider_schema = ProviderEntity(**yaml_data)
@@ -55,7 +53,7 @@ class ModelProvider(ABC):
 
         # 缓存模式
         self.provider_schema = provider_schema
-
+    
         return provider_schema
 
     def models(self, model_type: ModelType) -> list[AIModelEntity]:
@@ -85,8 +83,8 @@ class ModelProvider(ABC):
         :param model_type: 模型类型，定义在`ModelType`中。
         :return: 返回模型实例。
         """
-        # 获取当前路径的目录名
-        provider_name = self.__class__.__module__.split('.')[-1]
+        # get dirname of the current path
+        provider_name = self.__class__.__module__.split(".")[-1]
 
         if f"{provider_name}.{model_type.value}" in self.model_instance_map:
             return self.model_instance_map[f"{provider_name}.{model_type.value}"]
@@ -103,11 +101,17 @@ class ModelProvider(ABC):
         # 如果模型类型的路径不存在或模型的py文件不存在，则抛出异常
         parent_module = '.'.join(self.__class__.__module__.split('.')[:-1])
         mod = import_module_from_source(
-            f'{parent_module}.{model_type_name}.{model_type_name}', model_type_py_path)
-        model_class = next(filter(lambda x: x.__module__ == mod.__name__ and not x.__abstractmethods__,
-                                  get_subclasses_from_module(mod, AIModel)), None)
+            module_name=f"{parent_module}.{model_type_name}.{model_type_name}", py_file_path=model_type_py_path
+        )
+        model_class = next(
+            filter(
+                lambda x: x.__module__ == mod.__name__ and not x.__abstractmethods__,
+                get_subclasses_from_module(mod, AIModel),
+            ),
+            None,
+        )
         if not model_class:
-            raise Exception(f'Missing AIModel Class for model type {model_type} in {model_type_py_path}')
+            raise Exception(f"Missing AIModel Class for model type {model_type} in {model_type_py_path}")
 
         model_instance_map = model_class()
         self.model_instance_map[f"{provider_name}.{model_type.value}"] = model_instance_map

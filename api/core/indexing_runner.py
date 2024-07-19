@@ -464,7 +464,7 @@ class IndexingRunner:
             document_id=dataset_document.id,
             after_indexing_status="splitting",
             extra_update_params={
-                DatasetDocument.word_count: sum([len(text_doc.page_content) for text_doc in text_docs]),
+                DatasetDocument.word_count: sum(len(text_doc.page_content) for text_doc in text_docs),
                 DatasetDocument.parsing_completed_at: datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
             }
         )
@@ -910,8 +910,7 @@ class IndexingRunner:
             self._check_document_paused_status(dataset_document.id)
 
             tokens = 0
-            # 如果使用高质量索引技术或配置了嵌入模型，则计算文档的总令牌数
-            if dataset.indexing_technique == 'high_quality' or embedding_model_type_instance:
+            if embedding_model_instance:
                 tokens += sum(
                     embedding_model_instance.get_text_embedding_num_tokens(
                         [document.page_content]

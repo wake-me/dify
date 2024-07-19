@@ -33,7 +33,8 @@ def parse_app_site_args():
     parser.add_argument('description', type=str, required=False, location='json')
     # 添加应用程序默认语言参数，需为支持的语言
     parser.add_argument('default_language', type=supported_language, required=False, location='json')
-    # 添加应用程序自定义域名参数
+    parser.add_argument('chat_color_theme', type=str, required=False, location='json')
+    parser.add_argument('chat_color_theme_inverted', type=bool, required=False, location='json')
     parser.add_argument('customize_domain', type=str, required=False, location='json')
     # 添加应用程序版权声明参数
     parser.add_argument('copyright', type=str, required=False, location='json')
@@ -45,7 +46,7 @@ def parse_app_site_args():
                         location='json')
     # 添加是否提示用户公开应用程序的参数
     parser.add_argument('prompt_public', type=bool, required=False, location='json')
-    # 解析并返回所有参数
+    parser.add_argument('show_workflow_steps', type=bool, required=False, location='json')
     return parser.parse_args()
 
 
@@ -80,12 +81,15 @@ class AppSite(Resource):
             'icon_background',
             'description',
             'default_language',
+            'chat_color_theme',
+            'chat_color_theme_inverted',
             'customize_domain',
             'copyright',
             'privacy_policy',
             'custom_disclaimer',
             'customize_token_strategy',
-            'prompt_public'
+            'prompt_public',
+            'show_workflow_steps'
         ]:
             value = args.get(attr_name)
             if value is not None:

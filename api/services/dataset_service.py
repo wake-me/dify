@@ -6,25 +6,27 @@ import time
 import uuid
 from typing import Optional
 
-from flask import current_app
 from flask_login import current_user
 from sqlalchemy import func
 
+from configs import dify_config
 from core.errors.error import LLMBadRequestError, ProviderTokenNotInitError
 from core.model_manager import ModelManager
 from core.model_runtime.entities.model_entities import ModelType
 from core.rag.datasource.keyword.keyword_factory import Keyword
 from core.rag.models.document import Document as RAGDocument
+from core.rag.retrieval.retrival_methods import RetrievalMethod
 from events.dataset_event import dataset_was_deleted
 from events.document_event import document_was_deleted
 from extensions.ext_database import db
 from extensions.ext_redis import redis_client
 from libs import helper
-from models.account import Account
+from models.account import Account, TenantAccountRole
 from models.dataset import (
     AppDatasetJoin,
     Dataset,
     DatasetCollectionBinding,
+    DatasetPermission,
     DatasetProcessRule,
     DatasetQuery,
     Document,
@@ -33,7 +35,7 @@ from models.dataset import (
 from models.model import UploadFile
 from models.source import DataSourceOauthBinding
 from services.errors.account import NoPermissionError
-from services.errors.dataset import DatasetInUseError, DatasetNameDuplicateError
+from services.errors.dataset import DatasetNameDuplicateError
 from services.errors.document import DocumentIndexingError
 from services.errors.file import FileNotExistsError
 from services.feature_service import FeatureModel, FeatureService
@@ -55,22 +57,55 @@ class DatasetService:
 
     @staticmethod
     def get_datasets(page, per_page, provider="vendor", tenant_id=None, user=None, search=None, tag_ids=None):
+        query = Dataset.query.filter(Dataset.provider == provider, Dataset.tenant_id == tenant_id).order_by(
+            Dataset.created_at.desc()
+        )
+
         if user:
-            permission_filter = db.or_(Dataset.created_by == user.id,
-                                    Dataset.permission == 'all_team_members')
+            # get permitted dataset ids
+            dataset_permission = DatasetPermission.query.filter_by(
+                account_id=user.id,
+                tenant_id=tenant_id
+            ).all()
+            permitted_dataset_ids = {dp.dataset_id for dp in dataset_permission} if dataset_permission else None
+
+            if user.current_role == TenantAccountRole.DATASET_OPERATOR:
+                # only show datasets that the user has permission to access
+                if permitted_dataset_ids:
+                    query = query.filter(Dataset.id.in_(permitted_dataset_ids))
+                else:
+                    return [], 0
+            else:
+                # show all datasets that the user has permission to access
+                if permitted_dataset_ids:
+                    query = query.filter(
+                        db.or_(
+                            Dataset.permission == 'all_team_members',
+                            db.and_(Dataset.permission == 'only_me', Dataset.created_by == user.id),
+                            db.and_(Dataset.permission == 'partial_members', Dataset.id.in_(permitted_dataset_ids))
+                        )
+                    )
+                else:
+                    query = query.filter(
+                        db.or_(
+                            Dataset.permission == 'all_team_members',
+                            db.and_(Dataset.permission == 'only_me', Dataset.created_by == user.id)
+                        )
+                    )
         else:
-            permission_filter = Dataset.permission == 'all_team_members'
-        query = Dataset.query.filter(
-            db.and_(Dataset.provider == provider, Dataset.tenant_id == tenant_id, permission_filter)) \
-            .order_by(Dataset.created_at.desc())
+            # if no user, only show datasets that are shared with all team members
+            query = query.filter(Dataset.permission == 'all_team_members')
+
         if search:
-            query = query.filter(db.and_(Dataset.name.ilike(f'%{search}%')))
+            query = query.filter(Dataset.name.ilike(f'%{search}%'))
+
         if tag_ids:
             target_ids = TagService.get_target_ids_by_tag_ids('knowledge', tenant_id, tag_ids)
             if target_ids:
-                query = query.filter(db.and_(Dataset.id.in_(target_ids)))
+                query = query.filter(Dataset.id.in_(target_ids))
             else:
                 return [], 0
+
         datasets = query.paginate(
             page=page,
             per_page=per_page,
@@ -114,21 +149,12 @@ class DatasetService:
 
     @staticmethod
     def get_datasets_by_ids(ids, tenant_id):
-        """
-        根据提供的ID列表和租户ID获取数据集。
-        
-        参数:
-        ids -- 数据集ID的列表，这些ID用于查询特定的数据集。
-        tenant_id -- 租户ID，查询限定于该租户拥有的数据集。
-        
-        返回值:
-        返回一个包含数据集实例的列表以及数据集总数。
-        """
-        # 使用ORM方式构建查询，筛选出指定ID和租户ID的数据集
-        datasets = Dataset.query.filter(Dataset.id.in_(ids),
-                                        Dataset.tenant_id == tenant_id).paginate(
-            page=1, per_page=len(ids), max_per_page=len(ids), error_out=False)
-        # 返回查询结果中的数据集实例列表和总数量
+        datasets = Dataset.query.filter(
+            Dataset.id.in_(ids),
+            Dataset.tenant_id == tenant_id
+        ).paginate(
+            page=1, per_page=len(ids), max_per_page=len(ids), error_out=False
+        )
         return datasets.items, datasets.total
 
     @staticmethod
@@ -148,8 +174,8 @@ class DatasetService:
         # 检查数据集名称是否已经存在
         if Dataset.query.filter_by(name=name, tenant_id=tenant_id).first():
             raise DatasetNameDuplicateError(
-                f'Dataset with name {name} already exists.')
-        
+                f'Dataset with name {name} already exists.'
+            )
         embedding_model = None
         # 如果指定了高质量索引技术，尝试获取默认的文本嵌入模型
         if indexing_technique == 'high_quality':
@@ -205,26 +231,17 @@ class DatasetService:
                 # 如果请求模型实例失败，抛出值错误，提示用户没有可用的嵌入模型
                 raise ValueError(
                     "No Embedding Model available. Please configure a valid provider "
-                    "in the Settings -> Model Provider.")
+                    "in the Settings -> Model Provider."
+                )
             except ProviderTokenNotInitError as ex:
-                # 如果因为提供商令牌未初始化导致失败，抛出值错误，说明数据集不可用的具体原因
-                raise ValueError(f"The dataset in unavailable, due to: "
-                                f"{ex.description}")
+                raise ValueError(
+                    f"The dataset in unavailable, due to: "
+                    f"{ex.description}"
+                )
 
     @staticmethod
     def update_dataset(dataset_id, data, user):
-        """
-        更新数据集的信息。
-
-        参数:
-        - dataset_id: 数据集的唯一标识符。
-        - data: 包含要更新的数据集字段的字典。
-        - user: 进行更新操作的用户对象。
-
-        返回值:
-        - 更新后的数据集对象。
-        """
-        # 过滤掉值为None的字段，但保留'description'字段
+        data.pop('partial_member_list', None)
         filtered_data = {k: v for k, v in data.items() if v is not None or k == 'description'}
         # 根据数据集ID获取数据集对象
         dataset = DatasetService.get_dataset(dataset_id)
@@ -261,12 +278,13 @@ class DatasetService:
                 except LLMBadRequestError:
                     raise ValueError(
                         "No Embedding Model available. Please configure a valid provider "
-                        "in the Settings -> Model Provider.")
+                        "in the Settings -> Model Provider."
+                    )
                 except ProviderTokenNotInitError as ex:
                     raise ValueError(ex.description)
         else:
             if data['embedding_model_provider'] != dataset.embedding_model_provider or \
-                    data['embedding_model'] != dataset.embedding_model:
+                data['embedding_model'] != dataset.embedding_model:
                 action = 'update'
                 try:
                     model_manager = ModelManager()
@@ -286,7 +304,8 @@ class DatasetService:
                 except LLMBadRequestError:
                     raise ValueError(
                         "No Embedding Model available. Please configure a valid provider "
-                        "in the Settings -> Model Provider.")
+                        "in the Settings -> Model Provider."
+                    )
                 except ProviderTokenNotInitError as ex:
                     raise ValueError(ex.description)
 
@@ -304,9 +323,6 @@ class DatasetService:
 
     @staticmethod
     def delete_dataset(dataset_id, user):
-        count = AppDatasetJoin.query.filter_by(dataset_id=dataset_id).count()
-        if count > 0:
-            raise DatasetInUseError()
 
         dataset = DatasetService.get_dataset(dataset_id)
 
@@ -326,6 +342,13 @@ class DatasetService:
         return True
 
     @staticmethod
+    def dataset_use_check(dataset_id) -> bool:
+        count = AppDatasetJoin.query.filter_by(dataset_id=dataset_id).count()
+        if count > 0:
+            return True
+        return False
+
+    @staticmethod
     def check_dataset_permission(dataset, user):
         """
         检查用户是否有权限访问特定数据集。
@@ -340,16 +363,41 @@ class DatasetService:
         # 检查数据集的租户ID是否与用户当前的租户ID匹配
         if dataset.tenant_id != user.current_tenant_id:
             logging.debug(
-                f'User {user.id} does not have permission to access dataset {dataset.id}')
+                f'User {user.id} does not have permission to access dataset {dataset.id}'
+            )
             raise NoPermissionError(
-                'You do not have permission to access this dataset.')
-        
-        # 检查数据集的权限是否设置为'only_me'，并且数据集的创建者不是当前用户
+                'You do not have permission to access this dataset.'
+            )
         if dataset.permission == 'only_me' and dataset.created_by != user.id:
             logging.debug(
-                f'User {user.id} does not have permission to access dataset {dataset.id}')
+                f'User {user.id} does not have permission to access dataset {dataset.id}'
+            )
             raise NoPermissionError(
-                'You do not have permission to access this dataset.')
+                'You do not have permission to access this dataset.'
+            )
+        if dataset.permission == 'partial_members':
+            user_permission = DatasetPermission.query.filter_by(
+                dataset_id=dataset.id, account_id=user.id
+            ).first()
+            if not user_permission and dataset.tenant_id != user.current_tenant_id and dataset.created_by != user.id:
+                logging.debug(
+                    f'User {user.id} does not have permission to access dataset {dataset.id}'
+                )
+                raise NoPermissionError(
+                    'You do not have permission to access this dataset.'
+                )
+
+    @staticmethod
+    def check_dataset_operator_permission(user: Account = None, dataset: Dataset = None):
+        if dataset.permission == 'only_me':
+            if dataset.created_by != user.id:
+                raise NoPermissionError('You do not have permission to access this dataset.')
+
+        elif dataset.permission == 'partial_members':
+            if not any(
+                dp.dataset_id == dataset.id for dp in DatasetPermission.query.filter_by(account_id=user.id).all()
+            ):
+                raise NoPermissionError('You do not have permission to access this dataset.')
 
     @staticmethod
     def get_dataset_queries(dataset_id: str, page: int, per_page: int):
@@ -623,19 +671,15 @@ class DocumentService:
 
     @staticmethod
     def delete_document(document):
-        """
-        删除文档。
-
-        触发文档被删除的信号，然后从数据库中删除该文档，并提交数据库会话。
-
-        参数:
-        - document: 要删除的文档对象。
-
-        返回值:
-        - 无
-        """
-        # 发送文档被删除的信号
-        document_was_deleted.send(document.id, dataset_id=document.dataset_id, doc_form=document.doc_form)
+        # trigger document_was_deleted signal
+        file_id = None
+        if document.data_source_type == 'upload_file':
+            if document.data_source_info:
+                data_source_info = document.data_source_info_dict
+                if data_source_info and 'upload_file_id' in data_source_info:
+                    file_id = data_source_info['upload_file_id']
+        document_was_deleted.send(document.id, dataset_id=document.dataset_id,
+                                  doc_form=document.doc_form, file_id=file_id)
 
         # 从数据库会话中删除文档并提交更改
         db.session.delete(document)
@@ -757,6 +801,7 @@ class DocumentService:
         redis_client.setex(sync_indexing_cache_key, 600, 1)
 
         sync_website_document_indexing_task.delay(dataset_id, document.id)
+
     @staticmethod
     def get_documents_position(dataset_id):
         """
@@ -779,21 +824,13 @@ class DocumentService:
             return 1
 
     @staticmethod
-    def save_document_with_dataset_id(dataset: Dataset, document_data: dict,
-                                    account: Account, dataset_process_rule: Optional[DatasetProcessRule] = None,
-                                    created_from: str = 'web'):
-        """
-        根据给定的数据集和文档数据，在数据库中保存或更新文档，并关联数据集ID。
-        
-        :param dataset: 数据集对象，需要保存或更新文档的数据集。
-        :param document_data: 文档数据字典，包含文档的各种信息如来源、格式等。
-        :param account: 账户对象，执行操作的账户。
-        :param dataset_process_rule: 数据集处理规则对象，可选，用于指定文档处理规则。
-        :param created_from: 文档创建来源，默认为'web'。
-        :return: 包含保存或更新的文档信息的列表，以及批次ID。
-        """
+    def save_document_with_dataset_id(
+        dataset: Dataset, document_data: dict,
+        account: Account, dataset_process_rule: Optional[DatasetProcessRule] = None,
+        created_from: str = 'web'
+    ):
 
-        # 检查文档上传限制
+        # check document limit
         features = FeatureService.get_features(current_user.current_tenant_id)
         if features.billing.enabled:
             # 如果文档数据中不包含原始文档ID，或原始文档ID为空，则进行上传限制检查
@@ -810,8 +847,7 @@ class DocumentService:
                 elif document_data["data_source"]["type"] == "website_crawl":
                     website_info = document_data["data_source"]['info_list']['website_info_list']
                     count = len(website_info['urls'])
-                batch_upload_limit = int(current_app.config['BATCH_UPLOAD_LIMIT'])
-                # 如果文档数量超过批量上传限制，则抛出异常
+                batch_upload_limit = int(dify_config.BATCH_UPLOAD_LIMIT)
                 if count > batch_upload_limit:
                     raise ValueError(f"You have reached the batch upload limit of {batch_upload_limit}.")
 
@@ -825,7 +861,7 @@ class DocumentService:
         # 检查并更新数据集的索引技术设置
         if not dataset.indexing_technique:
             if 'indexing_technique' not in document_data \
-                    or document_data['indexing_technique'] not in Dataset.INDEXING_TECHNIQUE_LIST:
+                or document_data['indexing_technique'] not in Dataset.INDEXING_TECHNIQUE_LIST:
                 raise ValueError("Indexing technique is required")
 
             dataset.indexing_technique = document_data["indexing_technique"]
@@ -846,7 +882,7 @@ class DocumentService:
                 # 设置默认的检索模型
                 if not dataset.retrieval_model:
                     default_retrieval_model = {
-                        'search_method': 'semantic_search',
+                        'search_method': RetrievalMethod.SEMANTIC_SEARCH.value,
                         'reranking_enable': False,
                         'reranking_model': {
                             'reranking_provider_name': '',
@@ -857,7 +893,8 @@ class DocumentService:
                     }
 
                     dataset.retrieval_model = document_data.get('retrieval_model') if document_data.get(
-                        'retrieval_model') else default_retrieval_model
+                        'retrieval_model'
+                    ) else default_retrieval_model
 
         documents = []
         batch = time.strftime('%Y%m%d%H%M%S') + str(random.randint(100000, 999999))
@@ -927,12 +964,14 @@ class DocumentService:
                             documents.append(document)
                             duplicate_document_ids.append(document.id)
                             continue
-                    document = DocumentService.build_document(dataset, dataset_process_rule.id,
-                                                            document_data["data_source"]["type"],
-                                                            document_data["doc_form"],
-                                                            document_data["doc_language"],
-                                                            data_source_info, created_from, position,
-                                                            account, file_name, batch)
+                    document = DocumentService.build_document(
+                        dataset, dataset_process_rule.id,
+                        document_data["data_source"]["type"],
+                        document_data["doc_form"],
+                        document_data["doc_language"],
+                        data_source_info, created_from, position,
+                        account, file_name, batch
+                    )
                     db.session.add(document)
                     db.session.flush()
                     document_ids.append(document.id)
@@ -942,7 +981,7 @@ class DocumentService:
                 # 处理Notion导入的文档
                 notion_info_list = document_data["data_source"]['info_list']['notion_info_list']
                 exist_page_ids = []
-                exist_document = dict()
+                exist_document = {}
                 documents = Document.query.filter_by(
                     dataset_id=dataset.id,
                     tenant_id=current_user.current_tenant_id,
@@ -975,12 +1014,14 @@ class DocumentService:
                                 "notion_page_icon": page['page_icon'],
                                 "type": page['type']
                             }
-                            document = DocumentService.build_document(dataset, dataset_process_rule.id,
-                                                                    document_data["data_source"]["type"],
-                                                                    document_data["doc_form"],
-                                                                    document_data["doc_language"],
-                                                                    data_source_info, created_from, position,
-                                                                    account, page['page_name'], batch)
+                            document = DocumentService.build_document(
+                                dataset, dataset_process_rule.id,
+                                document_data["data_source"]["type"],
+                                document_data["doc_form"],
+                                document_data["doc_language"],
+                                data_source_info, created_from, position,
+                                account, page['page_name'], batch
+                            )
                             db.session.add(document)
                             db.session.flush()
                             document_ids.append(document.id)
@@ -1002,12 +1043,18 @@ class DocumentService:
                         'only_main_content': website_info.get('only_main_content', False),
                         'mode': 'crawl',
                     }
-                    document = DocumentService.build_document(dataset, dataset_process_rule.id,
-                                                              document_data["data_source"]["type"],
-                                                              document_data["doc_form"],
-                                                              document_data["doc_language"],
-                                                              data_source_info, created_from, position,
-                                                              account, url, batch)
+                    if len(url) > 255:
+                        document_name = url[:200] + '...'
+                    else:
+                        document_name = url
+                    document = DocumentService.build_document(
+                        dataset, dataset_process_rule.id,
+                        document_data["data_source"]["type"],
+                        document_data["doc_form"],
+                        document_data["doc_language"],
+                        data_source_info, created_from, position,
+                        account, document_name, batch
+                    )
                     db.session.add(document)
                     db.session.flush()
                     document_ids.append(document.id)
@@ -1040,33 +1087,16 @@ class DocumentService:
         # 如果尝试上传的文档数量超过剩余配额，抛出异常
         if count > can_upload_size:
             raise ValueError(
-                f'You have reached the limit of your subscription. Only {can_upload_size} documents can be uploaded.')
+                f'You have reached the limit of your subscription. Only {can_upload_size} documents can be uploaded.'
+            )
 
     @staticmethod
-    def build_document(dataset: Dataset, process_rule_id: str, data_source_type: str, document_form: str,
-                    document_language: str, data_source_info: dict, created_from: str, position: int,
-                    account: Account,
-                    name: str, batch: str):
-        """
-        构建文档对象。
-
-        参数:
-        - dataset: 数据集对象，包含数据集的元数据。
-        - process_rule_id: 数据处理规则ID。
-        - data_source_type: 数据源类型。
-        - document_form: 文档形式。
-        - document_language: 文档语言。
-        - data_source_info: 数据源信息字典。
-        - created_from: 文档创建来源。
-        - position: 文档在数据集中的位置。
-        - account: 账户对象，标识创建文档的用户。
-        - name: 文档名称。
-        - batch: 批次号。
-
-        返回值:
-        - 构建好的文档对象。
-        """
-        # 创建Document实例并设置属性
+    def build_document(
+        dataset: Dataset, process_rule_id: str, data_source_type: str, document_form: str,
+        document_language: str, data_source_info: dict, created_from: str, position: int,
+        account: Account,
+        name: str, batch: str
+    ):
         document = Document(
             tenant_id=dataset.tenant_id,
             dataset_id=dataset.id,
@@ -1085,37 +1115,20 @@ class DocumentService:
 
     @staticmethod
     def get_tenant_documents_count():
-        """
-        获取当前租户未归档、启用且已完成的文档数量。
-        
-        参数:
-        无
-        
-        返回值:
-        documents_count (int): 符合条件的文档数量。
-        """
-        # 查询条件：完成时间不为空、启用状态为True、归档状态为False、租户ID与当前用户所属租户ID匹配
-        documents_count = Document.query.filter(Document.completed_at.isnot(None),
-                                                Document.enabled == True,
-                                                Document.archived == False,
-                                                Document.tenant_id == current_user.current_tenant_id).count()
+        documents_count = Document.query.filter(
+            Document.completed_at.isnot(None),
+            Document.enabled == True,
+            Document.archived == False,
+            Document.tenant_id == current_user.current_tenant_id
+        ).count()
         return documents_count
 
     @staticmethod
-    def update_document_with_dataset_id(dataset: Dataset, document_data: dict,
-                                            account: Account, dataset_process_rule: Optional[DatasetProcessRule] = None,
-                                            created_from: str = 'web'):
-        """
-        使用给定的数据集ID更新文档信息。
-        
-        :param dataset: 数据集对象，用于确定要更新的文档所属的数据集。
-        :param document_data: 包含文档更新信息的字典，如文档名称、处理规则和数据源等。
-        :param account: 执行更新操作的账户对象。
-        :param dataset_process_rule: 数据集处理规则对象，可选，用于更新文档的处理规则。
-        :param created_from: 文档创建来源，默认为'web'。
-        :return: 更新后的文档对象。
-        """
-        # 检查数据集的模型设置是否正确
+    def update_document_with_dataset_id(
+        dataset: Dataset, document_data: dict,
+        account: Account, dataset_process_rule: Optional[DatasetProcessRule] = None,
+        created_from: str = 'web'
+    ):
         DatasetService.check_dataset_model_setting(dataset)
         # 根据原始文档ID获取文档对象
         document = DocumentService.get_document(dataset.id, document_data["original_document_id"])
@@ -1261,7 +1274,7 @@ class DocumentService:
             elif document_data["data_source"]["type"] == "website_crawl":
                 website_info = document_data["data_source"]['info_list']['website_info_list']
                 count = len(website_info['urls'])
-            batch_upload_limit = int(current_app.config['BATCH_UPLOAD_LIMIT'])
+            batch_upload_limit = int(dify_config.BATCH_UPLOAD_LIMIT)
             if count > batch_upload_limit:
                 raise ValueError(f"You have reached the batch upload limit of {batch_upload_limit}.")
 
@@ -1287,7 +1300,7 @@ class DocumentService:
                 retrieval_model = document_data['retrieval_model']
             else:
                 default_retrieval_model = {
-                    'search_method': 'semantic_search',
+                    'search_method': RetrievalMethod.SEMANTIC_SEARCH.value,
                     'reranking_enable': False,
                     'reranking_model': {
                         'reranking_provider_name': '',
@@ -1345,8 +1358,8 @@ class DocumentService:
         else:
             # 原始文档ID存在时，需判断是否提供了数据源或处理规则
             if ('data_source' not in args and not args['data_source']) \
-                    and ('process_rule' not in args and not args['process_rule']):
-                raise ValueError("Data source or Process rule is required")  # 必须提供数据源或处理规则
+                and ('process_rule' not in args and not args['process_rule']):
+                raise ValueError("Data source or Process rule is required")
             else:
                 if args.get('data_source'):
                     DocumentService.data_source_args_validate(args)
@@ -1443,7 +1456,7 @@ class DocumentService:
 
             # 检查预处理规则是否提供且合法
             if 'pre_processing_rules' not in args['process_rule']['rules'] \
-                    or args['process_rule']['rules']['pre_processing_rules'] is None:
+                or args['process_rule']['rules']['pre_processing_rules'] is None:
                 raise ValueError("Process rule pre_processing_rules is required")
 
             if not isinstance(args['process_rule']['rules']['pre_processing_rules'], list):
@@ -1470,7 +1483,7 @@ class DocumentService:
 
             # 检查分割规则的合法性
             if 'segmentation' not in args['process_rule']['rules'] \
-                    or args['process_rule']['rules']['segmentation'] is None:
+                or args['process_rule']['rules']['segmentation'] is None:
                 raise ValueError("Process rule segmentation is required")
 
             if not isinstance(args['process_rule']['rules']['segmentation'], dict):
@@ -1478,14 +1491,14 @@ class DocumentService:
 
             # 确保分割规则中的分隔符和最大令牌数是必须的，且类型正确
             if 'separator' not in args['process_rule']['rules']['segmentation'] \
-                    or not args['process_rule']['rules']['segmentation']['separator']:
+                or not args['process_rule']['rules']['segmentation']['separator']:
                 raise ValueError("Process rule segmentation separator is required")
 
             if not isinstance(args['process_rule']['rules']['segmentation']['separator'], str):
                 raise ValueError("Process rule segmentation separator is invalid")
 
             if 'max_tokens' not in args['process_rule']['rules']['segmentation'] \
-                    or not args['process_rule']['rules']['segmentation']['max_tokens']:
+                or not args['process_rule']['rules']['segmentation']['max_tokens']:
                 raise ValueError("Process rule segmentation max_tokens is required")
 
             if not isinstance(args['process_rule']['rules']['segmentation']['max_tokens'], int):
@@ -1550,7 +1563,7 @@ class DocumentService:
 
             # 确保预处理规则存在，且是列表类型
             if 'pre_processing_rules' not in args['process_rule']['rules'] \
-                    or args['process_rule']['rules']['pre_processing_rules'] is None:
+                or args['process_rule']['rules']['pre_processing_rules'] is None:
                 raise ValueError("Process rule pre_processing_rules is required")
 
             if not isinstance(args['process_rule']['rules']['pre_processing_rules'], list):
@@ -1578,21 +1591,21 @@ class DocumentService:
 
             # 确保分割规则存在，且满足结构和类型要求
             if 'segmentation' not in args['process_rule']['rules'] \
-                    or args['process_rule']['rules']['segmentation'] is None:
+                or args['process_rule']['rules']['segmentation'] is None:
                 raise ValueError("Process rule segmentation is required")
 
             if not isinstance(args['process_rule']['rules']['segmentation'], dict):
                 raise ValueError("Process rule segmentation is invalid")
 
             if 'separator' not in args['process_rule']['rules']['segmentation'] \
-                    or not args['process_rule']['rules']['segmentation']['separator']:
+                or not args['process_rule']['rules']['segmentation']['separator']:
                 raise ValueError("Process rule segmentation separator is required")
 
             if not isinstance(args['process_rule']['rules']['segmentation']['separator'], str):
                 raise ValueError("Process rule segmentation separator is invalid")
 
             if 'max_tokens' not in args['process_rule']['rules']['segmentation'] \
-                    or not args['process_rule']['rules']['segmentation']['max_tokens']:
+                or not args['process_rule']['rules']['segmentation']['max_tokens']:
                 raise ValueError("Process rule segmentation max_tokens is required")
 
             if not isinstance(args['process_rule']['rules']['segmentation']['max_tokens'], int):
@@ -1907,25 +1920,16 @@ class SegmentService:
 
 class DatasetCollectionBindingService:
     @classmethod
-    def get_dataset_collection_binding(cls, provider_name: str, model_name: str,
-                                        collection_type: str = 'dataset') -> DatasetCollectionBinding:
-        """
-        获取给定提供者名称、模型名称和集合类型的DatasetCollectionBinding对象。
-        如果找不到，则创建一个新的DatasetCollectionBinding对象并将其添加到数据库。
-
-        参数:
-        - provider_name: str, 提供者的名称
-        - model_name: str, 模型的名称
-        - collection_type: str, 集合的类型，默认为'dataset'
-
-        返回值:
-        - DatasetCollectionBinding, 对应的DatasetCollectionBinding对象
-        """
-        # 尝试从数据库中查询符合条件的DatasetCollectionBinding对象
+    def get_dataset_collection_binding(
+        cls, provider_name: str, model_name: str,
+        collection_type: str = 'dataset'
+    ) -> DatasetCollectionBinding:
         dataset_collection_binding = db.session.query(DatasetCollectionBinding). \
-            filter(DatasetCollectionBinding.provider_name == provider_name,
-                DatasetCollectionBinding.model_name == model_name,
-                DatasetCollectionBinding.type == collection_type). \
+            filter(
+            DatasetCollectionBinding.provider_name == provider_name,
+            DatasetCollectionBinding.model_name == model_name,
+            DatasetCollectionBinding.type == collection_type
+        ). \
             order_by(DatasetCollectionBinding.created_at). \
             first()
 
@@ -1942,24 +1946,77 @@ class DatasetCollectionBindingService:
         return dataset_collection_binding
 
     @classmethod
-    def get_dataset_collection_binding_by_id_and_type(cls, collection_binding_id: str,
-                                                        collection_type: str = 'dataset') -> DatasetCollectionBinding:
-        """
-        通过ID和类型获取数据集集合绑定对象。
-        
-        参数:
-        - cls: 类的引用，用于调用数据库会话。
-        - collection_binding_id: str，要查询的数据集集合绑定的ID。
-        - collection_type: str，数据集集合的类型，默认为 'dataset'。
-        
-        返回值:
-        - DatasetCollectionBinding对象，对应于指定ID和类型的绑定记录。
-        """
-        # 查询数据库，获取符合条件的数据集集合绑定对象
+    def get_dataset_collection_binding_by_id_and_type(
+        cls, collection_binding_id: str,
+        collection_type: str = 'dataset'
+    ) -> DatasetCollectionBinding:
         dataset_collection_binding = db.session.query(DatasetCollectionBinding). \
-            filter(DatasetCollectionBinding.id == collection_binding_id,
-                DatasetCollectionBinding.type == collection_type). \
+            filter(
+            DatasetCollectionBinding.id == collection_binding_id,
+            DatasetCollectionBinding.type == collection_type
+        ). \
             order_by(DatasetCollectionBinding.created_at). \
             first()
 
         return dataset_collection_binding
+
+
+class DatasetPermissionService:
+    @classmethod
+    def get_dataset_partial_member_list(cls, dataset_id):
+        user_list_query = db.session.query(
+            DatasetPermission.account_id,
+        ).filter(
+            DatasetPermission.dataset_id == dataset_id
+        ).all()
+
+        user_list = []
+        for user in user_list_query:
+            user_list.append(user.account_id)
+
+        return user_list
+
+    @classmethod
+    def update_partial_member_list(cls, tenant_id, dataset_id, user_list):
+        try:
+            db.session.query(DatasetPermission).filter(DatasetPermission.dataset_id == dataset_id).delete()
+            permissions = []
+            for user in user_list:
+                permission = DatasetPermission(
+                    tenant_id=tenant_id,
+                    dataset_id=dataset_id,
+                    account_id=user['user_id'],
+                )
+                permissions.append(permission)
+
+            db.session.add_all(permissions)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            raise e
+
+    @classmethod
+    def check_permission(cls, user, dataset, requested_permission, requested_partial_member_list):
+        if not user.is_dataset_editor:
+            raise NoPermissionError('User does not have permission to edit this dataset.')
+
+        if user.is_dataset_operator and dataset.permission != requested_permission:
+            raise NoPermissionError('Dataset operators cannot change the dataset permissions.')
+
+        if user.is_dataset_operator and requested_permission == 'partial_members':
+            if not requested_partial_member_list:
+                raise ValueError('Partial member list is required when setting to partial members.')
+
+            local_member_list = cls.get_dataset_partial_member_list(dataset.id)
+            request_member_list = [user['user_id'] for user in requested_partial_member_list]
+            if set(local_member_list) != set(request_member_list):
+                raise ValueError('Dataset operators cannot change the dataset permissions.')
+
+    @classmethod
+    def clear_partial_member_list(cls, dataset_id):
+        try:
+            db.session.query(DatasetPermission).filter(DatasetPermission.dataset_id == dataset_id).delete()
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            raise e

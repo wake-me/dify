@@ -46,6 +46,13 @@ class QuotaExceededError(Exception):
     description = "Quota Exceeded"
 
 
+class AppInvokeQuotaExceededError(Exception):
+    """
+    Custom exception raised when the quota for an app has been exceeded.
+    """
+    description = "App Invoke Quota Exceeded"
+
+
 class ModelCurrentlyNotSupportError(Exception):
     """
     自定义异常，当模型当前不支持时抛出。

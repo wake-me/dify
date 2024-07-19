@@ -6,8 +6,7 @@ from os import listdir, path
 from threading import Lock
 from typing import Any, Union
 
-from flask import current_app
-
+from configs import dify_config
 from core.agent.entities import AgentToolEntity
 from core.app.entities.app_invoke_entities import InvokeFrom
 from core.helper.module_import_helper import load_single_subclass_from_source
@@ -175,7 +174,7 @@ class ToolManager:
                 'invoke_from': invoke_from,
                 'tool_invoke_from': tool_invoke_from,
             })
-        
+
         elif provider_type == 'api':
             # 处理API提供者的情况，获取并解密凭证
             if tenant_id is None:
@@ -241,14 +240,16 @@ class ToolManager:
 
         # 尝试从参数字典中获取参数值，如果未找到，则使用默认值
         parameter_value = parameters.get(parameter_rule.name)
-        if not parameter_value:
+        if not parameter_value and parameter_value != 0:
+            # get default value
             parameter_value = parameter_rule.default
             if not parameter_value and parameter_rule.required:
                 raise ValueError(f"tool parameter {parameter_rule.name} not found in tool config")
 
         # 对于选择类型参数，检查参数值是否在选项列表中
         if parameter_rule.type == ToolParameter.ToolParameterType.SELECT:
-            options = list(map(lambda x: x.value, parameter_rule.options))
+            # check if tool_parameter_config in options
+            options = [x.value for x in parameter_rule.options]
             if parameter_value is not None and parameter_value not in options:
                 raise ValueError(
                     f"tool parameter {parameter_rule.name} value {parameter_value} not in options {options}")
@@ -402,17 +403,15 @@ class ToolManager:
         if cls._builtin_providers_loaded:
             yield from list(cls._builtin_providers.values())
             return
-            
-        # 如果缓存未加载，则加锁以防止并发加载
+
         with cls._builtin_provider_lock:
             # 再次检查提供者是否已被加载
             if cls._builtin_providers_loaded:
                 yield from list(cls._builtin_providers.values())
                 return
-                
-            # 在加锁保护下，加载内建工具提供者
+
             yield from cls._list_builtin_providers()
-    
+
     @classmethod
     def _list_builtin_providers(cls) -> Generator[BuiltinToolProviderController, None, None]:
         """
@@ -620,7 +619,7 @@ class ToolManager:
 
         controller = ApiToolProviderController.from_db(
             provider,
-            ApiProviderAuthType.API_KEY if provider.credentials['auth_type'] == 'api_key' else 
+            ApiProviderAuthType.API_KEY if provider.credentials['auth_type'] == 'api_key' else
             ApiProviderAuthType.NONE
         )
         controller.load_bundled_tools(provider.tools)
@@ -709,8 +708,7 @@ class ToolManager:
         provider_type = provider_type
         provider_id = provider_id
         if provider_type == 'builtin':
-            # 返回内建提供者的图标URL
-            return (current_app.config.get("CONSOLE_API_URL")
+            return (dify_config.CONSOLE_API_URL
                     + "/console/api/workspaces/current/tool-provider/builtin/"
                     + provider_id
                     + "/icon")
@@ -720,7 +718,7 @@ class ToolManager:
                 provider: ApiToolProvider = db.session.query(ApiToolProvider).filter(
                     ApiToolProvider.tenant_id == tenant_id,
                     ApiToolProvider.id == provider_id
-                )
+                ).first()
                 return json.loads(provider.icon)
             except:
                 # 如果查询失败，则返回默认图标

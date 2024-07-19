@@ -1,9 +1,9 @@
 from enum import Enum
 from typing import Optional
 
-from flask import current_app
 from pydantic import BaseModel, ConfigDict
 
+from configs import dify_config
 from core.entities.model_entities import ModelWithProviderEntity, ProviderModelWithStatusEntity
 from core.entities.provider_entities import QuotaConfiguration
 from core.model_runtime.entities.common_entities import I18nObject
@@ -71,8 +71,7 @@ class ProviderResponse(BaseModel):
     def __init__(self, **data) -> None:
         super().__init__(**data)
 
-        # 设置图标URL，基于供应商名称。
-        url_prefix = (current_app.config.get("CONSOLE_API_URL")
+        url_prefix = (dify_config.CONSOLE_API_URL
                       + f"/console/api/workspaces/current/model-providers/{self.provider}")
         if self.icon_small is not None:
             self.icon_small = I18nObject(
@@ -101,8 +100,7 @@ class ProviderWithModelsResponse(BaseModel):
     def __init__(self, **data) -> None:
         super().__init__(**data)
 
-        # 设置图标URL，基于供应商名称。
-        url_prefix = (current_app.config.get("CONSOLE_API_URL")
+        url_prefix = (dify_config.CONSOLE_API_URL
                       + f"/console/api/workspaces/current/model-providers/{self.provider}")
         if self.icon_small is not None:
             self.icon_small = I18nObject(
@@ -126,8 +124,7 @@ class SimpleProviderEntityResponse(SimpleProviderEntity):
     def __init__(self, **data) -> None:
         super().__init__(**data)  # 调用父类构造函数，初始化父类属性
 
-        # 构建URL前缀，用于获取当前工作空间中模型提供者的图标
-        url_prefix = (current_app.config.get("CONSOLE_API_URL")
+        url_prefix = (dify_config.CONSOLE_API_URL
                       + f"/console/api/workspaces/current/model-providers/{self.provider}")
         
         # 如果存在小图标地址，则将其设置为带有国际化路径的I18nObject

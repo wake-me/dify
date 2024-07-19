@@ -52,6 +52,9 @@ class ChatAppConfigManager(BaseAppConfigManager):
             app_model_config_dict = app_model_config.to_dict()
             config_dict = app_model_config_dict.copy()
         else:
+            if not override_config_dict:
+                raise Exception('override_config_dict is required when config_from is ARGS')
+
             config_dict = override_config_dict
 
         # 加载应用模式并构建应用配置

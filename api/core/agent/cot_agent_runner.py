@@ -1,7 +1,7 @@
 import json
 from abc import ABC, abstractmethod
 from collections.abc import Generator
-from typing import Union
+from typing import Optional, Union
 
 from core.agent.base_agent_runner import BaseAgentRunner
 from core.agent.entities import AgentScratchpadUnit
@@ -15,6 +15,7 @@ from core.model_runtime.entities.message_entities import (
     ToolPromptMessage,
     UserPromptMessage,
 )
+from core.ops.ops_trace_manager import TraceQueueManager
 from core.prompt.agent_history_prompt_transform import AgentHistoryPromptTransform
 from core.tools.entities.tool_entities import ToolInvokeMeta
 from core.tools.tool.tool import Tool
@@ -62,6 +63,8 @@ class CotAgentRunner(BaseAgentRunner, ABC):
         app_generate_entity = self.application_generate_entity
         self._repack_app_generate_entity(app_generate_entity)
         self._init_react_state(query)
+
+        trace_manager = app_generate_entity.trace_manager
 
         # check model mode
         if 'Observation' not in app_generate_entity.model_conf.stop:
@@ -238,7 +241,8 @@ class CotAgentRunner(BaseAgentRunner, ABC):
                     tool_invoke_response, tool_invoke_meta = self._handle_invoke_action(
                         action=scratchpad.action,
                         tool_instances=tool_instances,
-                        message_file_ids=message_file_ids
+                        message_file_ids=message_file_ids,
+                        trace_manager=trace_manager,
                     )
                     scratchpad.observation = tool_invoke_response
                     scratchpad.agent_response = tool_invoke_response
@@ -264,8 +268,7 @@ class CotAgentRunner(BaseAgentRunner, ABC):
 
                 # 更新提示工具消息
                 for prompt_tool in self._prompt_messages_tools:
-                    self.update_prompt_message_tool(
-                        tool_instances[prompt_tool.name], prompt_tool)
+                    self.update_prompt_message_tool(tool_instances[prompt_tool.name], prompt_tool)
 
             iteration_step += 1
 
@@ -302,14 +305,15 @@ class CotAgentRunner(BaseAgentRunner, ABC):
             message=AssistantPromptMessage(
                 content=final_answer
             ),
-            usage=llm_usage['usage'] if llm_usage['usage'] else LLMUsage.empty_usage(
-            ),
+            usage=llm_usage['usage'] if llm_usage['usage'] else LLMUsage.empty_usage(),
             system_fingerprint=''
         )), PublishFrom.APPLICATION_MANAGER)
 
     def _handle_invoke_action(self, action: AgentScratchpadUnit.Action,
                               tool_instances: dict[str, Tool],
-                              message_file_ids: list[str]) -> tuple[str, ToolInvokeMeta]:
+                              message_file_ids: list[str],
+                              trace_manager: Optional[TraceQueueManager] = None
+                              ) -> tuple[str, ToolInvokeMeta]:
         """
         处理调用工具的动作。
         :param action: 动作对象，包含要执行的动作名称和参数。
@@ -340,21 +344,22 @@ class CotAgentRunner(BaseAgentRunner, ABC):
             tenant_id=self.tenant_id,
             message=self.message,
             invoke_from=self.application_generate_entity.invoke_from,
-            agent_tool_callback=self.agent_callback
+            agent_tool_callback=self.agent_callback,
+            trace_manager=trace_manager,
         )
 
-        # 发布文件，将文件保存至变量池并发布消息文件事件
-        for message_file, save_as in message_files:
+        # publish files
+        for message_file_id, save_as in message_files:
             if save_as:
                 self.variables_pool.set_file(
-                    tool_name=tool_call_name, value=message_file.id, name=save_as)
+                    tool_name=tool_call_name, value=message_file_id, name=save_as)
 
             # 发布消息文件
             self.queue_manager.publish(QueueMessageFileEvent(
-                message_file_id=message_file.id
+                message_file_id=message_file_id
             ), PublishFrom.APPLICATION_MANAGER)
-            # 收集消息文件 ID
-            message_file_ids.append(message_file.id)
+            # add message file ids
+            message_file_ids.append(message_file_id)
 
         return tool_invoke_response, tool_invoke_meta
 

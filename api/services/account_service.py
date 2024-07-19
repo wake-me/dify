@@ -6,18 +6,19 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Any, Optional
 
-from flask import current_app
 from sqlalchemy import func
 from werkzeug.exceptions import Unauthorized
 
+from configs import dify_config
 from constants.languages import language_timezone_mapping, languages
 from events.tenant_event import tenant_was_created
 from extensions.ext_redis import redis_client
-from libs.helper import get_remote_ip
+from libs.helper import RateLimiter, TokenManager
 from libs.passport import PassportService
 from libs.password import compare_password, hash_password, valid_password
 from libs.rsa import generate_key_pair
 from models.account import *
+from models.model import DifySetup
 from services.errors.account import (
     AccountAlreadyInTenantError,
     AccountLoginError,
@@ -29,27 +30,21 @@ from services.errors.account import (
     LinkAccountIntegrateError,
     MemberNotInTenantError,
     NoPermissionError,
+    RateLimitExceededError,
     RoleAlreadyAssignedError,
     TenantNotFound,
 )
 from tasks.mail_invite_member_task import send_invite_member_mail_task
+from tasks.mail_reset_password_task import send_reset_password_mail_task
 
 
 class AccountService:
-    """
-    账户服务类，提供静态方法以处理账户相关的操作，例如加载用户、认证、更新密码、创建账户等。
-    
-    方法
-    - `load_user`: 根据用户ID加载账户信息，检查账户状态并更新当前租户信息及最后活跃时间。
-    - `get_account_jwt_token`: 生成并返回账户的JWT令牌。
-    - `authenticate`: 使用邮箱和密码进行账户认证，处理账户初始化状态变更。
-    - `update_account_password`: 更新账户密码，验证旧密码正确性后加密存储新密码。
-    - `create_account`: 创建新账户，设置邮箱、名称、语言偏好、密码（可选）以及其他相关属性。
-    - `link_account_integrate`: 将第三方账号与现有账户进行绑定或更新已存在的绑定记录。
-    - `close_account`: 关闭指定账户。
-    - `update_account`: 更新账户的指定字段信息。
-    - `update_last_login`: 更新账户的最后登录时间和IP地址。
-    """
+
+    reset_password_rate_limiter = RateLimiter(
+        prefix="reset_password_rate_limit",
+        max_attempts=5,
+        time_window=60 * 60
+    )
 
     @staticmethod
     def load_user(user_id: str) -> Account:
@@ -97,22 +92,11 @@ class AccountService:
 
 
     @staticmethod
-    def get_account_jwt_token(account):
-        """
-        为指定账户生成并返回JWT令牌。
-        
-        参数:
-        account - 包含账户信息的对象，该对象应具有id属性。
-        
-        返回值:
-        返回一个字符串类型的JWT令牌。
-        """
-        
-        # 准备JWT负载信息，包括用户ID、令牌过期时间、发行者和主题
+    def get_account_jwt_token(account, *, exp: timedelta = timedelta(days=30)):
         payload = {
             "user_id": account.id,
-            "exp": datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30),
-            "iss": current_app.config['EDITION'],
+            "exp": datetime.now(timezone.utc).replace(tzinfo=None) + exp,
+            "iss": dify_config.EDITION,
             "sub": 'Console API Passport',
         }
 
@@ -192,27 +176,15 @@ class AccountService:
         return account
 
     @staticmethod
-    def create_account(email: str, name: str, interface_language: str,
-                    password: str = None,
-                    interface_theme: str = 'light',
-                    timezone: str = 'America/New_York', ) -> Account:
-        """
-        创建一个新的账户。
-
-        参数:
-        - email: 账户的电子邮件地址，字符串类型。
-        - name: 账户的名称，字符串类型。
-        - interface_language: 账户界面的语言设置，字符串类型。
-        - password: 账户的密码，字符串类型。如果提供，将被加密存储；如果为None，则表示不设置密码。
-        - interface_theme: 账户界面的主题设置，默认为'light'。
-        - timezone: 账户所在的时区，默认为'America/New_York'。
-
-        返回值:
-        - 创建的账户对象(Account类型)。
-        """
-        account = Account()  # 创建一个新的账户对象
-        account.email = email  # 设置电子邮件地址
-        account.name = name  # 设置账户名称
+    def create_account(email: str,
+                       name: str,
+                       interface_language: str,
+                       password: Optional[str] = None,
+                       interface_theme: str = 'light') -> Account:
+        """create account"""
+        account = Account()
+        account.email = email
+        account.name = name
 
         if password:
             # 为账户生成密码盐并加密密码
@@ -299,15 +271,57 @@ class AccountService:
         return account
 
     @staticmethod
-    def update_last_login(account: Account, request) -> None:
+    def update_last_login(account: Account, *, ip_address: str) -> None:
         """Update last login time and ip"""
         account.last_login_at = datetime.now(timezone.utc).replace(tzinfo=None)
-        account.last_login_ip = get_remote_ip(request)
-        # 将账户对象添加到数据库会话，并提交更改
+        account.last_login_ip = ip_address
         db.session.add(account)
         db.session.commit()
-        # 记录登录成功的日志信息
-        logging.info(f'Account {account.id} logged in successfully.')
+
+    @staticmethod
+    def login(account: Account, *, ip_address: Optional[str] = None):
+        if ip_address:
+            AccountService.update_last_login(account, ip_address=ip_address)
+        exp = timedelta(days=30)
+        token = AccountService.get_account_jwt_token(account, exp=exp)
+        redis_client.set(_get_login_cache_key(account_id=account.id, token=token), '1', ex=int(exp.total_seconds()))
+        return token
+
+    @staticmethod
+    def logout(*, account: Account, token: str):
+        redis_client.delete(_get_login_cache_key(account_id=account.id, token=token))
+
+    @staticmethod
+    def load_logged_in_account(*, account_id: str, token: str):
+        if not redis_client.get(_get_login_cache_key(account_id=account_id, token=token)):
+            return None
+        return AccountService.load_user(account_id)
+
+    @classmethod
+    def send_reset_password_email(cls, account):
+        if cls.reset_password_rate_limiter.is_rate_limited(account.email):
+            raise RateLimitExceededError(f"Rate limit exceeded for email: {account.email}. Please try again later.")
+
+        token = TokenManager.generate_token(account, 'reset_password')
+        send_reset_password_mail_task.delay(
+            language=account.interface_language,
+            to=account.email,
+            token=token
+        )
+        cls.reset_password_rate_limiter.increment_rate_limit(account.email)
+        return token
+
+    @classmethod
+    def revoke_reset_password_token(cls, token: str):
+        TokenManager.revoke_token(token, 'reset_password')
+
+    @classmethod
+    def get_reset_password_data(cls, token: str) -> Optional[dict[str, Any]]:
+        return TokenManager.get_token_data(token, 'reset_password')
+
+
+def _get_login_cache_key(*, account_id: str, token: str):
+    return f"account_login:{account_id}:{token}"
 
 
 class TenantService:
@@ -513,6 +527,50 @@ class TenantService:
         updated_accounts = []
 
         # 执行查询，并为每个账户附加角色信息，将更新后的账户添加到列表中
+        for account, role in query:
+            account.role = role
+            updated_accounts.append(account)
+
+        return updated_accounts
+
+    @staticmethod
+    def get_dataset_operator_members(tenant: Tenant) -> list[Account]:
+        """Get dataset admin members"""
+        query = (
+            db.session.query(Account, TenantAccountJoin.role)
+            .select_from(Account)
+            .join(
+                TenantAccountJoin, Account.id == TenantAccountJoin.account_id
+            )
+            .filter(TenantAccountJoin.tenant_id == tenant.id)
+            .filter(TenantAccountJoin.role == 'dataset_operator')
+        )
+
+        # Initialize an empty list to store the updated accounts
+        updated_accounts = []
+
+        for account, role in query:
+            account.role = role
+            updated_accounts.append(account)
+
+        return updated_accounts
+
+    @staticmethod
+    def get_dataset_operator_members(tenant: Tenant) -> list[Account]:
+        """Get dataset admin members"""
+        query = (
+            db.session.query(Account, TenantAccountJoin.role)
+            .select_from(Account)
+            .join(
+                TenantAccountJoin, Account.id == TenantAccountJoin.account_id
+            )
+            .filter(TenantAccountJoin.tenant_id == tenant.id)
+            .filter(TenantAccountJoin.role == 'dataset_operator')
+        )
+
+        # Initialize an empty list to store the updated accounts
+        updated_accounts = []
+
         for account, role in query:
             account.role = role
             updated_accounts.append(account)
@@ -754,8 +812,51 @@ class RegisterService:
         return f'member_invite:token:{token}'
 
     @classmethod
-    def register(cls, email, name, password: str = None, open_id: str = None, provider: str = None,
-                language: str = None, status: AccountStatus = None) -> Account:
+    def setup(cls, email: str, name: str, password: str, ip_address: str) -> None:
+        """
+        Setup dify
+
+        :param email: email
+        :param name: username
+        :param password: password
+        :param ip_address: ip address
+        """
+        try:
+            # Register
+            account = AccountService.create_account(
+                email=email,
+                name=name,
+                interface_language=languages[0],
+                password=password,
+            )
+
+            account.last_login_ip = ip_address
+            account.initialized_at = datetime.now(timezone.utc).replace(tzinfo=None)
+
+            TenantService.create_owner_tenant_if_not_exist(account)
+
+            dify_setup = DifySetup(
+                version=dify_config.CURRENT_VERSION
+            )
+            db.session.add(dify_setup)
+            db.session.commit()
+        except Exception as e:
+            db.session.query(DifySetup).delete()
+            db.session.query(TenantAccountJoin).delete()
+            db.session.query(Account).delete()
+            db.session.query(Tenant).delete()
+            db.session.commit()
+
+            logging.exception(f'Setup failed: {e}')
+            raise ValueError(f'Setup failed: {e}')
+
+    @classmethod
+    def register(cls, email, name,
+                 password: Optional[str] = None,
+                 open_id: Optional[str] = None,
+                 provider: Optional[str] = None,
+                 language: Optional[str] = None,
+                 status: Optional[AccountStatus] = None) -> Account:
         db.session.begin_nested()
         """
         注册账户
@@ -788,9 +889,7 @@ class RegisterService:
             # 如果有提供open_id和provider，则绑定账户的第三方身份认证
             if open_id is not None or provider is not None:
                 AccountService.link_account_integrate(provider, open_id, account)
-
-            # 非自托管版本创建租户，并将账户设置为租户所有者
-            if current_app.config['EDITION'] != 'SELF_HOSTED':
+            if dify_config.EDITION != 'SELF_HOSTED':
                 tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
                 TenantService.create_tenant_member(tenant, account, role='owner')
                 account.current_tenant = tenant
@@ -890,9 +989,8 @@ class RegisterService:
             'account_id': account.id,
             'email': account.email,
             'workspace_id': tenant.id,
-        }  # 准备邀请数据，包含账户ID、电子邮件和工作空间ID。
-        expiryHours = current_app.config['INVITE_EXPIRY_HOURS']  # 从应用配置中获取邀请令牌的过期时间（小时）。
-        # 在Redis中设置邀请令牌及其相关数据，设置过期时间为expiryHours小时。
+        }
+        expiryHours = dify_config.INVITE_EXPIRY_HOURS
         redis_client.setex(
             cls._get_invitation_token_key(token),
             expiryHours * 60 * 60,

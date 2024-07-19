@@ -370,20 +370,23 @@ class AppRunner:
             ), PublishFrom.APPLICATION_MANAGER
         )
 
-    def moderation_for_inputs(self, app_id: str,
-                            tenant_id: str,
-                            app_generate_entity: AppGenerateEntity,
-                            inputs: dict,
-                            query: str) -> tuple[bool, dict, str]:
+    def moderation_for_inputs(
+            self, app_id: str,
+            tenant_id: str,
+            app_generate_entity: AppGenerateEntity,
+            inputs: dict,
+            query: str,
+            message_id: str,
+    ) -> tuple[bool, dict, str]:
         """
-        处理输入内容的审查流程。
-        
-        :param app_id: 应用ID
-        :param tenant_id: 租户ID
-        :param app_generate_entity: 应用生成实体，包含应用配置等信息
-        :param inputs: 输入的内容字典
-        :param query: 查询字符串，可能为空
-        :return: 返回一个元组，包含审查结果（布尔值，是否通过审查）、审查详细信息（字典）和查询字符串（字符串）
+        Process sensitive_word_avoidance.
+        :param app_id: app id
+        :param tenant_id: tenant id
+        :param app_generate_entity: app generate entity
+        :param inputs: inputs
+        :param query: query
+        :param message_id: message id
+        :return:
         """
         # 初始化输入审查特性对象
         moderation_feature = InputModeration()
@@ -393,7 +396,9 @@ class AppRunner:
             tenant_id=tenant_id,
             app_config=app_generate_entity.app_config,
             inputs=inputs,
-            query=query if query else ''
+            query=query if query else '',
+            message_id=message_id,
+            trace_manager=app_generate_entity.trace_manager
         )
     
     def check_hosting_moderation(self, application_generate_entity: EasyUIBasedAppGenerateEntity,

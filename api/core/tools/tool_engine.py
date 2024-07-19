@@ -1,7 +1,8 @@
+import json
 from copy import deepcopy
 from datetime import datetime, timezone
 from mimetypes import guess_type
-from typing import Union
+from typing import Any, Optional, Union
 
 from yarl import URL
 
@@ -9,6 +10,7 @@ from core.app.entities.app_invoke_entities import InvokeFrom
 from core.callback_handler.agent_tool_callback_handler import DifyAgentCallbackHandler
 from core.callback_handler.workflow_tool_callback_handler import DifyWorkflowCallbackHandler
 from core.file.file_obj import FileTransferMethod
+from core.ops.ops_trace_manager import TraceQueueManager
 from core.tools.entities.tool_entities import ToolInvokeMessage, ToolInvokeMessageBinary, ToolInvokeMeta, ToolParameter
 from core.tools.errors import (
     ToolEngineInvokeError,
@@ -31,10 +33,12 @@ class ToolEngine:
     Tool runtime engine take care of the tool executions.
     """
     @staticmethod
-    def agent_invoke(tool: Tool, tool_parameters: Union[str, dict],
-                     user_id: str, tenant_id: str, message: Message, invoke_from: InvokeFrom,
-                     agent_tool_callback: DifyAgentCallbackHandler) \
-                        -> tuple[str, list[tuple[MessageFile, bool]], ToolInvokeMeta]:
+    def agent_invoke(
+        tool: Tool, tool_parameters: Union[str, dict],
+        user_id: str, tenant_id: str, message: Message, invoke_from: InvokeFrom,
+        agent_tool_callback: DifyAgentCallbackHandler,
+        trace_manager: Optional[TraceQueueManager] = None
+    ) -> tuple[str, list[tuple[MessageFile, bool]], ToolInvokeMeta]:
         """
         代理调用工具，依据给定参数执行。
 
@@ -101,9 +105,11 @@ class ToolEngine:
 
             # 通知回调处理器，工具调用结束
             agent_tool_callback.on_tool_end(
-                tool_name=tool.identity.name, 
-                tool_inputs=tool_parameters, 
-                tool_outputs=plain_text
+                tool_name=tool.identity.name,
+                tool_inputs=tool_parameters,
+                tool_outputs=plain_text,
+                message_id=message.id,
+                trace_manager=trace_manager
             )
 
             # 返回纯文本响应、消息文件列表及元数据
@@ -140,8 +146,8 @@ class ToolEngine:
     def workflow_invoke(tool: Tool, tool_parameters: dict,
                         user_id: str, workflow_id: str, 
                         workflow_tool_callback: DifyWorkflowCallbackHandler,
-                        workflow_call_depth: int) \
-                              -> list[ToolInvokeMessage]:
+                        workflow_call_depth: int,
+                        ) -> list[ToolInvokeMessage]:
         """
         根据给定的参数，在工作流中调用工具。
 
@@ -172,9 +178,9 @@ class ToolEngine:
 
             # 通知回调处理器工具执行已结束，并传递工具的响应。
             workflow_tool_callback.on_tool_end(
-                tool_name=tool.identity.name, 
-                tool_inputs=tool_parameters, 
-                tool_outputs=response
+                tool_name=tool.identity.name,
+                tool_inputs=tool_parameters,
+                tool_outputs=response,
             )
 
             return response
@@ -254,6 +260,8 @@ class ToolEngine:
                 response.type == ToolInvokeMessage.MessageType.IMAGE:
                 # 图片消息追加提示信息，告知图片已发送给用户
                 result += "image has been created and sent to user already, you do not need to create it, just tell the user to check it now."
+            elif response.type == ToolInvokeMessage.MessageType.JSON:
+                result += f"tool response: {json.dumps(response.message, ensure_ascii=False)}."
             else:
                 # 对于其他类型的响应消息，简单处理并追加到结果字符串
                 result += f"tool response: {response.message}."
@@ -327,7 +335,7 @@ class ToolEngine:
         agent_message: Message,
         invoke_from: InvokeFrom,
         user_id: str
-    ) -> list[tuple[MessageFile, bool]]:
+    ) -> list[tuple[Any, str]]:
         """
         创建消息文件。
 
@@ -376,7 +384,7 @@ class ToolEngine:
 
             # 将创建的message_file及其save_as标志添加到结果列表中
             result.append((
-                message_file,
+                message_file.id,
                 message.save_as
             ))
 

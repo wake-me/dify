@@ -6,8 +6,10 @@ import requests
 from flask import current_app, redirect, request
 from flask_restful import Resource
 
+from configs import dify_config
 from constants.languages import languages
 from extensions.ext_database import db
+from libs.helper import get_remote_ip
 from libs.oauth import GitHubOAuth, GoogleOAuth, OAuthUserInfo
 from models.account import Account, AccountStatus
 from services.account_service import AccountService, RegisterService, TenantService
@@ -25,25 +27,24 @@ def get_oauth_providers():
         dict: 包含所有支持的OAuth提供者的字典，键是提供者名称（如github、google），值是对应的OAuth实例。
     """
     with current_app.app_context():
-        # 初始化GitHub OAuth客户端
-        github_oauth = GitHubOAuth(client_id=current_app.config.get('GITHUB_CLIENT_ID'),
-                                   client_secret=current_app.config.get(
-                                       'GITHUB_CLIENT_SECRET'),
-                                   redirect_uri=current_app.config.get(
-                                       'CONSOLE_API_URL') + '/console/api/oauth/authorize/github')
+        if not dify_config.GITHUB_CLIENT_ID or not dify_config.GITHUB_CLIENT_SECRET:
+            github_oauth = None
+        else:
+            github_oauth = GitHubOAuth(
+                client_id=dify_config.GITHUB_CLIENT_ID,
+                client_secret=dify_config.GITHUB_CLIENT_SECRET,
+                redirect_uri=dify_config.CONSOLE_API_URL + '/console/api/oauth/authorize/github',
+            )
+        if not dify_config.GOOGLE_CLIENT_ID or not dify_config.GOOGLE_CLIENT_SECRET:
+            google_oauth = None
+        else:
+            google_oauth = GoogleOAuth(
+                client_id=dify_config.GOOGLE_CLIENT_ID,
+                client_secret=dify_config.GOOGLE_CLIENT_SECRET,
+                redirect_uri=dify_config.CONSOLE_API_URL + '/console/api/oauth/authorize/google',
+            )
 
-        # 初始化Google OAuth客户端
-        google_oauth = GoogleOAuth(client_id=current_app.config.get('GOOGLE_CLIENT_ID'),
-                                   client_secret=current_app.config.get(
-                                       'GOOGLE_CLIENT_SECRET'),
-                                   redirect_uri=current_app.config.get(
-                                       'CONSOLE_API_URL') + '/console/api/oauth/authorize/google')
-
-        # 将初始化的OAuth客户端添加到提供者字典中
-        OAUTH_PROVIDERS = {
-            'github': github_oauth,
-            'google': google_oauth
-        }
+        OAUTH_PROVIDERS = {'github': github_oauth, 'google': google_oauth}
         return OAUTH_PROVIDERS
 
 class OAuthLogin(Resource):
@@ -105,9 +106,7 @@ class OAuthCallback(Resource):
             token = oauth_provider.get_access_token(code)
             user_info = oauth_provider.get_user_info(token)
         except requests.exceptions.HTTPError as e:
-            # 记录OAuth过程中出现的HTTP错误
-            logging.exception(
-                f"An error occurred during the OAuth process with {provider}: {e.response.text}")
+            logging.exception(f'An error occurred during the OAuth process with {provider}: {e.response.text}')
             return {'error': 'OAuth process failed'}, 400
 
         # 根据OAuth提供的用户信息生成或更新账户
@@ -127,14 +126,9 @@ class OAuthCallback(Resource):
         # 如果账户是首个所有者，则创建租户
         TenantService.create_owner_tenant_if_not_exist(account)
 
-        # 更新账户的最后登录时间
-        AccountService.update_last_login(account, request)
+        token = AccountService.login(account, ip_address=get_remote_ip(request))
 
-        # 生成并获取账户的JWT令牌
-        token = AccountService.get_account_jwt_token(account)
-
-        # 重定向到控制台页面，并附带访问令牌
-        return redirect(f'{current_app.config.get("CONSOLE_WEB_URL")}?console_token={token}')
+        return redirect(f'{dify_config.CONSOLE_WEB_URL}?console_token={token}')
 
 def _get_account_by_openid_or_email(provider: str, user_info: OAuthUserInfo) -> Optional[Account]:
     """
@@ -174,11 +168,7 @@ def _generate_account(provider: str, user_info: OAuthUserInfo):
         # 如果账户不存在，则创建新账户
         account_name = user_info.name if user_info.name else 'Dify'
         account = RegisterService.register(
-            email=user_info.email,
-            name=account_name,
-            password=None,
-            open_id=user_info.id,
-            provider=provider
+            email=user_info.email, name=account_name, password=None, open_id=user_info.id, provider=provider
         )
 
         # 设置用户界面语言

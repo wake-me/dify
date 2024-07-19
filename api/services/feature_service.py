@@ -1,6 +1,6 @@
-from flask import current_app
 from pydantic import BaseModel, ConfigDict
 
+from configs import dify_config
 from services.billing_service import BillingService
 from services.enterprise.enterprise_service import EnterpriseService
 
@@ -33,6 +33,7 @@ class FeatureModel(BaseModel):
     docs_processing: str = 'standard'
     can_replace_logo: bool = False
     model_load_balancing_enabled: bool = False
+    dataset_operator_enabled: bool = False
 
     # pydantic configs
     model_config = ConfigDict(protected_namespaces=())
@@ -62,8 +63,8 @@ class FeatureService:
 
         cls._fulfill_params_from_env(features)  # 从环境变量填充参数
 
-        if current_app.config['BILLING_ENABLED']:
-            cls._fulfill_params_from_billing_api(features, tenant_id)  # 如果计费启用，则从计费API填充参数
+        if dify_config.BILLING_ENABLED:
+            cls._fulfill_params_from_billing_api(features, tenant_id)
 
         return features
 
@@ -71,15 +72,16 @@ class FeatureService:
     def get_system_features(cls) -> SystemFeatureModel:
         system_features = SystemFeatureModel()
 
-        if current_app.config['ENTERPRISE_ENABLED']:
+        if dify_config.ENTERPRISE_ENABLED:
             cls._fulfill_params_from_enterprise(system_features)
 
         return system_features
 
     @classmethod
     def _fulfill_params_from_env(cls, features: FeatureModel):
-        features.can_replace_logo = current_app.config['CAN_REPLACE_LOGO']
-        features.model_load_balancing_enabled = current_app.config['MODEL_LB_ENABLED']
+        features.can_replace_logo = dify_config.CAN_REPLACE_LOGO
+        features.model_load_balancing_enabled = dify_config.MODEL_LB_ENABLED
+        features.dataset_operator_enabled = dify_config.DATASET_OPERATOR_ENABLED
 
     @classmethod
     def _fulfill_params_from_billing_api(cls, features: FeatureModel, tenant_id: str):

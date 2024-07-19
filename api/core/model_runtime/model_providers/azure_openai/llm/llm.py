@@ -1,14 +1,13 @@
 import copy
 import logging
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from typing import Optional, Union, cast
 
 import tiktoken
 from openai import AzureOpenAI, Stream
 from openai.types import Completion
 from openai.types.chat import ChatCompletion, ChatCompletionChunk, ChatCompletionMessageToolCall
-from openai.types.chat.chat_completion_chunk import ChoiceDeltaFunctionCall, ChoiceDeltaToolCall
-from openai.types.chat.chat_completion_message import FunctionCall
+from openai.types.chat.chat_completion_chunk import ChoiceDeltaToolCall
 
 from core.model_runtime.entities.llm_entities import LLMMode, LLMResult, LLMResultChunk, LLMResultChunkDelta
 from core.model_runtime.entities.message_entities import (
@@ -16,6 +15,7 @@ from core.model_runtime.entities.message_entities import (
     ImagePromptMessageContent,
     PromptMessage,
     PromptMessageContentType,
+    PromptMessageFunction,
     PromptMessageTool,
     SystemPromptMessage,
     TextPromptMessageContent,
@@ -26,7 +26,8 @@ from core.model_runtime.entities.model_entities import AIModelEntity, ModelPrope
 from core.model_runtime.errors.validate import CredentialsValidateFailedError
 from core.model_runtime.model_providers.__base.large_language_model import LargeLanguageModel
 from core.model_runtime.model_providers.azure_openai._common import _CommonAzureOpenAI
-from core.model_runtime.model_providers.azure_openai._constant import LLM_BASE_MODELS, AzureBaseModel
+from core.model_runtime.model_providers.azure_openai._constant import LLM_BASE_MODELS
+from core.model_runtime.utils import helper
 
 logger = logging.getLogger(__name__)
 
@@ -42,26 +43,14 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
                 tools: Optional[list[PromptMessageTool]] = None, stop: Optional[list[str]] = None,
                 stream: bool = True, user: Optional[str] = None) \
             -> Union[LLMResult, Generator]:
-        """
-        调用OpenAI大型语言模型进行处理。
 
-        :param model: 指定的模型名称或标识。
-        :param credentials: 包含模型访问凭证的字典。
-        :param prompt_messages: 提示消息列表，用于引导模型的响应。
-        :param model_parameters: 模型参数字典，用于配置模型的行为。
-        :param tools: 可选，提示消息工具列表，用于辅助生成提示消息。
-        :param stop: 可选，停止信号列表，用于终止生成过程。
-        :param stream: 是否以流式方式返回结果。
-        :param user: 可选，模拟用户的标识。
-        :return: 根据模型类型返回LLMResult或Generator对象，包含模型生成的结果。
-        """
-        
-        # 获取AI模型实体
-        ai_model_entity = self._get_ai_model_entity(credentials.get('base_model_name'), model)
+        base_model_name = credentials.get('base_model_name')
+        if not base_model_name:
+            raise ValueError('Base Model Name is required')
+        ai_model_entity = self._get_ai_model_entity(base_model_name=base_model_name, model=model)
 
-        # 判断模型模式，决定调用的函数
-        if ai_model_entity.entity.model_properties.get(ModelPropertyKey.MODE) == LLMMode.CHAT.value:
-            # 如果是聊天模型，则调用聊天生成函数
+        if ai_model_entity and ai_model_entity.entity.model_properties.get(ModelPropertyKey.MODE) == LLMMode.CHAT.value:
+            # chat model
             return self._chat_generate(
                 model=model,
                 credentials=credentials,
@@ -84,28 +73,29 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
                 user=user
             )
 
-    def get_num_tokens(self, model: str, credentials: dict, prompt_messages: list[PromptMessage],
-                    tools: Optional[list[PromptMessageTool]] = None) -> int:
-        """
-        根据提供的模型、凭证和提示信息获取令牌数量。
-        
-        :param model: 指定的模型名称。
-        :param credentials: 包含模型凭证信息的字典。
-        :param prompt_messages: 提示信息列表，每个提示信息是一个PromptMessage对象。
-        :param tools: 可选，PromptMessageTool工具列表，用于辅助处理提示信息。
-        :return: 返回令牌的数量，具体取决于模型类型。
-        """
-
-        # 获取模型的模式（聊天模式或文本完成模式）
-        model_mode = self._get_ai_model_entity(credentials.get('base_model_name'), model).entity.model_properties.get(
-            ModelPropertyKey.MODE)
+    def get_num_tokens(
+        self,
+        model: str,
+        credentials: dict,
+        prompt_messages: list[PromptMessage],
+        tools: Optional[list[PromptMessageTool]] = None
+    ) -> int:
+        base_model_name = credentials.get('base_model_name')
+        if not base_model_name:
+            raise ValueError('Base Model Name is required')
+        model_entity = self._get_ai_model_entity(base_model_name=base_model_name, model=model)
+        if not model_entity:
+            raise ValueError(f'Base Model Name {base_model_name} is invalid')
+        model_mode = model_entity.entity.model_properties.get(ModelPropertyKey.MODE)
 
         if model_mode == LLMMode.CHAT.value:
             # 如果是聊天模型，则基于消息和工具计算令牌数量
             return self._num_tokens_from_messages(credentials, prompt_messages, tools)
         else:
-            # 如果是文本完成模型，则只基于第一个提示信息的内容计算令牌数量，不支持工具调用
-            return self._num_tokens_from_string(credentials, prompt_messages[0].content)
+            # text completion model, do not support tool calling
+            content = prompt_messages[0].content
+            assert isinstance(content, str)
+            return self._num_tokens_from_string(credentials,content)
 
     def validate_credentials(self, model: str, credentials: dict) -> None:
         """
@@ -130,8 +120,10 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
         if 'base_model_name' not in credentials:
             raise CredentialsValidateFailedError('Base Model Name is required')
 
-        # 尝试获取AI模型实体以验证模型名称的有效性
-        ai_model_entity = self._get_ai_model_entity(credentials.get('base_model_name'), model)
+        base_model_name = credentials.get('base_model_name')
+        if not base_model_name:
+            raise CredentialsValidateFailedError('Base Model Name is required')
+        ai_model_entity = self._get_ai_model_entity(base_model_name=base_model_name, model=model)
 
         if not ai_model_entity:
             raise CredentialsValidateFailedError(f'Base Model Name {credentials["base_model_name"]} is invalid')
@@ -164,19 +156,10 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
             raise CredentialsValidateFailedError(str(ex))
 
     def get_customizable_model_schema(self, model: str, credentials: dict) -> Optional[AIModelEntity]:
-        """
-        获取可定制模型的架构信息。
-        
-        参数:
-        - model: 模型名称，字符串类型。
-        - credentials: 包含认证信息的字典，其中应至少包含'base_model_name'键。
-        
-        返回值:
-        - 如果找到对应的模型实体，则返回AIModelEntity对象；否则返回None。
-        """
-        # 根据提供的基本模型名称和模型名称获取AI模型实体
-        ai_model_entity = self._get_ai_model_entity(credentials.get('base_model_name'), model)
-        # 如果找到了模型实体，则返回该实体，否则返回None
+        base_model_name = credentials.get('base_model_name')
+        if not base_model_name:
+            raise ValueError('Base Model Name is required')
+        ai_model_entity = self._get_ai_model_entity(base_model_name=base_model_name, model=model)
         return ai_model_entity.entity if ai_model_entity else None
 
     def _generate(self, model: str, credentials: dict,
@@ -224,21 +207,11 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
         # 处理非流式响应
         return self._handle_generate_response(model, credentials, response, prompt_messages)
 
-    def _handle_generate_response(self, model: str, credentials: dict, response: Completion,
-                                prompt_messages: list[PromptMessage]) -> LLMResult:
-        """
-        处理生成响应的逻辑。
-        
-        参数:
-        - model: 使用的模型名称。
-        - credentials: 用于模型访问的凭证。
-        - response: 完成度对象，包含生成的文本和其他元数据。
-        - prompt_messages: 提示信息列表，用于上下文引用。
-        
-        返回值:
-        - LLMResult对象，封装了模型响应的各种信息，包括生成的文本、使用情况统计等。
-        """
-        assistant_text = response.choices[0].text  # 获取助手生成的文本
+    def _handle_generate_response(
+        self, model: str, credentials: dict, response: Completion,
+        prompt_messages: list[PromptMessage]
+    ):
+        assistant_text = response.choices[0].text
 
         # 将助手消息转换为提示消息格式
         assistant_prompt_message = AssistantPromptMessage(
@@ -251,8 +224,10 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
             prompt_tokens = response.usage.prompt_tokens
             completion_tokens = response.usage.completion_tokens
         else:
-            # 否则，根据文本内容计算token数量
-            prompt_tokens = self._num_tokens_from_string(credentials, prompt_messages[0].content)
+            # calculate num tokens
+            content = prompt_messages[0].content
+            assert isinstance(content, str)
+            prompt_tokens = self._num_tokens_from_string(credentials, content)
             completion_tokens = self._num_tokens_from_string(credentials, assistant_text)
 
         # 根据模型使用情况计算响应的使用信息
@@ -269,17 +244,10 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
 
         return result
 
-    def _handle_generate_stream_response(self, model: str, credentials: dict, response: Stream[Completion],
-                                        prompt_messages: list[PromptMessage]) -> Generator:
-        """
-        处理生成流式响应的逻辑。
-        
-        :param model: 使用的模型名称。
-        :param credentials: 用户的凭证信息，用于认证和访问权限。
-        :param response: 一个流，包含完成信息的多个片段。
-        :param prompt_messages: 提示信息列表，用于上下文交互。
-        :return: 一个生成器，逐个yield处理后的结果块。
-        """
+    def _handle_generate_stream_response(
+        self, model: str, credentials: dict, response: Stream[Completion],
+        prompt_messages: list[PromptMessage]
+    ) -> Generator:
         full_text = ''
         for chunk in response:
             if len(chunk.choices) == 0:
@@ -305,8 +273,10 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
                     prompt_tokens = chunk.usage.prompt_tokens
                     completion_tokens = chunk.usage.completion_tokens
                 else:
-                    # 根据文本内容计算token数量
-                    prompt_tokens = self._num_tokens_from_string(credentials, prompt_messages[0].content)
+                    # calculate num tokens
+                    content = prompt_messages[0].content
+                    assert isinstance(content, str)
+                    prompt_tokens = self._num_tokens_from_string(credentials, content)
                     completion_tokens = self._num_tokens_from_string(credentials, full_text)
 
                 # 计算并转换响应的使用情况
@@ -370,11 +340,12 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
 
         # 如果提供了工具列表，将其配置添加到extra_model_kwargs中
         if tools:
-            extra_model_kwargs['functions'] = [{
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": tool.parameters
-            } for tool in tools]
+            extra_model_kwargs['tools'] = [helper.dump_model(PromptMessageFunction(function=tool)) for tool in tools]
+            # extra_model_kwargs['functions'] = [{
+            #     "name": tool.name,
+            #     "description": tool.description,
+            #     "parameters": tool.parameters
+            # } for tool in tools]
 
         # 如果提供了停止信号，添加到extra_model_kwargs中
         if stop:
@@ -384,9 +355,10 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
         if user:
             extra_model_kwargs['user'] = user
 
-        # 向模型发送请求，获取响应
+        # chat model
+        messages = [self._convert_prompt_message_to_dict(m) for m in prompt_messages]
         response = client.chat.completions.create(
-            messages=[self._convert_prompt_message_to_dict(m) for m in prompt_messages],
+            messages=messages,
             model=model,
             stream=stream,
             **model_parameters,
@@ -399,30 +371,17 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
 
         return self._handle_chat_generate_response(model, credentials, response, prompt_messages, tools)
 
-    def _handle_chat_generate_response(self, model: str, credentials: dict, response: ChatCompletion,
-                                    prompt_messages: list[PromptMessage],
-                                    tools: Optional[list[PromptMessageTool]] = None) -> LLMResult:
-        """
-        处理聊天生成响应的逻辑。
-
-        参数:
-        - model: 使用的模型名称。
-        - credentials: 用于模型访问的凭证。
-        - response: 从聊天模型获取的完成响应对象。
-        - prompt_messages: 提示消息列表，用于上下文。
-        - tools: 可选，工具消息列表，用于提供额外的功能。
-
-        返回值:
-        - LLMResult对象，包含处理后的聊天响应信息。
-        """
-
-        # 提取助手消息和函数调用信息
+    def _handle_chat_generate_response(
+        self, model: str, credentials: dict, response: ChatCompletion,
+        prompt_messages: list[PromptMessage],
+        tools: Optional[list[PromptMessageTool]] = None
+    ):
         assistant_message = response.choices[0].message
-        assistant_message_function_call = assistant_message.function_call
+        assistant_message_tool_calls = assistant_message.tool_calls
 
-        # 从助手消息中提取函数调用
-        function_call = self._extract_response_function_call(assistant_message_function_call)
-        tool_calls = [function_call] if function_call else []
+        # extract tool calls from response
+        tool_calls = []
+        self._update_tool_calls(tool_calls=tool_calls, tool_calls_response=assistant_message_tool_calls)
 
         # 将助手消息转换为提示消息格式
         assistant_prompt_message = AssistantPromptMessage(
@@ -443,8 +402,8 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
         # 计算响应的使用信息
         usage = self._calc_response_usage(model, credentials, prompt_tokens, completion_tokens)
 
-        # 转换响应格式
-        response = LLMResult(
+        # transform response
+        result = LLMResult(
             model=response.model or model,
             prompt_messages=prompt_messages,
             message=assistant_prompt_message,
@@ -452,63 +411,34 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
             system_fingerprint=response.system_fingerprint,
         )
 
-        return response
+        return result
 
-    def _handle_chat_generate_stream_response(self, model: str, credentials: dict,
-                                                response: Stream[ChatCompletionChunk],
-                                                prompt_messages: list[PromptMessage],
-                                                tools: Optional[list[PromptMessageTool]] = None) -> Generator:
-        """
-        处理聊天生成流式响应的函数。
-        
-        参数:
-        - model: 字符串，指定用于生成聊天回复的模型。
-        - credentials: 字典，包含用于认证的凭证信息。
-        - response: Stream[ChatCompletionChunk]，聊天完成块的流式响应。
-        - prompt_messages: PromptMessage列表，触发聊天生成的提示消息列表。
-        - tools: PromptMessageTool列表，可选，与提示消息相关的工具列表。
-        
-        返回值:
-        - Generator，生成器对象，逐块返回处理后的聊天结果。
-        """
+    def _handle_chat_generate_stream_response(
+        self,
+        model: str,
+        credentials: dict,
+        response: Stream[ChatCompletionChunk],
+        prompt_messages: list[PromptMessage],
+        tools: Optional[list[PromptMessageTool]] = None
+    ):
         index = 0
         full_assistant_content = ''
-        delta_assistant_message_function_call_storage: ChoiceDeltaFunctionCall = None
         real_model = model
         system_fingerprint = None
         completion = ''
+        tool_calls = []
         for chunk in response:
             if len(chunk.choices) == 0:
                 continue
 
             delta = chunk.choices[0]
 
-            # 忽略内容为空或功能调用为空的delta
-            if delta.delta is None or (
-                delta.finish_reason is None
-                and (delta.delta.content is None or delta.delta.content == '')
-                and delta.delta.function_call is None
-            ):
-                continue
-            
-            # 处理流式功能调用
-            if delta_assistant_message_function_call_storage is not None:
-                if assistant_message_function_call:
-                    delta_assistant_message_function_call_storage.arguments += assistant_message_function_call.arguments
-                    continue
-                else:
-                    assistant_message_function_call = delta_assistant_message_function_call_storage
-                    delta_assistant_message_function_call_storage = None
-            else:
-                if assistant_message_function_call:
-                    delta_assistant_message_function_call_storage = assistant_message_function_call
-                    if delta_assistant_message_function_call_storage.arguments is None:
-                        delta_assistant_message_function_call_storage.arguments = ''
-                    continue
+            # extract tool calls from response
+            self._update_tool_calls(tool_calls=tool_calls, tool_calls_response=delta.delta.tool_calls)
 
-            # 从响应中提取工具调用信息
-            function_call = self._extract_response_function_call(assistant_message_function_call)
-            tool_calls = [function_call] if function_call else []
+            # Handling exceptions when content filters' streaming mode is set to asynchronous modified filter
+            if delta.finish_reason is None and not delta.delta.content:
+                continue
 
             # 将助手消息转换为提示消息
             assistant_prompt_message = AssistantPromptMessage(
@@ -558,78 +488,49 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
         )
 
     @staticmethod
-    def _extract_response_tool_calls(response_tool_calls: list[ChatCompletionMessageToolCall | ChoiceDeltaToolCall]) \
-            -> list[AssistantPromptMessage.ToolCall]:
-        """
-        从响应工具调用列表中提取工具调用信息。
+    def _update_tool_calls(tool_calls: list[AssistantPromptMessage.ToolCall], tool_calls_response: Optional[Sequence[ChatCompletionMessageToolCall | ChoiceDeltaToolCall]]) -> None:
+        if tool_calls_response:
+            for response_tool_call in tool_calls_response:
+                if isinstance(response_tool_call, ChatCompletionMessageToolCall):
+                    function = AssistantPromptMessage.ToolCall.ToolCallFunction(
+                        name=response_tool_call.function.name,
+                        arguments=response_tool_call.function.arguments
+                    )
 
-        参数:
-        - response_tool_calls: 一个列表，包含ChatCompletionMessageToolCall和ChoiceDeltaToolCall对象，
-        这些对象表示与聊天助手交互时调用的工具。
+                    tool_call = AssistantPromptMessage.ToolCall(
+                        id=response_tool_call.id,
+                        type=response_tool_call.type,
+                        function=function
+                    )
+                    tool_calls.append(tool_call)
+                elif isinstance(response_tool_call, ChoiceDeltaToolCall):
+                    index = response_tool_call.index
+                    if index < len(tool_calls):
+                        tool_calls[index].id = response_tool_call.id or tool_calls[index].id
+                        tool_calls[index].type = response_tool_call.type or tool_calls[index].type
+                        if response_tool_call.function:
+                            tool_calls[index].function.name = response_tool_call.function.name or tool_calls[index].function.name
+                            tool_calls[index].function.arguments += response_tool_call.function.arguments or ''
+                    else:
+                        assert response_tool_call.id is not None
+                        assert response_tool_call.type is not None
+                        assert response_tool_call.function is not None
+                        assert response_tool_call.function.name is not None
+                        assert response_tool_call.function.arguments is not None
 
-        返回值:
-        - 一个列表，包含AssistantPromptMessage.ToolCall对象，这些对象表示经过处理后可用于助手响应的工具调用信息。
-        """
-
-        tool_calls = []
-        if response_tool_calls:
-            # 遍历响应工具调用列表，将每个调用转换为AssistantPromptMessage.ToolCall格式
-            for response_tool_call in response_tool_calls:
-                function = AssistantPromptMessage.ToolCall.ToolCallFunction(
-                    name=response_tool_call.function.name,
-                    arguments=response_tool_call.function.arguments
-                )
-
-                tool_call = AssistantPromptMessage.ToolCall(
-                    id=response_tool_call.id,
-                    type=response_tool_call.type,
-                    function=function
-                )
-                tool_calls.append(tool_call)  # 将转换后的工具调用添加到新列表中
-
-        return tool_calls
-
-    @staticmethod
-    def _extract_response_function_call(response_function_call: FunctionCall | ChoiceDeltaFunctionCall) \
-            -> AssistantPromptMessage.ToolCall:
-        """
-        从响应函数调用中提取工具调用信息。
-
-        参数:
-        - response_function_call: FunctionCall 或 ChoiceDeltaFunctionCall 类型，表示一个函数调用信息。
-
-        返回值:
-        - AssistantPromptMessage.ToolCall 类型，表示提取出的工具调用信息。
-        """
-        tool_call = None
-        if response_function_call:
-            # 构建 AssistantPromptMessage.ToolCall.Function 对象，存储函数名称和参数
-            function = AssistantPromptMessage.ToolCall.ToolCallFunction(
-                name=response_function_call.name,
-                arguments=response_function_call.arguments
-            )
-
-            # 根据函数调用信息，构建 AssistantPromptMessage.ToolCall 对象
-            tool_call = AssistantPromptMessage.ToolCall(
-                id=response_function_call.name,
-                type="function",
-                function=function
-            )
-
-        return tool_call
+                        function = AssistantPromptMessage.ToolCall.ToolCallFunction(
+                            name=response_tool_call.function.name,
+                            arguments=response_tool_call.function.arguments
+                        )
+                        tool_call = AssistantPromptMessage.ToolCall(
+                            id=response_tool_call.id,
+                            type=response_tool_call.type,
+                            function=function
+                        )
+                        tool_calls.append(tool_call)
 
     @staticmethod
-    def _convert_prompt_message_to_dict(message: PromptMessage) -> dict:
-        """
-        将提示消息对象转换为字典格式。
-
-        参数:
-        - message: PromptMessage, 待转换的消息对象，可以是用户提示消息、助手提示消息、系统提示消息或工具提示消息。
-
-        返回值:
-        - dict, 转换后的消息字典，包含消息的角色（用户、助手、系统或工具）和内容。
-        """
-        
+    def _convert_prompt_message_to_dict(message: PromptMessage):
         if isinstance(message, UserPromptMessage):
             # 处理用户提示消息
             message = cast(UserPromptMessage, message)
@@ -639,6 +540,7 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
             else:
                 # 当内容为消息列表时，逐个处理并构建子消息字典
                 sub_messages = []
+                assert message.content is not None
                 for message_content in message.content:
                     if message_content.type == PromptMessageContentType.TEXT:
                         # 处理文本类型消息内容
@@ -659,19 +561,13 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
                             }
                         }
                         sub_messages.append(sub_message_dict)
-
                 message_dict = {"role": "user", "content": sub_messages}
         elif isinstance(message, AssistantPromptMessage):
             # 处理助手提示消息
             message = cast(AssistantPromptMessage, message)
             message_dict = {"role": "assistant", "content": message.content}
             if message.tool_calls:
-                # 如果存在工具调用，添加工具调用信息
-                function_call = message.tool_calls[0]
-                message_dict["function_call"] = {
-                    "name": function_call.function.name,
-                    "arguments": function_call.function.arguments,
-                }
+                message_dict["tool_calls"] = [helper.dump_model(tool_call) for tool_call in message.tool_calls]
         elif isinstance(message, SystemPromptMessage):
             # 处理系统提示消息
             message = cast(SystemPromptMessage, message)
@@ -680,9 +576,10 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
             # 处理工具提示消息
             message = cast(ToolPromptMessage, message)
             message_dict = {
-                "role": "function",
+                "role": "tool",
+                "name": message.name,
                 "content": message.content,
-                "name": message.tool_call_id
+                "tool_call_id": message.tool_call_id
             }
         else:
             # 如果消息类型未知，抛出异常
@@ -720,10 +617,11 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
 
         return num_tokens
 
-    def _num_tokens_from_messages(self, credentials: dict, messages: list[PromptMessage],
-                                tools: Optional[list[PromptMessageTool]] = None) -> int:
-        """
-        计算gpt-3.5-turbo和gpt-4模型所需的token数量，使用tiktoken包进行计算。
+    def _num_tokens_from_messages(
+        self, credentials: dict, messages: list[PromptMessage],
+        tools: Optional[list[PromptMessageTool]] = None
+    ) -> int:
+        """Calculate num tokens for gpt-3.5-turbo and gpt-4 with tiktoken package.
 
         官方文档: https://github.com/openai/openai-cookbook/blob/
         main/examples/How_to_format_inputs_to_ChatGPT_models.ipynb
@@ -773,6 +671,7 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
                 # 计算工具调用和函数调用中的token数量
                 if key == "tool_calls":
                     for tool_call in value:
+                        assert isinstance(tool_call, dict)
                         for t_key, t_value in tool_call.items():
                             num_tokens += len(encoding.encode(t_key))
                             if t_key == "function":
@@ -826,14 +725,13 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
             if 'title' in parameters:
                 # 如果参数中包含标题，则计算标题的令牌数
                 num_tokens += len(encoding.encode('title'))
-                num_tokens += len(encoding.encode(parameters.get("title")))
+                num_tokens += len(encoding.encode(parameters['title']))
             num_tokens += len(encoding.encode('type'))
-            num_tokens += len(encoding.encode(parameters.get("type")))
-            
+            num_tokens += len(encoding.encode(parameters['type']))
             if 'properties' in parameters:
                 # 计算属性的令牌数
                 num_tokens += len(encoding.encode('properties'))
-                for key, value in parameters.get('properties').items():
+                for key, value in parameters['properties'].items():
                     num_tokens += len(encoding.encode(key))
                     for field_key, field_value in value.items():
                         num_tokens += len(encoding.encode(field_key))
@@ -855,18 +753,7 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
         return num_tokens
 
     @staticmethod
-    def _get_ai_model_entity(base_model_name: str, model: str) -> AzureBaseModel:
-        """
-        根据基础模型名称和模型名称获取AI模型实体。
-        
-        参数:
-        - base_model_name: str，基础模型的名称。
-        - model: str，模型的名称。
-        
-        返回值:
-        - AzureBaseModel，如果找到匹配的基础模型实体，则返回其深拷贝；否则返回None。
-        """
-        # 遍历预定义的LLM基础模型列表
+    def _get_ai_model_entity(base_model_name: str, model: str):
         for ai_model_entity in LLM_BASE_MODELS:
             # 如果找到匹配的基础模型名称
             if ai_model_entity.base_model_name == base_model_name:
@@ -878,6 +765,3 @@ class AzureOpenAILargeLanguageModel(_CommonAzureOpenAI, LargeLanguageModel):
                 ai_model_entity_copy.entity.label.zh_Hans = model
                 # 返回更新后的模型实体深拷贝
                 return ai_model_entity_copy
-
-        # 如果没有找到匹配的基础模型名称，返回None
-        return None

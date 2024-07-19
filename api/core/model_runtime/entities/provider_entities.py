@@ -1,10 +1,11 @@
+from collections.abc import Sequence
 from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
 from core.model_runtime.entities.common_entities import I18nObject
-from core.model_runtime.entities.model_entities import AIModelEntity, ModelType, ProviderModel
+from core.model_runtime.entities.model_entities import ModelType, ProviderModel
 
 
 class ConfigurateMethod(Enum):
@@ -126,8 +127,9 @@ class SimpleProviderEntity(BaseModel):
     label: I18nObject
     icon_small: Optional[I18nObject] = None
     icon_large: Optional[I18nObject] = None
-    supported_model_types: list[ModelType]
-    models: list[AIModelEntity] = []
+    supported_model_types: Sequence[ModelType]
+    models: list[ProviderModel] = []
+
 
 class ProviderHelpEntity(BaseModel):
     """
@@ -146,19 +148,18 @@ class ProviderEntity(BaseModel):
     供应商实体模型类。
     用于定义供应商的基本信息和功能。
     """
-
-    provider: str  # 供应商名称
-    label: I18nObject  # 供应商标签，支持多语言
-    description: Optional[I18nObject] = None  # 供应商描述，支持多语言，可选
-    icon_small: Optional[I18nObject] = None  # 小图标，支持多语言，可选
-    icon_large: Optional[I18nObject] = None  # 大图标，支持多语言，可选
-    background: Optional[str] = None  # 背景颜色或图片链接，可选
-    help: Optional[ProviderHelpEntity] = None  # 帮助信息，可选
-    supported_model_types: list[ModelType]  # 支持的模型类型列表
-    configurate_methods: list[ConfigurateMethod]  # 配置方法列表
-    models: list[ProviderModel] = []  # 供应商提供的模型列表
-    provider_credential_schema: Optional[ProviderCredentialSchema] = None  # 供应商凭证模式，可选
-    model_credential_schema: Optional[ModelCredentialSchema] = None  # 模型凭证模式，可选
+    provider: str
+    label: I18nObject
+    description: Optional[I18nObject] = None
+    icon_small: Optional[I18nObject] = None
+    icon_large: Optional[I18nObject] = None
+    background: Optional[str] = None
+    help: Optional[ProviderHelpEntity] = None
+    supported_model_types: Sequence[ModelType]
+    configurate_methods: list[ConfigurateMethod]
+    models: list[ProviderModel] = []
+    provider_credential_schema: Optional[ProviderCredentialSchema] = None
+    model_credential_schema: Optional[ModelCredentialSchema] = None
 
     # pydantic configs
     model_config = ConfigDict(protected_namespaces=())

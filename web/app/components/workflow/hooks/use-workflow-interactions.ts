@@ -1,4 +1,8 @@
-import { useCallback } from 'react'
+import {
+  useCallback,
+  useState,
+} from 'react'
+import { useTranslation } from 'react-i18next'
 import { useReactFlow } from 'reactflow'
 import { useWorkflowStore } from '../store'
 import { WORKFLOW_DATA_UPDATE } from '../constants'
@@ -9,8 +13,12 @@ import {
 } from '../utils'
 import { useEdgesInteractions } from './use-edges-interactions'
 import { useNodesInteractions } from './use-nodes-interactions'
+import { useNodesSyncDraft } from './use-nodes-sync-draft'
 import { useEventEmitterContextContext } from '@/context/event-emitter'
 import { fetchWorkflowDraft } from '@/service/workflow'
+import { exportAppConfig } from '@/service/apps'
+import { useToastContext } from '@/app/components/base/toast'
+import { useStore as useAppStore } from '@/app/components/app/store'
 
 export const useWorkflowInteractions = () => {
   const workflowStore = useWorkflowStore()
@@ -69,5 +77,43 @@ export const useWorkflowUpdate = () => {
   return {
     handleUpdateWorkflowCanvas,
     handleRefreshWorkflowDraft,
+  }
+}
+
+export const useDSL = () => {
+  const { t } = useTranslation()
+  const { notify } = useToastContext()
+  const [exporting, setExporting] = useState(false)
+  const { doSyncWorkflowDraft } = useNodesSyncDraft()
+
+  const appDetail = useAppStore(s => s.appDetail)
+
+  const handleExportDSL = useCallback(async () => {
+    if (!appDetail)
+      return
+
+    if (exporting)
+      return
+
+    try {
+      setExporting(true)
+      await doSyncWorkflowDraft()
+      const { data } = await exportAppConfig(appDetail.id)
+      const a = document.createElement('a')
+      const file = new Blob([data], { type: 'application/yaml' })
+      a.href = URL.createObjectURL(file)
+      a.download = `${appDetail.name}.yml`
+      a.click()
+    }
+    catch (e) {
+      notify({ type: 'error', message: t('app.exportFailed') })
+    }
+    finally {
+      setExporting(false)
+    }
+  }, [appDetail, notify, t, doSyncWorkflowDraft, exporting])
+
+  return {
+    handleExportDSL,
   }
 }

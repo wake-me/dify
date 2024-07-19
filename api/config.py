@@ -277,3 +277,4 @@ class Config:
         # fetch app templates mode, remote, builtin, db(only for dify SaaS), default: remote
         self.HOSTED_FETCH_APP_TEMPLATES_MODE = get_env('HOSTED_FETCH_APP_TEMPLATES_MODE')
         self.HOSTED_FETCH_APP_TEMPLATES_REMOTE_DOMAIN = get_env('HOSTED_FETCH_APP_TEMPLATES_REMOTE_DOMAIN')
+

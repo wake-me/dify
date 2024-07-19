@@ -2,8 +2,10 @@ from enum import Enum
 
 
 class VectorType(str, Enum):
+    ANALYTICDB = 'analyticdb'
     CHROMA = 'chroma'
     MILVUS = 'milvus'
+    MYSCALE = 'myscale'
     PGVECTOR = 'pgvector'
     PGVECTO_RS = 'pgvecto-rs'
     QDRANT = 'qdrant'
@@ -12,3 +14,4 @@ class VectorType(str, Enum):
     WEAVIATE = 'weaviate'
     OPENSEARCH = 'opensearch'
     TENCENT = 'tencent'
+    ORACLE = 'oracle'

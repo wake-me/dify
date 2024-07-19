@@ -1,7 +1,7 @@
 
-from flask import current_app
 from flask_login import current_user
 
+from configs import dify_config
 from extensions.ext_database import db
 from models.account import Tenant, TenantAccountJoin, TenantAccountJoinRole
 from services.account_service import TenantService
@@ -52,7 +52,7 @@ class WorkspaceService:
         # 如果允许替换图标，并且用户是所有者或管理员，那么提供自定义配置信息
         if can_replace_logo and TenantService.has_roles(tenant, 
         [TenantAccountJoinRole.OWNER, TenantAccountJoinRole.ADMIN]):
-            base_url = current_app.config.get('FILES_URL')
+            base_url = dify_config.FILES_URL
             replace_webapp_logo = f'{base_url}/files/workspaces/{tenant.id}/webapp-logo' if tenant.custom_config_dict.get('replace_webapp_logo') else None
             remove_webapp_brand = tenant.custom_config_dict.get('remove_webapp_brand', False)
 

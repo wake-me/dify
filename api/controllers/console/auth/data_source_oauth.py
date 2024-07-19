@@ -6,6 +6,7 @@ from flask_login import current_user
 from flask_restful import Resource
 from werkzeug.exceptions import Forbidden
 
+from configs import dify_config
 from controllers.console import api
 from libs.login import login_required
 from libs.oauth_data_source import NotionOAuth
@@ -24,12 +25,11 @@ def get_oauth_providers():
         dict: 包含OAuth提供者名称及其对应实例的字典。
     """
     with current_app.app_context():
-        # 初始化Notion OAuth实例
-        notion_oauth = NotionOAuth(client_id=current_app.config.get('NOTION_CLIENT_ID'),
-                                   client_secret=current_app.config.get(
-                                       'NOTION_CLIENT_SECRET'),
-                                   redirect_uri=current_app.config.get(
-                                       'CONSOLE_API_URL') + '/console/api/oauth/data-source/callback/notion')
+        if not dify_config.NOTION_CLIENT_ID or not dify_config.NOTION_CLIENT_SECRET:
+            return {}
+        notion_oauth = NotionOAuth(client_id=dify_config.NOTION_CLIENT_ID,
+                                   client_secret=dify_config.NOTION_CLIENT_SECRET,
+                                   redirect_uri=dify_config.CONSOLE_API_URL + '/console/api/oauth/data-source/callback/notion')
 
         # 定义OAuth提供者字典
         OAUTH_PROVIDERS = {
@@ -70,11 +70,10 @@ class OAuthDataSource(Resource):
         # 检查是否找到了指定的OAuth提供者
         if not oauth_provider:
             return {'error': 'Invalid provider'}, 400
-        
-        # 根据应用的配置决定是内部集成还是外部集成
-        if current_app.config.get('NOTION_INTEGRATION_TYPE') == 'internal':
-            # 内部集成：保存内部访问令牌
-            internal_secret = current_app.config.get('NOTION_INTERNAL_SECRET')
+        if dify_config.NOTION_INTEGRATION_TYPE == 'internal':
+            internal_secret = dify_config.NOTION_INTERNAL_SECRET
+            if not internal_secret:
+                return {'error': 'Internal secret is not set'},
             oauth_provider.save_internal_access_token(internal_secret)
             return { 'data': '' }
         else:
@@ -114,19 +113,13 @@ class OAuthDataSourceCallback(Resource):
         if 'code' in request.args:
             code = request.args.get('code')
 
-            # 重定向到指定URL，并附带code参数
-            return redirect(f'{current_app.config.get("CONSOLE_WEB_URL")}?type=notion&code={code}')
-        
-        # 处理请求参数中的error
+            return redirect(f'{dify_config.CONSOLE_WEB_URL}?type=notion&code={code}')
         elif 'error' in request.args:
             error = request.args.get('error')
 
-            # 重定向到指定URL，并附带error参数
-            return redirect(f'{current_app.config.get("CONSOLE_WEB_URL")}?type=notion&error={error}')
-        
-        # 默认错误处理：访问被拒绝
+            return redirect(f'{dify_config.CONSOLE_WEB_URL}?type=notion&error={error}')
         else:
-            return redirect(f'{current_app.config.get("CONSOLE_WEB_URL")}?type=notion&error=Access denied')
+            return redirect(f'{dify_config.CONSOLE_WEB_URL}?type=notion&error=Access denied')
         
 
 class OAuthDataSourceBinding(Resource):

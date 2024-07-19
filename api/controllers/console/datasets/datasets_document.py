@@ -20,6 +20,7 @@ from controllers.console.datasets.error import (
     ArchivedDocumentImmutableError,
     DocumentAlreadyFinishedError,
     DocumentIndexingError,
+    IndexingEstimateError,
     InvalidActionError,
     InvalidMetadataError,
 )
@@ -333,7 +334,7 @@ class DatasetDocumentListApi(Resource):
             raise NotFound('Dataset not found.')
 
         # The role of the current user in the ta table must be admin, owner, or editor
-        if not current_user.is_editor:
+        if not current_user.is_dataset_editor:
             raise Forbidden()
 
         try:
@@ -407,7 +408,10 @@ class DatasetInitApi(Resource):
                             location='json')
         args = parser.parse_args()
 
-        # 针对高质索引技术，检查模型是否已配置
+        # The role of the current user in the ta table must be admin, owner, or editor, or dataset_operator
+        if not current_user.is_dataset_editor:
+            raise Forbidden()
+
         if args['indexing_technique'] == 'high_quality':
             try:
                 model_manager = ModelManager()
@@ -535,6 +539,8 @@ class DocumentIndexingEstimateApi(DocumentResource):
                 except ProviderTokenNotInitError as ex:
                     # 如果提供者令牌未初始化，抛出异常
                     raise ProviderNotInitializeError(ex.description)
+                except Exception as e:
+                    raise IndexingEstimateError(str(e))
 
         return response
 
@@ -671,6 +677,8 @@ class DocumentBatchIndexingEstimateApi(DocumentResource):
             except ProviderTokenNotInitError as ex:
                 # 如果提供者令牌未初始化，则抛出提供者未初始化异常，并附带错误描述
                 raise ProviderNotInitializeError(ex.description)
+            except Exception as e:
+                raise IndexingEstimateError(str(e))
         return response
 
 
@@ -1098,17 +1106,18 @@ class DocumentStatusApi(DocumentResource):
         if dataset is None:
             raise NotFound("Dataset not found.")
 
-        # 检查用户的数据集模型设置
-        DatasetService.check_dataset_model_setting(dataset)
-
-        # 获取文档对象
-        document = self.get_document(dataset_id, document_id)
-
         # The role of the current user in the ta table must be admin, owner, or editor
-        if not current_user.is_editor:
+        if not current_user.is_dataset_editor:
             raise Forbidden()
 
-        # 检查文档是否正在被索引
+        # check user's model setting
+        DatasetService.check_dataset_model_setting(dataset)
+
+        # check user's permission
+        DatasetService.check_dataset_permission(dataset, current_user)
+
+        document = self.get_document(dataset_id, document_id)
+
         indexing_cache_key = 'document_{}_indexing'.format(document.id)
         cache_result = redis_client.get(indexing_cache_key)
         if cache_result is not None:
@@ -1344,10 +1353,11 @@ class DocumentRenameApi(DocumentResource):
     @account_initialization_required
     @marshal_with(document_fields)
     def post(self, dataset_id, document_id):
-        # The role of the current user in the ta table must be admin or owner
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin, owner, editor, or dataset_operator
+        if not current_user.is_dataset_editor:
             raise Forbidden()
-
+        dataset = DatasetService.get_dataset(dataset_id)
+        DatasetService.check_dataset_operator_permission(current_user, dataset)
         parser = reqparse.RequestParser()
         parser.add_argument('name', type=str, required=True, nullable=False, location='json')
         args = parser.parse_args()

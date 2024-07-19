@@ -75,7 +75,6 @@ class AppQueueManager:
         listen_timeout = current_app.config.get("APP_MAX_EXECUTION_TIME")
         start_time = time.time()
         last_ping_time = 0
-
         while True:
             try:
                 message = self._q.get(timeout=1)  # 尝试从队列获取消息

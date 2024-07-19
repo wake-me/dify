@@ -2,12 +2,14 @@
 import type { FC } from 'react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
-import cn from 'classnames'
+import {
+  RiDeleteBinLine,
+} from '@remixicon/react'
 import Indicator from '../../../indicator'
 import Operate from '../data-source-notion/operate'
 import { DataSourceType } from './types'
 import s from './style.module.css'
-import { Trash03 } from '@/app/components/base/icons/src/vender/line/general'
+import cn from '@/utils/classnames'
 
 export type ConfigItemType = {
   id: string
@@ -69,7 +71,7 @@ const ConfigItem: FC<Props> = ({
       {
         isWebsite && !readOnly && (
           <div className='p-2 text-gray-500 cursor-pointer rounded-md hover:bg-black/5' onClick={onRemove} >
-            <Trash03 className='w-4 h-4 ' />
+            <RiDeleteBinLine className='w-4 h-4 ' />
           </div>
         )
       }

@@ -405,6 +405,8 @@ class AccountIntegrateApi(Resource):
         return {'data': integrate_data}  # 返回集成信息列表
 
 
+
+
 # Register API resources
 api.add_resource(AccountInitApi, '/account/init')
 api.add_resource(AccountProfileApi, '/account/profile')

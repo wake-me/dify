@@ -3,7 +3,7 @@ import os
 import re
 import time
 from abc import abstractmethod
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from typing import Optional, Union
 
 from pydantic import ConfigDict
@@ -44,7 +44,7 @@ class LargeLanguageModel(AIModel):
     def invoke(self, model: str, credentials: dict,
                prompt_messages: list[PromptMessage], model_parameters: Optional[dict] = None,
                tools: Optional[list[PromptMessageTool]] = None, stop: Optional[list[str]] = None,
-               stream: bool = True, user: Optional[str] = None, callbacks: list[Callback] = None) \
+               stream: bool = True, user: Optional[str] = None, callbacks: Optional[list[Callback]] = None) \
             -> Union[LLMResult, Generator]:
         """
         调用大规模语言模型。
@@ -134,8 +134,7 @@ class LargeLanguageModel(AIModel):
                 user=user,
                 callbacks=callbacks
             )
-        else:
-            # 触发调用后的回调
+        elif isinstance(result, LLMResult):
             self._trigger_after_invoke_callbacks(
                 model=model,
                 result=result,
@@ -152,9 +151,9 @@ class LargeLanguageModel(AIModel):
         return result
 
     def _code_block_mode_wrapper(self, model: str, credentials: dict, prompt_messages: list[PromptMessage],
-                            model_parameters: dict, tools: Optional[list[PromptMessageTool]] = None,
-                            stop: Optional[list[str]] = None, stream: bool = True, user: Optional[str] = None,
-                            callbacks: list[Callback] = None) -> Union[LLMResult, Generator]:
+                           model_parameters: dict, tools: Optional[list[PromptMessageTool]] = None,
+                           stop: Optional[list[str]] = None, stream: bool = True, user: Optional[str] = None,
+                           callbacks: Optional[list[Callback]] = None) -> Union[LLMResult, Generator]:
         """
         Code block 模式包装器，确保响应是一个带有输出 Markdown 引用的代码块
 
@@ -205,7 +204,7 @@ if you are not sure about the structure.
             # 重写系统提示信息
             prompt_messages[0] = SystemPromptMessage(
                 content=block_prompts
-                    .replace("{{instructions}}", prompt_messages[0].content)
+                    .replace("{{instructions}}", str(prompt_messages[0].content))
             )
         else:
             # 插入系统提示信息
@@ -288,12 +287,10 @@ if you are not sure about the structure.
                 piece = content
             else:
                 yield piece
-                continue  # 忽略空内容的片段
-
-            new_piece = ""  # 用于构建处理后的新内容
-
-            # 根据当前状态处理片段中的每个字符
+                continue
+            new_piece: str = ""
             for char in piece:
+                char = str(char)
                 if state == "normal":
                     if char == "`":
                         state = "in_backticks"
@@ -358,7 +355,7 @@ if you are not sure about the structure.
             if state == "done":
                 continue
 
-            new_piece = ""
+            new_piece: str = ""
             for char in piece:
                 if state == "search_start":
                     if char == "`":
@@ -383,7 +380,7 @@ if you are not sure about the structure.
                             # 如果计数了反引号但仍在收集内容，则是一个错误的开始
                             new_piece += "`" * backtick_count
                             backtick_count = 0
-                        new_piece += char
+                        new_piece += str(char)
 
                 elif state == "done":
                     break
@@ -403,26 +400,17 @@ if you are not sure about the structure.
                 )
 
     def _invoke_result_generator(self, model: str, result: Generator, credentials: dict,
-                                    prompt_messages: list[PromptMessage], model_parameters: dict,
-                                    tools: Optional[list[PromptMessageTool]] = None,
-                                    stop: Optional[list[str]] = None, stream: bool = True,
-                                    user: Optional[str] = None, callbacks: list[Callback] = None) -> Generator:
+                                 prompt_messages: list[PromptMessage], model_parameters: dict,
+                                 tools: Optional[list[PromptMessageTool]] = None,
+                                 stop: Optional[list[str]] = None, stream: bool = True,
+                                 user: Optional[str] = None, callbacks: Optional[list[Callback]] = None) -> Generator:
         """
-        调用结果生成器。
+        Invoke result generator
 
-        :param model: 使用的模型名称。
-        :param result: 结果生成器，用于迭代获取结果片段。
-        :param credentials: 用于模型调用的凭证信息。
-        :param prompt_messages: 与模型交互时的提示信息列表。
-        :param model_parameters: 模型调用时的参数。
-        :param tools: 辅助工具列表，用于在与模型交互时提供额外的功能。
-        :param stop: 停止信号列表，用于在满足特定条件时终止生成器的迭代。
-        :param stream: 是否流式处理结果，默认为True。
-        :param user: 用户标识，用于标识调用结果生成器的用户。
-        :param callbacks: 在处理结果时触发的回调列表。
-        :return: 返回一个生成器，该生成器迭代处理结果并触发相应的回调函数。
+        :param result: result generator
+        :return: result generator
         """
-        # 初始化提示消息和使用信息
+        callbacks = callbacks or []
         prompt_message = AssistantPromptMessage(
             content=""
         )
@@ -531,39 +519,6 @@ if you are not sure about the structure.
         # 使用正则表达式根据停止词列表截断文本，只截断第一个遇到的停止词
         return re.split("|".join(stop), text, maxsplit=1)[0]
 
-    def _llm_result_to_stream(self, result: LLMResult) -> Generator:
-        """
-        将llm结果转换为流
-
-        :param result: llm结果
-        :return: 流
-        """
-        index = 0  # 初始化索引
-
-        tool_calls = result.message.tool_calls  # 提取工具调用信息
-
-        # 遍历结果中的每个单词
-        for word in result.message.content:
-            # 为最后一个单词设置工具调用信息，否则设置为空列表
-            assistant_prompt_message = AssistantPromptMessage(
-                content=word,
-                tool_calls=tool_calls if index == (len(result.message.content) - 1) else []
-            )
-
-            # 生成并返回每个单词对应的LLMResultChunk对象
-            yield LLMResultChunk(
-                model=result.model,
-                prompt_messages=result.prompt_messages,
-                system_fingerprint=result.system_fingerprint,
-                delta=LLMResultChunkDelta(
-                    index=index,
-                    message=assistant_prompt_message,
-                )
-            )
-
-            index += 1  # 更新索引
-            time.sleep(0.01)  # 每处理一个单词短暂停顿
-
     def get_parameter_rules(self, model: str, credentials: dict) -> list[ParameterRule]:
         """
         获取参数规则
@@ -581,7 +536,7 @@ if you are not sure about the structure.
         # 如果模型架构不存在，返回空列表
         return []
 
-    def get_model_mode(self, model: str, credentials: Optional[dict] = None) -> LLMMode:
+    def get_model_mode(self, model: str, credentials: Optional[Mapping] = None) -> LLMMode:
         """
         获取模型模式
 
@@ -648,7 +603,7 @@ if you are not sure about the structure.
                                          prompt_messages: list[PromptMessage], model_parameters: dict,
                                          tools: Optional[list[PromptMessageTool]] = None,
                                          stop: Optional[list[str]] = None, stream: bool = True,
-                                         user: Optional[str] = None, callbacks: list[Callback] = None) -> None:
+                                         user: Optional[str] = None, callbacks: Optional[list[Callback]] = None) -> None:
         """
         触发调用前的回调函数。
 
@@ -688,10 +643,10 @@ if you are not sure about the structure.
                         logger.warning(f"Callback {callback.__class__.__name__} on_before_invoke failed with error {e}")
 
     def _trigger_new_chunk_callbacks(self, chunk: LLMResultChunk, model: str, credentials: dict,
-                                    prompt_messages: list[PromptMessage], model_parameters: dict,
-                                    tools: Optional[list[PromptMessageTool]] = None,
-                                    stop: Optional[list[str]] = None, stream: bool = True,
-                                    user: Optional[str] = None, callbacks: list[Callback] = None) -> None:
+                                     prompt_messages: list[PromptMessage], model_parameters: dict,
+                                     tools: Optional[list[PromptMessageTool]] = None,
+                                     stop: Optional[list[str]] = None, stream: bool = True,
+                                     user: Optional[str] = None, callbacks: Optional[list[Callback]] = None) -> None:
         """
         触发新的数据块回调。
 
@@ -731,10 +686,10 @@ if you are not sure about the structure.
                         logger.warning(f"Callback {callback.__class__.__name__} on_new_chunk failed with error {e}")
 
     def _trigger_after_invoke_callbacks(self, model: str, result: LLMResult, credentials: dict,
-                                            prompt_messages: list[PromptMessage], model_parameters: dict,
-                                            tools: Optional[list[PromptMessageTool]] = None,
-                                            stop: Optional[list[str]] = None, stream: bool = True,
-                                            user: Optional[str] = None, callbacks: list[Callback] = None) -> None:
+                                        prompt_messages: list[PromptMessage], model_parameters: dict,
+                                        tools: Optional[list[PromptMessageTool]] = None,
+                                        stop: Optional[list[str]] = None, stream: bool = True,
+                                        user: Optional[str] = None, callbacks: Optional[list[Callback]] = None) -> None:
         """
         触发调用后回调
 
@@ -776,10 +731,10 @@ if you are not sure about the structure.
                         logger.warning(f"Callback {callback.__class__.__name__} on_after_invoke failed with error {e}")
 
     def _trigger_invoke_error_callbacks(self, model: str, ex: Exception, credentials: dict,
-                                            prompt_messages: list[PromptMessage], model_parameters: dict,
-                                            tools: Optional[list[PromptMessageTool]] = None,
-                                            stop: Optional[list[str]] = None, stream: bool = True,
-                                            user: Optional[str] = None, callbacks: list[Callback] = None) -> None:
+                                        prompt_messages: list[PromptMessage], model_parameters: dict,
+                                        tools: Optional[list[PromptMessageTool]] = None,
+                                        stop: Optional[list[str]] = None, stream: bool = True,
+                                        user: Optional[str] = None, callbacks: Optional[list[Callback]] = None) -> None:
         """
         触发调用错误回调函数
         

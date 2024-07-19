@@ -32,7 +32,6 @@ from core.model_runtime.entities.model_entities import ModelFeature
 from core.model_runtime.model_providers.__base.large_language_model import LargeLanguageModel
 from core.model_runtime.utils.encoders import jsonable_encoder
 from core.tools.entities.tool_entities import (
-    ToolInvokeMessage,
     ToolParameter,
     ToolRuntimeVariablePool,
 )
@@ -154,34 +153,6 @@ class BaseAgentRunner(AppRunner):
             app_generate_entity.app_config.prompt_template.simple_prompt_template = ''
 
         return app_generate_entity
-
-    def _convert_tool_response_to_str(self, tool_response: list[ToolInvokeMessage]) -> str:
-        """
-        处理工具响应并将之转换为字符串格式。
-        
-        参数:
-        - tool_response: 工具响应列表，每个元素是 ToolInvokeMessage 类型，包含不同类型的响应信息（文本、链接、图片等）。
-        
-        返回值:
-        - result: 转换后的字符串，包含所有响应信息的文本表示。
-        """
-        result = ''
-        for response in tool_response:
-            # 根据响应类型处理不同的响应信息
-            if response.type == ToolInvokeMessage.MessageType.TEXT:
-                result += response.message
-            elif response.type == ToolInvokeMessage.MessageType.LINK:
-                # 对链接响应添加特定提示信息
-                result += f"result link: {response.message}. please tell user to check it."
-            elif response.type == ToolInvokeMessage.MessageType.IMAGE_LINK or \
-                response.type == ToolInvokeMessage.MessageType.IMAGE:
-                # 对图片响应添加统一的处理信息，表明图片已发送给用户
-                result += "image has been created and sent to user already, you do not need to create it, just tell the user to check it now."
-            else:
-                # 对于未处理的其他类型响应，添加通用处理信息
-                result += f"tool response: {response.message}."
-
-        return result
     
     def _convert_tool_to_prompt_message_tool(self, tool: AgentToolEntity) -> tuple[PromptMessageTool, Tool]:
         """

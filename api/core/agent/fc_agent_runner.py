@@ -49,6 +49,9 @@ class FunctionCallAgentRunner(BaseAgentRunner):
         }
         final_answer = ''
 
+        # get tracing instance
+        trace_manager = app_generate_entity.trace_manager
+        
         def increase_usage(final_llm_usage_dict: dict[str, LLMUsage], usage: LLMUsage):
             # 更新LLM使用情况
             if not final_llm_usage_dict['usage']:
@@ -243,18 +246,19 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                         message=self.message,
                         invoke_from=self.application_generate_entity.invoke_from,
                         agent_tool_callback=self.agent_callback,
+                        trace_manager=trace_manager,
                     )
-                    # 发布文件
-                    for message_file, save_as in message_files:
+                    # publish files
+                    for message_file_id, save_as in message_files:
                         if save_as:
-                            self.variables_pool.set_file(tool_name=tool_call_name, value=message_file.id, name=save_as)
+                            self.variables_pool.set_file(tool_name=tool_call_name, value=message_file_id, name=save_as)
 
                         # 发布消息文件
                         self.queue_manager.publish(QueueMessageFileEvent(
-                            message_file_id=message_file.id
+                            message_file_id=message_file_id
                         ), PublishFrom.APPLICATION_MANAGER)
-                        # 添加消息文件ids
-                        message_file_ids.append(message_file.id)
+                        # add message file ids
+                        message_file_ids.append(message_file_id)
                     
                     tool_response = {
                         "tool_call_id": tool_call_id,

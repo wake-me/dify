@@ -20,6 +20,7 @@ from core.app.entities.app_invoke_entities import InvokeFrom, WorkflowAppGenerat
 from core.app.entities.task_entities import WorkflowAppBlockingResponse, WorkflowAppStreamResponse
 from core.file.message_file_parser import MessageFileParser
 from core.model_runtime.errors.invoke import InvokeAuthorizationError, InvokeError
+from core.ops.ops_trace_manager import TraceQueueManager
 from extensions.ext_database import db
 from models.account import Account
 from models.model import App, EndUser
@@ -29,24 +30,25 @@ logger = logging.getLogger(__name__)
 
 
 class WorkflowAppGenerator(BaseAppGenerator):
-    def generate(self, app_model: App,
-                 workflow: Workflow,
-                 user: Union[Account, EndUser],
-                 args: dict,
-                 invoke_from: InvokeFrom,
-                 stream: bool = True,
-                 call_depth: int = 0) \
-            -> Union[dict, Generator[dict, None, None]]:
+    def generate(
+        self, app_model: App,
+        workflow: Workflow,
+        user: Union[Account, EndUser],
+        args: dict,
+        invoke_from: InvokeFrom,
+        stream: bool = True,
+        call_depth: int = 0,
+    ) -> Union[dict, Generator[dict, None, None]]:
         """
         生成App响应。
 
-        :param app_model: App模型，代表一个应用。
-        :param workflow: 工作流，定义了应用的处理流程。
-        :param user: 账户或终端用户，执行操作的用户。
-        :param args: 请求参数。
-        :param invoke_from: 调用来源。
-        :param stream: 是否流式返回结果，默认为True。
-        :return: 返回一个字典或生成器，包含应用的响应信息。
+        :param app_model: App
+        :param workflow: Workflow
+        :param user: account or end user
+        :param args: request args
+        :param invoke_from: invoke from source
+        :param stream: is stream
+        :param call_depth: call depth
         """
         # 解析输入参数
         inputs = args['inputs']
@@ -70,7 +72,10 @@ class WorkflowAppGenerator(BaseAppGenerator):
             workflow=workflow
         )
 
-        # 初始化应用生成实体
+        # get tracing instance
+        trace_manager = TraceQueueManager(app_model.id)
+
+        # init application generate entity
         application_generate_entity = WorkflowAppGenerateEntity(
             task_id=str(uuid.uuid4()),
             app_config=app_config,
@@ -79,7 +84,8 @@ class WorkflowAppGenerator(BaseAppGenerator):
             user_id=user.id,
             stream=stream,
             invoke_from=invoke_from,
-            call_depth=call_depth
+            call_depth=call_depth,
+            trace_manager=trace_manager
         )
 
         return self._generate(
@@ -89,17 +95,16 @@ class WorkflowAppGenerator(BaseAppGenerator):
             application_generate_entity=application_generate_entity,
             invoke_from=invoke_from,
             stream=stream,
-            call_depth=call_depth
         )
 
-    def _generate(self, app_model: App,
-                 workflow: Workflow,
-                 user: Union[Account, EndUser],
-                 application_generate_entity: WorkflowAppGenerateEntity,
-                 invoke_from: InvokeFrom,
-                 stream: bool = True,
-                 call_depth: int = 0) \
-            -> Union[dict, Generator[dict, None, None]]:
+    def _generate(
+        self, app_model: App,
+        workflow: Workflow,
+        user: Union[Account, EndUser],
+        application_generate_entity: WorkflowAppGenerateEntity,
+        invoke_from: InvokeFrom,
+        stream: bool = True,
+    ) -> Union[dict, Generator[dict, None, None]]:
         """
         Generate App response.
 
@@ -132,7 +137,7 @@ class WorkflowAppGenerator(BaseAppGenerator):
             workflow=workflow,
             queue_manager=queue_manager,
             user=user,
-            stream=stream
+            stream=stream,
         )
 
         # 转换响应格式
@@ -160,10 +165,10 @@ class WorkflowAppGenerator(BaseAppGenerator):
         """
         if not node_id:
             raise ValueError('node_id is required')
-        
+
         if args.get('inputs') is None:
             raise ValueError('inputs is required')
-        
+
         extras = {
             "auto_generate_conversation_name": False
         }

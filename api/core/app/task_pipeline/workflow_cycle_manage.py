@@ -22,6 +22,7 @@ from core.app.entities.task_entities import (
 from core.app.task_pipeline.workflow_iteration_cycle_manage import WorkflowIterationCycleManage
 from core.file.file_obj import FileVar
 from core.model_runtime.utils.encoders import jsonable_encoder
+from core.ops.ops_trace_manager import TraceQueueManager, TraceTask, TraceTaskName
 from core.tools.tool_manager import ToolManager
 from core.workflow.entities.node_entities import NodeRunMetadataKey, NodeType
 from core.workflow.nodes.tool.entities import ToolNodeData
@@ -97,19 +98,24 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
 
         return workflow_run
 
-    def _workflow_run_success(self, workflow_run: WorkflowRun,
-                              start_at: float,
-                              total_tokens: int,
-                              total_steps: int,
-                              outputs: Optional[str] = None) -> WorkflowRun:
+    def _workflow_run_success(
+        self, workflow_run: WorkflowRun,
+        start_at: float,
+        total_tokens: int,
+        total_steps: int,
+        outputs: Optional[str] = None,
+        conversation_id: Optional[str] = None,
+        trace_manager: Optional[TraceQueueManager] = None
+    ) -> WorkflowRun:
         """
-        标记工作流运行成功，并更新相关状态和统计信息。
-        :param workflow_run: WorkflowRun 实例，表示正在运行的工作流实例。
-        :param start_at: 开始时间，表示工作流运行的起始时间戳。
-        :param total_tokens: 总令牌数，表示工作流运行过程中处理的令牌总数。
-        :param total_steps: 总步骤数，表示工作流运行过程中执行的总步骤数。
-        :param outputs: 输出数据，表示工作流运行的结果（可选）。
-        :return: 更新后的 WorkflowRun 实例。
+        Workflow run success
+        :param workflow_run: workflow run
+        :param start_at: start time
+        :param total_tokens: total tokens
+        :param total_steps: total steps
+        :param outputs: outputs
+        :param conversation_id: conversation id
+        :return:
         """
         # 更新工作流运行状态及相关统计信息，并持久化到数据库。
         workflow_run.status = WorkflowRunStatus.SUCCEEDED.value
@@ -123,14 +129,27 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
         db.session.refresh(workflow_run)
         db.session.close()
 
+        if trace_manager:
+            trace_manager.add_trace_task(
+                TraceTask(
+                    TraceTaskName.WORKFLOW_TRACE,
+                    workflow_run=workflow_run,
+                    conversation_id=conversation_id,
+                )
+            )
+
         return workflow_run
 
-    def _workflow_run_failed(self, workflow_run: WorkflowRun,
-                             start_at: float,
-                             total_tokens: int,
-                             total_steps: int,
-                             status: WorkflowRunStatus,
-                             error: str) -> WorkflowRun:
+    def _workflow_run_failed(
+        self, workflow_run: WorkflowRun,
+        start_at: float,
+        total_tokens: int,
+        total_steps: int,
+        status: WorkflowRunStatus,
+        error: str,
+        conversation_id: Optional[str] = None,
+        trace_manager: Optional[TraceQueueManager] = None
+    ) -> WorkflowRun:
         """
         处理工作流运行失败的逻辑。
         
@@ -155,7 +174,16 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
         db.session.refresh(workflow_run)  # 刷新工作流运行对象，以获取最新的数据库状态
         db.session.close()  # 关闭数据库会话
 
-        return workflow_run  # 返回更新后的工作流运行实例对象
+        if trace_manager:
+            trace_manager.add_trace_task(
+                TraceTask(
+                    TraceTaskName.WORKFLOW_TRACE,
+                    workflow_run=workflow_run,
+                    conversation_id=conversation_id,
+                )
+            )
+
+        return workflow_run
 
     def _init_node_execution_from_workflow_run(self, workflow_run: WorkflowRun,
                                                 node_id: str,
@@ -187,7 +215,8 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
             title=node_title,
             status=WorkflowNodeExecutionStatus.RUNNING.value,
             created_by_role=workflow_run.created_by_role,
-            created_by=workflow_run.created_by
+            created_by=workflow_run.created_by,
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None)
         )
 
         # 将节点执行实例添加到数据库会话并提交
@@ -495,9 +524,9 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
         # 从数据库中查询对应的workflow节点执行信息
         workflow_node_execution = db.session.query(WorkflowNodeExecution).filter(
             WorkflowNodeExecution.id == current_node_execution.workflow_node_execution_id).first()
-        
+
         execution_metadata = event.execution_metadata if isinstance(event, QueueNodeSucceededEvent) else None
-        
+
         if self._iteration_state and self._iteration_state.current_iterations:
             if not execution_metadata:
                 execution_metadata = {}
@@ -526,7 +555,7 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
             if execution_metadata and execution_metadata.get(NodeRunMetadataKey.TOTAL_TOKENS):
                 self._task_state.total_tokens += (
                     int(execution_metadata.get(NodeRunMetadataKey.TOTAL_TOKENS)))
-                
+
                 if self._iteration_state:
                     for iteration_node_id in self._iteration_state.current_iterations:
                         data = self._iteration_state.current_iterations[iteration_node_id]
@@ -554,24 +583,18 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
 
         return workflow_node_execution
 
-    def _handle_workflow_finished(self, event: QueueStopEvent | QueueWorkflowSucceededEvent | QueueWorkflowFailedEvent) \
-            -> Optional[WorkflowRun]:
-        """
-        处理工作流完成的事件，根据事件类型更新工作流运行状态。
-
-        参数:
-        - event: 队列停止事件、工作流成功事件或工作流失败事件，触发对工作流运行状态的更新。
-
-        返回值:
-        - 如果找到对应的工作流运行实例，则返回更新后的实例；否则，返回None。
-        """
-        # 从数据库查询对应的工作流运行实例
+    def _handle_workflow_finished(
+        self, event: QueueStopEvent | QueueWorkflowSucceededEvent | QueueWorkflowFailedEvent,
+        conversation_id: Optional[str] = None,
+        trace_manager: Optional[TraceQueueManager] = None
+    ) -> Optional[WorkflowRun]:
         workflow_run = db.session.query(WorkflowRun).filter(
             WorkflowRun.id == self._task_state.workflow_run_id).first()
         if not workflow_run:
             return None
 
-        # 处理工作流停止事件
+        if conversation_id is None:
+            conversation_id = self._application_generate_entity.inputs.get('sys.conversation_id')
         if isinstance(event, QueueStopEvent):
             workflow_run = self._workflow_run_failed(
                 workflow_run=workflow_run,
@@ -579,7 +602,9 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
                 total_tokens=self._task_state.total_tokens,
                 total_steps=self._task_state.total_steps,
                 status=WorkflowRunStatus.STOPPED,
-                error='Workflow stopped.'
+                error='Workflow stopped.',
+                conversation_id=conversation_id,
+                trace_manager=trace_manager
             )
 
             # 如果存在最新节点执行信息，则处理该节点的失败
@@ -602,7 +627,9 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
                 total_tokens=self._task_state.total_tokens,
                 total_steps=self._task_state.total_steps,
                 status=WorkflowRunStatus.FAILED,
-                error=event.error
+                error=event.error,
+                conversation_id=conversation_id,
+                trace_manager=trace_manager
             )
         else:
             # 处理工作流成功事件
@@ -618,7 +645,9 @@ class WorkflowCycleManage(WorkflowIterationCycleManage):
                 start_at=self._task_state.start_at,
                 total_tokens=self._task_state.total_tokens,
                 total_steps=self._task_state.total_steps,
-                outputs=outputs
+                outputs=outputs,
+                conversation_id=conversation_id,
+                trace_manager=trace_manager
             )
 
         # 更新任务状态的工作流运行ID，并关闭数据库会话

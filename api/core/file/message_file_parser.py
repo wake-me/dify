@@ -210,8 +210,7 @@ class MessageFileParser:
 
             # 发送HEAD请求检查URL是否可达
             response = requests.head(url, headers=headers, allow_redirects=True)
-            if response.status_code == 200:
-                # 若返回状态码为200，表示URL有效
+            if response.status_code in {200, 304}:
                 return True, ""
             else:
                 # 若状态码非200，表示URL不存在或有其他问题

@@ -19,6 +19,7 @@ from core.app.apps.message_based_app_queue_manager import MessageBasedAppQueueMa
 from core.app.entities.app_invoke_entities import CompletionAppGenerateEntity, InvokeFrom
 from core.file.message_file_parser import MessageFileParser
 from core.model_runtime.errors.invoke import InvokeAuthorizationError, InvokeError
+from core.ops.ops_trace_manager import TraceQueueManager
 from extensions.ext_database import db
 from models.account import Account
 from models.model import App, EndUser, Message
@@ -106,7 +107,10 @@ class CompletionAppGenerator(MessageBasedAppGenerator):
             override_config_dict=override_model_config_dict
         )
 
-        # 初始化应用生成实体
+        # get tracing instance
+        trace_manager = TraceQueueManager(app_model.id)
+
+        # init application generate entity
         application_generate_entity = CompletionAppGenerateEntity(
             task_id=str(uuid.uuid4()),
             app_config=app_config,
@@ -117,7 +121,8 @@ class CompletionAppGenerator(MessageBasedAppGenerator):
             user_id=user.id,
             stream=stream,
             invoke_from=invoke_from,
-            extras=extras
+            extras=extras,
+            trace_manager=trace_manager
         )
 
         # 初始化生成记录
@@ -152,7 +157,7 @@ class CompletionAppGenerator(MessageBasedAppGenerator):
             conversation=conversation,
             message=message,
             user=user,
-            stream=stream
+            stream=stream,
         )
 
         # 转换并返回最终的响应对象
@@ -166,12 +171,12 @@ class CompletionAppGenerator(MessageBasedAppGenerator):
                          queue_manager: AppQueueManager,
                          message_id: str) -> None:
         """
-        在新线程中生成工作器。
-        :param flask_app: Flask应用实例
-        :param application_generate_entity: 应用生成实体，包含生成任务的具体信息
-        :param queue_manager: 队列管理器，用于任务的发布和管理
-        :param message_id: 消息ID，用于标识特定的消息
-        :return: 无返回值
+        Generate worker in a new thread.
+        :param flask_app: Flask app
+        :param application_generate_entity: application generate entity
+        :param queue_manager: queue manager
+        :param message_id: message ID
+        :return:
         """
         with flask_app.app_context():
             try:
@@ -320,7 +325,7 @@ class CompletionAppGenerator(MessageBasedAppGenerator):
             conversation=conversation,
             message=message,
             user=user,
-            stream=stream
+            stream=stream,
         )
 
         # 转换响应格式，返回给调用者

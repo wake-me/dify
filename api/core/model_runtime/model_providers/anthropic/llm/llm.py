@@ -120,6 +120,11 @@ class AnthropicLargeLanguageModel(LargeLanguageModel):
             # 设置系统信息
             extra_model_kwargs['system'] = system
 
+        # Add the new header for claude-3-5-sonnet-20240620 model
+        extra_headers = {}
+        if model == "claude-3-5-sonnet-20240620":
+            extra_headers["anthropic-beta"] = "max-tokens-3-5-sonnet-2024-07-15"
+
         if tools:
             # 转换工具提示信息，并调用聊天工具接口
             extra_model_kwargs['tools'] = [
@@ -129,6 +134,7 @@ class AnthropicLargeLanguageModel(LargeLanguageModel):
                 model=model,
                 messages=prompt_message_dicts,
                 stream=stream,
+                extra_headers=extra_headers,
                 **model_parameters,
                 **extra_model_kwargs
             )
@@ -138,6 +144,7 @@ class AnthropicLargeLanguageModel(LargeLanguageModel):
                 model=model,
                 messages=prompt_message_dicts,
                 stream=stream,
+                extra_headers=extra_headers,
                 **model_parameters,
                 **extra_model_kwargs
             )
@@ -148,7 +155,7 @@ class AnthropicLargeLanguageModel(LargeLanguageModel):
 
         # 处理非流式返回响应
         return self._handle_chat_generate_response(model, credentials, response, prompt_messages)
-
+    
     def _code_block_mode_wrapper(self, model: str, credentials: dict, prompt_messages: list[PromptMessage],
                                  model_parameters: dict, tools: Optional[list[PromptMessageTool]] = None,
                                  stop: Optional[list[str]] = None, stream: bool = True, user: Optional[str] = None,

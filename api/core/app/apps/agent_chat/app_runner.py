@@ -28,10 +28,13 @@ class AgentChatAppRunner(AppRunner):
     """
     Agent Application Runner
     """
-    def run(self, application_generate_entity: AgentChatAppGenerateEntity,
-            queue_manager: AppQueueManager,
-            conversation: Conversation,
-            message: Message) -> None:
+
+    def run(
+        self, application_generate_entity: AgentChatAppGenerateEntity,
+        queue_manager: AppQueueManager,
+        conversation: Conversation,
+        message: Message,
+    ) -> None:
         """
         运行助手应用程序
         :param application_generate_entity: 应用生成实体，包含应用配置、输入、查询等信息
@@ -94,6 +97,7 @@ class AgentChatAppRunner(AppRunner):
                 app_generate_entity=application_generate_entity,
                 inputs=inputs,
                 query=query,
+                message_id=message.id
             )
         except ModerationException as e:
             self.direct_output(
@@ -190,7 +194,7 @@ class AgentChatAppRunner(AppRunner):
         llm_model = cast(LargeLanguageModel, model_instance.model_type_instance)
         model_schema = llm_model.get_model_schema(model_instance.model, model_instance.credentials)
 
-        if set([ModelFeature.MULTI_TOOL_CALL, ModelFeature.TOOL_CALL]).intersection(model_schema.features or []):
+        if {ModelFeature.MULTI_TOOL_CALL, ModelFeature.TOOL_CALL}.intersection(model_schema.features or []):
             agent_entity.strategy = AgentEntity.Strategy.FUNCTION_CALLING
 
         # 更新会话和消息对象，并关闭数据库会话
@@ -211,7 +215,7 @@ class AgentChatAppRunner(AppRunner):
             runner_cls = FunctionCallAgentRunner
         else:
             raise ValueError(f"Invalid agent strategy: {agent_entity.strategy}")
-        
+
         runner = runner_cls(
             tenant_id=app_config.tenant_id,
             application_generate_entity=application_generate_entity,

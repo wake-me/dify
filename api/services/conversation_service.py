@@ -145,7 +145,9 @@ class ConversationService:
 
         # 尝试根据消息内容生成对话名称
         try:
-            name = LLMGenerator.generate_conversation_name(app_model.tenant_id, message.query)
+            name = LLMGenerator.generate_conversation_name(
+                app_model.tenant_id, message.query, conversation.id, app_model.id
+            )
             conversation.name = name
         except:
             # 如果生成对话名称过程中出现异常，则不做任何处理

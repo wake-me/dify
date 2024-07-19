@@ -112,23 +112,11 @@ class Workflow(db.Model):
 
     @property
     def created_by_account(self):
-        """
-        获取创建者账号信息。
-
-        返回:
-        - Account对象: 创建该工作流的账户信息。
-        """
-        return Account.query.get(self.created_by)
+        return db.session.get(Account, self.created_by)
 
     @property
     def updated_by_account(self):
-        """
-        获取最后更新者账号信息，如果未更新则返回None。
-
-        返回:
-        - Account对象或None: 最后更新该工作流的账户信息，如果未更新则为None。
-        """
-        return Account.query.get(self.updated_by) if self.updated_by else None
+        return db.session.get(Account, self.updated_by) if self.updated_by else None
 
     @property
     def graph_dict(self):
@@ -327,7 +315,7 @@ class WorkflowRun(db.Model):
             如果创建者角色为账户，则返回Account对象；否则返回None。
         """
         created_by_role = CreatedByRole.value_of(self.created_by_role)
-        return Account.query.get(self.created_by) \
+        return db.session.get(Account, self.created_by) \
             if created_by_role == CreatedByRole.ACCOUNT else None
 
     @property
@@ -339,7 +327,7 @@ class WorkflowRun(db.Model):
         """
         from models.model import EndUser
         created_by_role = CreatedByRole.value_of(self.created_by_role)
-        return EndUser.query.get(self.created_by)  \
+        return db.session.get(EndUser, self.created_by) \
             if created_by_role == CreatedByRole.END_USER else None
 
     @property
@@ -390,6 +378,55 @@ class WorkflowRun(db.Model):
             返回与该工作流执行相关联的工作流对象，如果没有找到则返回None。
         """
         return db.session.query(Workflow).filter(Workflow.id == self.workflow_id).first()
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'tenant_id': self.tenant_id,
+            'app_id': self.app_id,
+            'sequence_number': self.sequence_number,
+            'workflow_id': self.workflow_id,
+            'type': self.type,
+            'triggered_from': self.triggered_from,
+            'version': self.version,
+            'graph': self.graph_dict,
+            'inputs': self.inputs_dict,
+            'status': self.status,
+            'outputs': self.outputs_dict,
+            'error': self.error,
+            'elapsed_time': self.elapsed_time,
+            'total_tokens': self.total_tokens,
+            'total_steps': self.total_steps,
+            'created_by_role': self.created_by_role,
+            'created_by': self.created_by,
+            'created_at': self.created_at,
+            'finished_at': self.finished_at,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'WorkflowRun':
+        return cls(
+            id=data.get('id'),
+            tenant_id=data.get('tenant_id'),
+            app_id=data.get('app_id'),
+            sequence_number=data.get('sequence_number'),
+            workflow_id=data.get('workflow_id'),
+            type=data.get('type'),
+            triggered_from=data.get('triggered_from'),
+            version=data.get('version'),
+            graph=json.dumps(data.get('graph')),
+            inputs=json.dumps(data.get('inputs')),
+            status=data.get('status'),
+            outputs=json.dumps(data.get('outputs')),
+            error=data.get('error'),
+            elapsed_time=data.get('elapsed_time'),
+            total_tokens=data.get('total_tokens'),
+            total_steps=data.get('total_steps'),
+            created_by_role=data.get('created_by_role'),
+            created_by=data.get('created_by'),
+            created_at=data.get('created_at'),
+            finished_at=data.get('finished_at'),
+        )
 
 
 class WorkflowNodeExecutionTriggeredFrom(Enum):
@@ -522,7 +559,7 @@ class WorkflowNodeExecution(db.Model):
         :return: 账户信息或者None
         """
         created_by_role = CreatedByRole.value_of(self.created_by_role)
-        return Account.query.get(self.created_by) \
+        return db.session.get(Account, self.created_by) \
             if created_by_role == CreatedByRole.ACCOUNT else None
 
     @property
@@ -533,7 +570,7 @@ class WorkflowNodeExecution(db.Model):
         """
         from models.model import EndUser
         created_by_role = CreatedByRole.value_of(self.created_by_role)
-        return EndUser.query.get(self.created_by) \
+        return db.session.get(EndUser, self.created_by) \
             if created_by_role == CreatedByRole.END_USER else None
 
     @property
@@ -656,13 +693,7 @@ class WorkflowAppLog(db.Model):
 
     @property
     def workflow_run(self):
-        """
-        获取关联的Workflow Run实例。
-        
-        返回值:
-        - WorkflowRun对象
-        """
-        return WorkflowRun.query.get(self.workflow_run_id)
+        return db.session.get(WorkflowRun, self.workflow_run_id)
 
     @property
     def created_by_account(self):
@@ -673,7 +704,7 @@ class WorkflowAppLog(db.Model):
         - 如果创建者是账户，则返回Account对象；否则返回None。
         """
         created_by_role = CreatedByRole.value_of(self.created_by_role)
-        return Account.query.get(self.created_by) \
+        return db.session.get(Account, self.created_by) \
             if created_by_role == CreatedByRole.ACCOUNT else None
 
     @property
@@ -686,5 +717,5 @@ class WorkflowAppLog(db.Model):
         """
         from models.model import EndUser
         created_by_role = CreatedByRole.value_of(self.created_by_role)
-        return EndUser.query.get(self.created_by) \
+        return db.session.get(EndUser, self.created_by) \
             if created_by_role == CreatedByRole.END_USER else None

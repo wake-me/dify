@@ -75,8 +75,8 @@ class ProviderConfiguration(BaseModel):
 
         # 在特定条件下，向提供商的配置方法列表中添加预定义模型配置方法
         if original_provider_configurate_methods[self.provider.provider] == [ConfigurateMethod.CUSTOMIZABLE_MODEL]:
-            if (any([len(quota_configuration.restrict_models) > 0
-                     for quota_configuration in self.system_configuration.quota_configurations])
+            if (any(len(quota_configuration.restrict_models) > 0
+                     for quota_configuration in self.system_configuration.quota_configurations)
                     and ConfigurateMethod.PREDEFINED_MODEL not in self.provider.configurate_methods):
                 self.provider.configurate_methods.append(ConfigurateMethod.PREDEFINED_MODEL)
 
@@ -235,8 +235,8 @@ class ProviderConfiguration(BaseModel):
 
         # 验证并调整凭证信息
         credentials = model_provider_factory.provider_credentials_validate(
-            self.provider.provider,
-            credentials
+            provider=self.provider.provider,
+            credentials=credentials
         )
 
         # 对凭证信息进行加密

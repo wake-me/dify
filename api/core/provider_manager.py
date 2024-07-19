@@ -442,7 +442,7 @@ class ProviderManager:
             model_load_balancing_enabled = cache_result == 'True'
 
         if not model_load_balancing_enabled:
-            return dict()
+            return {}
 
         provider_load_balancing_configs = db.session.query(LoadBalancingModelConfig) \
             .filter(
@@ -477,8 +477,7 @@ class ProviderManager:
             if not provider_records:
                 provider_records = []
 
-            # 为当前提供商构建配额到记录的映射
-            provider_quota_to_provider_record_dict = dict()
+            provider_quota_to_provider_record_dict = {}
             for provider_record in provider_records:
                 if provider_record.provider_type != ProviderType.SYSTEM.value:
                     continue  # 忽略非系统类型的提供商记录
@@ -695,8 +694,8 @@ class ProviderManager:
 
         provider_hosting_configuration = hosting_configuration.provider_map.get(provider_entity.provider)
 
-        # 将提供者记录转换为字典格式
-        quota_type_to_provider_records_dict = dict()
+        # Convert provider_records to dict
+        quota_type_to_provider_records_dict = {}
         for provider_record in provider_records:
             if provider_record.provider_type != ProviderType.SYSTEM.value:
                 continue

@@ -1,4 +1,6 @@
 import hashlib
+import logging
+import re
 import subprocess
 import uuid
 from abc import abstractmethod
@@ -10,7 +12,7 @@ from core.model_runtime.entities.model_entities import ModelPropertyKey, ModelTy
 from core.model_runtime.errors.invoke import InvokeBadRequestError
 from core.model_runtime.model_providers.__base.ai_model import AIModel
 
-
+logger = logging.getLogger(__name__)
 class TTSModel(AIModel):
     """
     TTS模型类，用于语音合成模型的管理。
@@ -21,7 +23,7 @@ class TTSModel(AIModel):
     # pydantic configs
     model_config = ConfigDict(protected_namespaces=())
 
-    def invoke(self, model: str, tenant_id: str, credentials: dict, content_text: str, voice: str, streaming: bool,
+    def invoke(self, model: str, tenant_id: str, credentials: dict, content_text: str, voice: str,
                user: Optional[str] = None):
         """
         调用大型语言模型进行语音合成。
@@ -36,15 +38,16 @@ class TTSModel(AIModel):
         :return: 转换后的音频文件。
         """
         try:
-            self._is_ffmpeg_installed()  # 检查ffmpeg是否安装
-            return self._invoke(model=model, credentials=credentials, user=user, streaming=streaming,
+            logger.info(f"Invoke TTS model: {model} , invoke content : {content_text}")
+            self._is_ffmpeg_installed()
+            return self._invoke(model=model, credentials=credentials, user=user,
                                 content_text=content_text, voice=voice, tenant_id=tenant_id)
         except Exception as e:
             # 转换调用过程中的错误为统一的异常格式并抛出
             raise self._transform_invoke_error(e)
 
     @abstractmethod
-    def _invoke(self, model: str, tenant_id: str, credentials: dict, content_text: str, voice: str, streaming: bool,
+    def _invoke(self, model: str, tenant_id: str, credentials: dict, content_text: str, voice: str,
                 user: Optional[str] = None):
         """
         实际调用大型语言模型进行语音合成的抽象方法。
@@ -142,37 +145,26 @@ class TTSModel(AIModel):
             return model_schema.model_properties[ModelPropertyKey.MAX_WORKERS]
 
     @staticmethod
-    def _split_text_into_sentences(text: str, limit: int, delimiters=None):
-        """
-        将文本拆分为句子，确保每个句子的字符数不超过指定限制。
-        
-        参数:
-        text: str - 需要拆分的文本。
-        limit: int - 每个句子的最大字符数限制。
-        delimiters: set, 可选 - 定义句子分隔符的集合，默认为中文常用的句号、感叹号、问号和分号以及换行符。
-        
-        返回值:
-        generator - 生成器，逐个yield符合限制的句子。
-        """
-        if delimiters is None:
-            delimiters = set('。！？；\n')  # 默认分隔符集
-
-        buf = []  # 用于构建句子的缓冲区
-        word_count = 0  # 当前句子字符计数
-        for char in text:
-            buf.append(char)  # 将字符加入缓冲区
-            if char in delimiters:
-                if word_count >= limit:
-                    yield ''.join(buf)  # 达到字符限制，输出句子
-                    buf = []  # 清空缓冲区
-                    word_count = 0  # 重置字符计数
-                else:
-                    word_count += 1  # 遇到分隔符时增加字符计数
-            else:
-                word_count += 1  # 对非分隔符字符增加字符计数
-
-        if buf:
-            yield ''.join(buf)  # 处理最后一个句子，确保不会遗漏
+    def _split_text_into_sentences(org_text, max_length=2000, pattern=r'[。.!?]'):
+        match = re.compile(pattern)
+        tx = match.finditer(org_text)
+        start = 0
+        result = []
+        one_sentence = ''
+        for i in tx:
+            end = i.regs[0][1]
+            tmp = org_text[start:end]
+            if len(one_sentence + tmp) > max_length:
+                result.append(one_sentence)
+                one_sentence = ''
+            one_sentence += tmp
+            start = end
+        last_sens = org_text[start:]
+        if last_sens:
+            one_sentence += last_sens
+        if one_sentence != '':
+            result.append(one_sentence)
+        return result
 
     @staticmethod
     def _is_ffmpeg_installed():

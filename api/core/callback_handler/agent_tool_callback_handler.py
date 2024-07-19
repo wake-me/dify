@@ -3,7 +3,8 @@ from typing import Any, Optional, TextIO, Union
 
 from pydantic import BaseModel
 
-# 文本颜色映射
+from core.ops.ops_trace_manager import TraceQueueManager, TraceTask, TraceTaskName
+
 _TEXT_COLOR_MAPPING = {
     "blue": "36;1",
     "yellow": "33;1",
@@ -87,6 +88,9 @@ class DifyAgentCallbackHandler(BaseModel):
         tool_name: str,
         tool_inputs: dict[str, Any],
         tool_outputs: str,
+        message_id: Optional[str] = None,
+        timer: Optional[Any] = None,
+        trace_manager: Optional[TraceQueueManager] = None
     ) -> None:
         """
         工具结束执行时的回调函数。
@@ -101,6 +105,18 @@ class DifyAgentCallbackHandler(BaseModel):
         print_text("Inputs: " + str(tool_inputs) + "\n", color=self.color)
         print_text("Outputs: " + str(tool_outputs)[:1000] + "\n", color=self.color)
         print_text("\n")
+
+        if trace_manager:
+            trace_manager.add_trace_task(
+                TraceTask(
+                    TraceTaskName.TOOL_TRACE,
+                    message_id=message_id,
+                    tool_name=tool_name,
+                    tool_inputs=tool_inputs,
+                    tool_outputs=tool_outputs,
+                    timer=timer,
+                )
+            )
 
     def on_tool_error(
         self, error: Union[Exception, KeyboardInterrupt], **kwargs: Any

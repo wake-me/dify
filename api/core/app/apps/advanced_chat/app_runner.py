@@ -74,7 +74,8 @@ class AdvancedChatAppRunner(AppRunner):
                 app_record=app_record,
                 app_generate_entity=application_generate_entity,
                 inputs=inputs,
-                query=query
+                query=query,
+                message_id=message.id
         ):
             return
 
@@ -162,20 +163,23 @@ class AdvancedChatAppRunner(AppRunner):
         # return workflow
         return workflow
 
-    def handle_input_moderation(self, queue_manager: AppQueueManager,
-                                app_record: App,
-                                app_generate_entity: AdvancedChatAppGenerateEntity,
-                                inputs: dict,
-                                query: str) -> bool:
+    def handle_input_moderation(
+            self, queue_manager: AppQueueManager,
+            app_record: App,
+            app_generate_entity: AdvancedChatAppGenerateEntity,
+            inputs: dict,
+            query: str,
+            message_id: str
+    ) -> bool:
         """
-        处理输入审核。
-        
-        :param queue_manager: 应用队列管理器，用于管理应用相关的队列操作。
-        :param app_record: 应用记录，包含应用的基本信息。
-        :param app_generate_entity: 应用生成实体，包含应用的配置和生成的相关实体。
-        :param inputs: 输入参数，待审核的用户输入。
-        :param query: 查询字符串，用户发起的查询内容。
-        :return: 审核结果，如果审核通过返回False，否则返回True。
+        Handle input moderation
+        :param queue_manager: application queue manager
+        :param app_record: app record
+        :param app_generate_entity: application generate entity
+        :param inputs: inputs
+        :param query: query
+        :param message_id: message id
+        :return:
         """
         try:
             # 对输入进行敏感词规避处理
@@ -185,6 +189,7 @@ class AdvancedChatAppRunner(AppRunner):
                 app_generate_entity=app_generate_entity,
                 inputs=inputs,
                 query=query,
+                message_id=message_id,
             )
         except ModerationException as e:
             # 审核异常处理，将异常信息输出到流中，并停止处理
@@ -263,7 +268,13 @@ class AdvancedChatAppRunner(AppRunner):
                     ), PublishFrom.APPLICATION_MANAGER
                 )
                 index += 1
-                time.sleep(0.01)  # 每发布一个文本块后暂停0.01秒，模拟流式传输的延迟
+                time.sleep(0.01)
+        else:
+            queue_manager.publish(
+                QueueTextChunkEvent(
+                    text=text
+                ), PublishFrom.APPLICATION_MANAGER
+            )
 
         # 发布停止事件，通知相关实体输出已结束
         queue_manager.publish(

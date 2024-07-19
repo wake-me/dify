@@ -3,8 +3,9 @@ import time
 
 import click
 from celery import shared_task
-from flask import current_app, render_template
+from flask import render_template
 
+from configs import dify_config
 from extensions.ext_mail import mail
 
 
@@ -30,7 +31,7 @@ def send_invite_member_mail_task(language: str, to: str, token: str, inviter_nam
 
     # send invite member mail using different languages
     try:
-        url = f'{current_app.config.get("CONSOLE_WEB_URL")}/activate?token={token}'
+        url = f'{dify_config.CONSOLE_WEB_URL}/activate?token={token}'
         if language == 'zh-Hans':
             # 发送中文版本的邀请邮件
             html_content = render_template('invite_member_mail_template_zh-CN.html',
@@ -42,12 +43,11 @@ def send_invite_member_mail_task(language: str, to: str, token: str, inviter_nam
         else:
             # 发送英文版本的邀请邮件
             html_content = render_template('invite_member_mail_template_en-US.html',
-                                        to=to,
-                                        inviter_name=inviter_name, 
-                                        workspace_name=workspace_name,
-                                        url=url)
+                                           to=to,
+                                           inviter_name=inviter_name,
+                                           workspace_name=workspace_name,
+                                           url=url)
             mail.send(to=to, subject="Join Dify Workspace Now", html=html_content)
-        
 
         end_at = time.perf_counter()
         # 记录邀请邮件发送成功及耗时的日志

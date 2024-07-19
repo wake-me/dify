@@ -4,8 +4,8 @@ import time
 
 import click
 from celery import shared_task
-from flask import current_app
 
+from configs import dify_config
 from core.indexing_runner import DocumentIsPausedException, IndexingRunner
 from extensions.ext_database import db
 from models.dataset import Dataset, Document
@@ -35,7 +35,7 @@ def document_indexing_task(dataset_id: str, document_ids: list):
         if features.billing.enabled:
             vector_space = features.vector_space
             count = len(document_ids)
-            batch_upload_limit = int(current_app.config['BATCH_UPLOAD_LIMIT'])
+            batch_upload_limit = int(dify_config.BATCH_UPLOAD_LIMIT)
             if count > batch_upload_limit:
                 raise ValueError(f"You have reached the batch upload limit of {batch_upload_limit}.")
             # 检查是否超过订阅的文档数量限制

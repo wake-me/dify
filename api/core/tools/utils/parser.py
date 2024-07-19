@@ -20,11 +20,8 @@ class ApiBasedToolSchemaParser:
         warning = warning if warning is not None else {}
         extra_info = extra_info if extra_info is not None else {}
 
-        # 将 OpenAPI 中的描述信息添加到 extra_info 中
-        if 'description' in openapi['info']:
-            extra_info['description'] = openapi['info']['description']
-        else:
-            extra_info['description'] = ''
+        # set description to extra_info
+        extra_info['description'] = openapi['info'].get('description', '')
 
         if len(openapi['servers']) == 0:
             raise ToolProviderNotFoundError('No server found in the openapi yaml.')
@@ -94,8 +91,8 @@ class ApiBasedToolSchemaParser:
                     # 解析请求体参数
                     if 'schema' in interface['operation']['requestBody']['content'][content_type]:
                         body_schema = interface['operation']['requestBody']['content'][content_type]['schema']
-                        required = body_schema['required'] if 'required' in body_schema else []
-                        properties = body_schema['properties'] if 'properties' in body_schema else {}
+                        required = body_schema.get('required', [])
+                        properties = body_schema.get('properties', {})
                         for name, property in properties.items():
                             tool = ToolParameter(
                                 name=name,
@@ -104,14 +101,14 @@ class ApiBasedToolSchemaParser:
                                     zh_Hans=name
                                 ),
                                 human_description=I18nObject(
-                                    en_US=property['description'] if 'description' in property else '',
-                                    zh_Hans=property['description'] if 'description' in property else ''
+                                    en_US=property.get('description', ''),
+                                    zh_Hans=property.get('description', '')
                                 ),
                                 type=ToolParameter.ToolParameterType.STRING,
                                 required=name in required,
                                 form=ToolParameter.ToolParameterForm.LLM,
-                                llm_description=property['description'] if 'description' in property else '',
-                                default=property['default'] if 'default' in property else None,
+                                llm_description=property.get('description', ''),
+                                default=property.get('default', None),
                             )
 
                             # 检查是否有类型信息
@@ -148,7 +145,7 @@ class ApiBasedToolSchemaParser:
                 server_url=server_url + interface['path'],
                 method=interface['method'],
                 summary=interface['operation']['description'] if 'description' in interface['operation'] else 
-                        interface['operation']['summary'] if 'summary' in interface['operation'] else None,
+                        interface['operation'].get('summary', None),
                 operation_id=interface['operation']['operationId'],
                 parameters=parameters,
                 author='',

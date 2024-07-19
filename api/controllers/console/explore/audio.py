@@ -19,6 +19,7 @@ from controllers.console.app.error import (
 from controllers.console.explore.wraps import InstalledAppResource
 from core.errors.error import ModelCurrentlyNotSupportError, ProviderTokenNotInitError, QuotaExceededError
 from core.model_runtime.errors.invoke import InvokeError
+from models.model import AppMode
 from services.audio_service import AudioService
 from services.errors.audio import (
     AudioTooLargeServiceError,
@@ -104,42 +105,36 @@ class ChatTextApi(InstalledAppResource):
     """
 
     def post(self, installed_app):
-        """
-        处理POST请求，将文本转换为语音并返回。
+        from flask_restful import reqparse
 
-        Args:
-            installed_app: 一个已安装的应用对象，用于获取应用的配置和模型信息。
-
-        Returns:
-            一个包含转换后音频数据的字典。
-
-        Raises:
-            AppUnavailableError: 如果应用配置禁用了文本到语音功能或遇到配置错误，则抛出此错误。
-            NoAudioUploadedError: 如果没有上传音频时抛出此错误。
-            AudioTooLargeError: 如果音频文件过大无法处理时抛出此错误。
-            UnsupportedAudioTypeError: 如果音频类型不受支持时抛出此错误。
-            ProviderNotSupportSpeechToTextError: 如果服务提供商不支持文本转语音功能时抛出此错误。
-            ProviderNotInitializeError: 如果服务提供商未初始化时抛出此错误。
-            ProviderQuotaExceededError: 如果服务提供商的配额超过限制时抛出此错误。
-            ProviderModelCurrentlyNotSupportError: 如果服务提供商当前不支持指定模型时抛出此错误。
-            CompletionRequestError: 如果完成请求发生错误时抛出此错误。
-            ValueError: 如果出现值错误时抛出。
-            InternalServerError: 如果内部服务器发生错误时抛出。
-        """
-        
-        # 获取应用模型和配置
         app_model = installed_app.app
-
         try:
-            # 调用音频服务，将文本转换为语音
+            parser = reqparse.RequestParser()
+            parser.add_argument('message_id', type=str, required=False, location='json')
+            parser.add_argument('voice', type=str, location='json')
+            parser.add_argument('text', type=str, location='json')
+            parser.add_argument('streaming', type=bool, location='json')
+            args = parser.parse_args()
+
+            message_id = args.get('message_id', None)
+            text = args.get('text', None)
+            if (app_model.mode in [AppMode.ADVANCED_CHAT.value, AppMode.WORKFLOW.value]
+                    and app_model.workflow
+                    and app_model.workflow.features_dict):
+                text_to_speech = app_model.workflow.features_dict.get('text_to_speech')
+                voice = args.get('voice') if args.get('voice') else text_to_speech.get('voice')
+            else:
+                try:
+                    voice = args.get('voice') if args.get('voice') else app_model.app_model_config.text_to_speech_dict.get('voice')
+                except Exception:
+                    voice = None
             response = AudioService.transcript_tts(
                 app_model=app_model,
-                text=request.form['text'],
-                voice=request.form['voice'] if request.form.get('voice') else app_model.app_model_config.text_to_speech_dict.get('voice'),
-                streaming=False
+                message_id=message_id,
+                voice=voice,
+                text=text
             )
-            # 返回转换后的音频数据
-            return {'data': response.data.decode('latin1')}
+            return response
         except services.errors.app_model_config.AppModelConfigBrokenError:
             # 记录应用模型配置错误
             logging.exception("App model config broken.")
@@ -179,3 +174,5 @@ class ChatTextApi(InstalledAppResource):
 
 api.add_resource(ChatAudioApi, '/installed-apps/<uuid:installed_app_id>/audio-to-text', endpoint='installed_app_audio')
 api.add_resource(ChatTextApi, '/installed-apps/<uuid:installed_app_id>/text-to-audio', endpoint='installed_app_text')
+# api.add_resource(ChatTextApiWithMessageId, '/installed-apps/<uuid:installed_app_id>/text-to-audio/message-id',
+#                  endpoint='installed_app_text_with_message_id')

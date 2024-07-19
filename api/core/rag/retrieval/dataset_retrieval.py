@@ -12,9 +12,12 @@ from core.model_manager import ModelInstance, ModelManager
 from core.model_runtime.entities.message_entities import PromptMessageTool
 from core.model_runtime.entities.model_entities import ModelFeature, ModelType
 from core.model_runtime.model_providers.__base.large_language_model import LargeLanguageModel
+from core.ops.ops_trace_manager import TraceQueueManager, TraceTask, TraceTaskName
+from core.ops.utils import measure_time
 from core.rag.datasource.retrieval_service import RetrievalService
 from core.rag.models.document import Document
 from core.rag.rerank.rerank import RerankRunner
+from core.rag.retrieval.retrival_methods import RetrievalMethod
 from core.rag.retrieval.router.multi_dataset_function_call_router import FunctionCallMultiDatasetRouter
 from core.rag.retrieval.router.multi_dataset_react_route import ReactMultiDatasetRouter
 from core.tools.tool.dataset_retriever.dataset_multi_retriever_tool import DatasetMultiRetrieverTool
@@ -25,7 +28,7 @@ from models.dataset import Dataset, DatasetQuery, DocumentSegment
 from models.dataset import Document as DatasetDocument
 
 default_retrieval_model = {
-    'search_method': 'semantic_search',
+    'search_method': RetrievalMethod.SEMANTIC_SEARCH.value,
     'reranking_enable': False,
     'reranking_model': {
         'reranking_provider_name': '',
@@ -37,32 +40,34 @@ default_retrieval_model = {
 
 
 class DatasetRetrieval:
-    def retrieve(self, app_id: str, user_id: str, tenant_id: str,
-                 model_config: ModelConfigWithCredentialsEntity,
-                 config: DatasetEntity,
-                 query: str,
-                 invoke_from: InvokeFrom,
-                 show_retrieve_source: bool,
-                 hit_callback: DatasetIndexToolCallbackHandler,
-                 memory: Optional[TokenBufferMemory] = None) -> Optional[str]:
+    def __init__(self, application_generate_entity=None):
+        self.application_generate_entity = application_generate_entity
+
+    def retrieve(
+            self, app_id: str, user_id: str, tenant_id: str,
+            model_config: ModelConfigWithCredentialsEntity,
+            config: DatasetEntity,
+            query: str,
+            invoke_from: InvokeFrom,
+            show_retrieve_source: bool,
+            hit_callback: DatasetIndexToolCallbackHandler,
+            message_id: str,
+            memory: Optional[TokenBufferMemory] = None,
+    ) -> Optional[str]:
         """
-        从指定的数据集中检索数据。
-
-        :param app_id: 应用ID
-        :param user_id: 用户ID
-        :param tenant_id: 租户ID
-        :param model_config: 包含模型配置和凭证信息的实体
-        :param config: 包含数据集配置的实体
-        :param query: 检索查询字符串
-        :param invoke_from: 调用来源
-        :param show_retrieve_source: 是否显示检索数据源信息
-        :param hit_callback: 检索命中时的回调处理函数
-        :param memory: 用于存储中间状态的内存对象（可选）
-        :return: 检索结果的字符串，如果没有可用的数据集或没有检索到数据则返回空字符串
-
-        此方法根据提供的模型配置、数据集配置以及查询字符串，在指定的数据集中进行检索，
-        并返回检索结果。根据配置，可能会使用单数据集检索或多数据集检索策略。检索结果中可能包括
-        命中的文档内容和/或相关数据源的信息（如果配置为显示）。
+        Retrieve dataset.
+        :param app_id: app_id
+        :param user_id: user_id
+        :param tenant_id: tenant id
+        :param model_config: model config
+        :param config: dataset config
+        :param query: query
+        :param invoke_from: invoke from
+        :param show_retrieve_source: show retrieve source
+        :param hit_callback: hit callback
+        :param message_id: message id
+        :param memory: memory
+        :return:
         """
         dataset_ids = config.dataset_ids
         if len(dataset_ids) == 0:
@@ -117,15 +122,20 @@ class DatasetRetrieval:
         all_documents = []
         user_from = 'account' if invoke_from in [InvokeFrom.EXPLORE, InvokeFrom.DEBUGGER] else 'end_user'
         if retrieve_config.retrieve_strategy == DatasetRetrieveConfigEntity.RetrieveStrategy.SINGLE:
-            all_documents = self.single_retrieve(app_id, tenant_id, user_id, user_from, available_datasets, query,
-                                                 model_instance,
-                                                 model_config, planning_strategy)
+            all_documents = self.single_retrieve(
+                app_id, tenant_id, user_id, user_from, available_datasets, query,
+                model_instance,
+                model_config, planning_strategy, message_id
+            )
         elif retrieve_config.retrieve_strategy == DatasetRetrieveConfigEntity.RetrieveStrategy.MULTIPLE:
-            all_documents = self.multiple_retrieve(app_id, tenant_id, user_id, user_from,
-                                                   available_datasets, query, retrieve_config.top_k,
-                                                   retrieve_config.score_threshold,
-                                                   retrieve_config.reranking_model.get('reranking_provider_name'),
-                                                   retrieve_config.reranking_model.get('reranking_model_name'))
+            all_documents = self.multiple_retrieve(
+                app_id, tenant_id, user_id, user_from,
+                available_datasets, query, retrieve_config.top_k,
+                retrieve_config.score_threshold,
+                retrieve_config.reranking_model.get('reranking_provider_name'),
+                retrieve_config.reranking_model.get('reranking_model_name'),
+                message_id,
+            )
 
         document_score_list = {}
         for item in all_documents:
@@ -193,30 +203,18 @@ class DatasetRetrieval:
             return str("\n".join(document_context_list))
         return ''
 
-    def single_retrieve(self, app_id: str,
-                        tenant_id: str,
-                        user_id: str,
-                        user_from: str,
-                        available_datasets: list,
-                        query: str,
-                        model_instance: ModelInstance,
-                        model_config: ModelConfigWithCredentialsEntity,
-                        planning_strategy: PlanningStrategy,
-                        ):
-        """
-        根据提供的参数和策略执行单次数据检索。
-
-        :param app_id: 应用ID
-        :param tenant_id: 租户ID
-        :param user_id: 用户ID
-        :param user_from: 用户来源
-        :param available_datasets: 可用的数据集列表
-        :param query: 查询字符串
-        :param model_instance: 模型实例
-        :param model_config: 模型配置，包含认证信息
-        :param planning_strategy: 规划策略，决定如何选择数据集进行查询
-        :return: 检索结果列表，可能为空
-        """
+    def single_retrieve(
+            self, app_id: str,
+            tenant_id: str,
+            user_id: str,
+            user_from: str,
+            available_datasets: list,
+            query: str,
+            model_instance: ModelInstance,
+            model_config: ModelConfigWithCredentialsEntity,
+            planning_strategy: PlanningStrategy,
+            message_id: Optional[str] = None,
+    ):
         tools = []
         # 为每个可用数据集生成一个message_tool对象
         for dataset in available_datasets:
@@ -272,46 +270,35 @@ class DatasetRetrieval:
                 if score_threshold_enabled:
                     score_threshold = retrieval_model_config.get("score_threshold")
 
-                # 执行检索并处理结果
-                results = RetrievalService.retrieve(retrival_method=retrival_method, dataset_id=dataset.id,
-                                                    query=query,
-                                                    top_k=top_k, score_threshold=score_threshold,
-                                                    reranking_model=reranking_model)
+                with measure_time() as timer:
+                    results = RetrievalService.retrieve(
+                        retrival_method=retrival_method, dataset_id=dataset.id,
+                        query=query,
+                        top_k=top_k, score_threshold=score_threshold,
+                        reranking_model=reranking_model
+                    )
                 self._on_query(query, [dataset_id], app_id, user_from, user_id)
+
                 if results:
-                    self._on_retrival_end(results)
+                    self._on_retrival_end(results, message_id, timer)
+
                 return results
         return []
 
-    def multiple_retrieve(self,
-                          app_id: str,
-                          tenant_id: str,
-                          user_id: str,
-                          user_from: str,
-                          available_datasets: list,
-                          query: str,
-                          top_k: int,
-                          score_threshold: float,
-                          reranking_provider_name: str,
-                          reranking_model_name: str):
-        """
-        多数据集检索并重新排序文档。
-
-        参数:
-        - app_id: 应用ID，字符串类型。
-        - tenant_id: 租户ID，字符串类型。
-        - user_id: 用户ID，字符串类型。
-        - user_from: 用户来源，字符串类型。
-        - available_datasets: 可用数据集列表，每个数据集包含id等信息。
-        - query: 检索查询字符串。
-        - top_k: 检索每个多数据集后的文档数量。
-        - score_threshold: 重新排序的分数阈值。
-        - reranking_provider_name: 重新排序模型的提供者名称。
-        - reranking_model_name: 用于重新排序的模型名称。
-
-        返回值:
-        - all_documents: 经过重新排序后的所有文档列表。
-        """
+    def multiple_retrieve(
+            self,
+            app_id: str,
+            tenant_id: str,
+            user_id: str,
+            user_from: str,
+            available_datasets: list,
+            query: str,
+            top_k: int,
+            score_threshold: float,
+            reranking_provider_name: str,
+            reranking_model_name: str,
+            message_id: Optional[str] = None,
+    ):
         threads = []
         all_documents = []
         dataset_ids = [dataset.id for dataset in available_datasets]  # 提取数据集ID列表
@@ -339,24 +326,24 @@ class DatasetRetrieval:
         )
 
         rerank_runner = RerankRunner(rerank_model_instance)
-        all_documents = rerank_runner.run(query, all_documents,
-                                        score_threshold,
-                                        top_k)
-        self._on_query(query, dataset_ids, app_id, user_from, user_id)  # 查询结束后触发的回调
+
+        with measure_time() as timer:
+            all_documents = rerank_runner.run(
+                query, all_documents,
+                score_threshold,
+                top_k
+            )
+        self._on_query(query, dataset_ids, app_id, user_from, user_id)
+
         if all_documents:
-            self._on_retrival_end(all_documents)  # 文档检索结束后的回调
+            self._on_retrival_end(all_documents, message_id, timer)
+
         return all_documents
 
-    def _on_retrival_end(self, documents: list[Document]) -> None:
-        """
-        处理检索结束后的逻辑。
-        
-        参数:
-        - documents: 一个Document类型的列表，表示检索结束后的文档结果集。
-        
-        返回值:
-        - 无
-        """
+    def _on_retrival_end(
+        self, documents: list[Document], message_id: Optional[str] = None, timer: Optional[dict] = None
+    ) -> None:
+        """Handle retrival end."""
         for document in documents:
             # 根据文档的doc_id查询对应的文档段落
             query = db.session.query(DocumentSegment).filter(
@@ -375,6 +362,18 @@ class DatasetRetrieval:
 
             # 提交数据库事务
             db.session.commit()
+
+        # get tracing instance
+        trace_manager: TraceQueueManager = self.application_generate_entity.trace_manager if self.application_generate_entity else None
+        if trace_manager:
+            trace_manager.add_trace_task(
+                TraceTask(
+                    TraceTaskName.DATASET_RETRIEVAL_TRACE,
+                    message_id=message_id,
+                    documents=documents,
+                    timer=timer
+                )
+            )
 
     def _on_query(self, query: str, dataset_ids: list[str], app_id: str, user_from: str, user_id: str) -> None:
         """
@@ -498,7 +497,7 @@ class DatasetRetrieval:
         if retrieve_config.retrieve_strategy == DatasetRetrieveConfigEntity.RetrieveStrategy.SINGLE:
             # 设置默认检索模型配置
             default_retrieval_model = {
-                'search_method': 'semantic_search',
+                'search_method': RetrievalMethod.SEMANTIC_SEARCH.value,
                 'reranking_enable': False,
                 'reranking_model': {
                     'reranking_provider_name': '',

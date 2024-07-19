@@ -1,5 +1,5 @@
 import enum
-import importlib
+import importlib.util
 import json
 import logging
 import os
@@ -111,6 +111,8 @@ class Extensible:
                 # 动态加载`.py`文件，并寻找继承自cls的类
                 py_path = os.path.join(subdir_path, extension_name + '.py')
                 spec = importlib.util.spec_from_file_location(extension_name, py_path)
+                if not spec or not spec.loader:
+                    raise Exception(f"Failed to load module {extension_name} from {py_path}")
                 mod = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(mod)
 
@@ -148,7 +150,6 @@ class Extensible:
                     position=position
                 ))
 
-        # 根据位置信息对扩展进行排序
-        sorted_extensions = sort_to_dict_by_position_map(position_map, extensions, lambda x: x.name)
+        sorted_extensions = sort_to_dict_by_position_map(position_map=position_map, data=extensions, name_func=lambda x: x.name)
 
         return sorted_extensions
