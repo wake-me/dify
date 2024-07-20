@@ -29,10 +29,10 @@ print(result)
 
 PYTHON_PRELOAD = """"""
 
-PYTHON_STANDARD_PACKAGES = set([
+PYTHON_STANDARD_PACKAGES = {
     'json', 'datetime', 'math', 'random', 're', 'string', 'sys', 'time', 'traceback', 'uuid', 'os', 'base64',
-    'hashlib', 'hmac', 'binascii', 'collections', 'functools', 'operator', 'itertools', 'uuid', 
-])
+    'hashlib', 'hmac', 'binascii', 'collections', 'functools', 'operator', 'itertools', 
+}
 
 class PythonTemplateTransformer(TemplateTransformer):
     @classmethod
