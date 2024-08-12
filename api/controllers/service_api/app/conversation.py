@@ -70,7 +70,7 @@ class ConversationDetailApi(Resource):
         except services.errors.conversation.ConversationNotExistsError:
             # 如果对话不存在，则抛出404错误
             raise NotFound("Conversation Not Exists.")
-        return {"result": "success"}, 204  # 返回删除成功的消息和状态码
+        return {'result': 'success'}, 200
 
 
 class ConversationRenameApi(Resource):

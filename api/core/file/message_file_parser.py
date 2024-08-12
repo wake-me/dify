@@ -1,4 +1,5 @@
-from typing import Union
+from collections.abc import Mapping, Sequence
+from typing import Any, Union
 
 import requests
 
@@ -26,8 +27,8 @@ class MessageFileParser:
         self.tenant_id = tenant_id  # 租户标识
         self.app_id = app_id  # 应用标识
 
-    def validate_and_transform_files_arg(self, files: list[dict], file_extra_config: FileExtraConfig,
-                                        user: Union[Account, EndUser]) -> list[FileVar]:
+    def validate_and_transform_files_arg(self, files: Sequence[Mapping[str, Any]], file_extra_config: FileExtraConfig,
+                                         user: Union[Account, EndUser]) -> list[FileVar]:
         """
         验证并转换文件参数
 

@@ -20,14 +20,30 @@ reranking_model_fields = {
     'reranking_model_name': fields.String  # 重排模型名称
 }
 
-# 定义数据集检索模型字段
+keyword_setting_fields = {
+    'keyword_weight': fields.Float
+}
+
+vector_setting_fields = {
+    'vector_weight': fields.Float,
+    'embedding_model_name': fields.String,
+    'embedding_provider_name': fields.String,
+}
+
+weighted_score_fields = {
+    'keyword_setting': fields.Nested(keyword_setting_fields),
+    'vector_setting': fields.Nested(vector_setting_fields),
+}
+
 dataset_retrieval_model_fields = {
-    'search_method': fields.String,  # 检索方法
-    'reranking_enable': fields.Boolean,  # 是否启用重排
-    'reranking_model': fields.Nested(reranking_model_fields),  # 重排模型详情
-    'top_k': fields.Integer,  # 返回结果数量
-    'score_threshold_enabled': fields.Boolean,  # 是否启用得分阈值
-    'score_threshold': fields.Float  # 得分阈值
+    'search_method': fields.String,
+    'reranking_enable': fields.Boolean,
+    'reranking_mode': fields.String,
+    'reranking_model': fields.Nested(reranking_model_fields),
+    'weights': fields.Nested(weighted_score_fields, allow_null=True),
+    'top_k': fields.Integer,
+    'score_threshold_enabled': fields.Boolean,
+    'score_threshold': fields.Float
 }
 
 tag_fields = {

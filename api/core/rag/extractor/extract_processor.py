@@ -4,9 +4,8 @@ from pathlib import Path
 from typing import Union
 from urllib.parse import unquote
 
-import requests
-
 from configs import dify_config
+from core.helper import ssrf_proxy
 from core.rag.extractor.csv_extractor import CSVExtractor
 from core.rag.extractor.entity.datasource_type import DatasourceType
 from core.rag.extractor.entity.extract_setting import ExtractSetting
@@ -62,19 +61,7 @@ class ExtractProcessor:
 
     @classmethod
     def load_from_url(cls, url: str, return_text: bool = False) -> Union[list[Document], str]:
-        """
-        从给定的URL加载内容，并根据返回文本标志返回文档列表或文本字符串。
-        
-        参数:
-        - cls: 类的引用，用于调用提取方法。
-        - url: str，要加载内容的URL地址。
-        - return_text: bool，标志是否返回文本内容，默认为False，返回Document列表，如果为True，则返回合并后的文本字符串。
-        
-        返回值:
-        - Union[list[Document], str]，如果return_text为False，返回Document对象列表；如果为True，返回合并后的文本字符串。
-        """
-        # 发起HTTP请求获取URL内容
-        response = requests.get(url, headers={
+        response = ssrf_proxy.get(url, headers={
             "User-Agent": USER_AGENT
         })
 

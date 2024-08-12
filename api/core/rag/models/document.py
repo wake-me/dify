@@ -15,7 +15,11 @@ class Document(BaseModel):
     """
     page_content: str
 
-    # 用于存储关于页面内容的任意元数据，可以包括来源、与其他文档的关系等
+    vector: Optional[list[float]] = None
+
+    """Arbitrary metadata about the page content (e.g., source, relationships to other
+        documents, etc.).
+    """
     metadata: Optional[dict] = Field(default_factory=dict)
 
 class BaseDocumentTransformer(ABC):

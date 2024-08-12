@@ -1,9 +1,10 @@
 import json
 from functools import wraps
 
-from flask import abort, current_app, request
+from flask import abort, request
 from flask_login import current_user
 
+from configs import dify_config
 from controllers.console.workspace.error import AccountNotInitializedError
 from services.feature_service import FeatureService
 from services.operation_service import OperationService
@@ -42,8 +43,7 @@ def only_edition_cloud(view):
     """
     @wraps(view)
     def decorated(*args, **kwargs):
-        # 检查当前应用的版本是否为‘CLOUD’，如果不是，则返回404错误
-        if current_app.config['EDITION'] != 'CLOUD':
+        if dify_config.EDITION != 'CLOUD':
             abort(404)
 
         # 执行并返回原始视图函数
@@ -64,8 +64,7 @@ def only_edition_self_hosted(view):
     """
     @wraps(view)
     def decorated(*args, **kwargs):
-        # 检查当前应用配置中的'EDITION'是否为'SELF_HOSTED'，如果不是，则返回404错误
-        if current_app.config['EDITION'] != 'SELF_HOSTED':
+        if dify_config.EDITION != 'SELF_HOSTED':
             abort(404)
 
         # 调用原始视图函数并返回其结果

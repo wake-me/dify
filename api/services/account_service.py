@@ -47,20 +47,7 @@ class AccountService:
     )
 
     @staticmethod
-    def load_user(user_id: str) -> Account:
-        """
-        根据用户ID加载用户账号信息。
-        
-        参数:
-        user_id (str): 用户的唯一标识符。
-        
-        返回值:
-        Account: 如果找到且账号状态正常，则返回Account对象；否则返回None。
-        
-        抛出:
-        Forbidden: 如果账号被禁用或关闭，抛出Forbidden异常。
-        """
-        # 从数据库查询账号信息
+    def load_user(user_id: str) -> None | Account:
         account = Account.query.filter_by(id=user_id).first()
         if not account:
             return None  # 账号不存在时返回None
@@ -69,8 +56,7 @@ class AccountService:
         if account.status in [AccountStatus.BANNED.value, AccountStatus.CLOSED.value]:
             raise Unauthorized("Account is banned or closed.")
 
-        # 查询当前有效的租户关联，如果存在则更新账号的当前租户ID
-        current_tenant = TenantAccountJoin.query.filter_by(account_id=account.id, current=True).first()
+        current_tenant: TenantAccountJoin = TenantAccountJoin.query.filter_by(account_id=account.id, current=True).first()
         if current_tenant:
             account.current_tenant_id = current_tenant.tenant_id
         else:

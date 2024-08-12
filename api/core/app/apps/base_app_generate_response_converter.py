@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Generator
-from typing import Union
+from typing import Any, Union
 
 from core.app.entities.app_invoke_entities import InvokeFrom
 from core.app.entities.task_entities import AppBlockingResponse, AppStreamResponse
@@ -15,66 +15,41 @@ class AppGenerateResponseConverter(ABC):
     @classmethod
     def convert(cls, response: Union[
         AppBlockingResponse,
-        Generator[AppStreamResponse, None, None]
-    ], invoke_from: InvokeFrom) -> Union[
-        dict,
-        Generator[str, None, None]
-    ]:
-        """
-        根据调用来源转换响应格式。
-
-        :param response: 响应对象，可以是阻塞类型响应或流式响应生成器。
-        :param invoke_from: 调用来源枚举，决定响应的转换方式。
-        :return: 转换后的响应，可以是字典或生成器，具体取决于调用来源和响应类型。
-        """
+        Generator[AppStreamResponse, Any, None]
+    ], invoke_from: InvokeFrom):
         if invoke_from in [InvokeFrom.DEBUGGER, InvokeFrom.SERVICE_API]:
-            # 调用来自DEBUGGER或SERVICE_API，且响应为阻塞类型，则进行完全响应转换
-            if isinstance(response, cls._blocking_response_type):
+            if isinstance(response, AppBlockingResponse):
                 return cls.convert_blocking_full_response(response)
             else:
-                # 响应为流式，则生成包含数据的生成器
-                def _generate():
+                def _generate_full_response() -> Generator[str, Any, None]:
                     for chunk in cls.convert_stream_full_response(response):
                         if chunk == 'ping':
                             yield f'event: {chunk}\n\n'
                         else:
                             yield f'data: {chunk}\n\n'
 
-                return _generate()
+                return _generate_full_response()
         else:
-            # 其他调用来源，进行简单响应转换
-            if isinstance(response, cls._blocking_response_type):
+            if isinstance(response, AppBlockingResponse):
                 return cls.convert_blocking_simple_response(response)
             else:
-                def _generate():
+                def _generate_simple_response() -> Generator[str, Any, None]:
                     for chunk in cls.convert_stream_simple_response(response):
                         if chunk == 'ping':
                             yield f'event: {chunk}\n\n'
                         else:
                             yield f'data: {chunk}\n\n'
 
-                return _generate()
+                return _generate_simple_response()
 
     @classmethod
     @abstractmethod
-    def convert_blocking_full_response(cls, blocking_response: AppBlockingResponse) -> dict:
-        """
-        转换阻塞类型的完全响应。
-
-        :param blocking_response: 阻塞类型响应对象。
-        :return: 转换后的完全响应字典。
-        """
+    def convert_blocking_full_response(cls, blocking_response: AppBlockingResponse) -> dict[str, Any]:
         raise NotImplementedError
 
     @classmethod
     @abstractmethod
-    def convert_blocking_simple_response(cls, blocking_response: AppBlockingResponse) -> dict:
-        """
-        转换阻塞类型的简单响应。
-
-        :param blocking_response: 阻塞类型响应对象。
-        :return: 转换后的简单响应字典。
-        """
+    def convert_blocking_simple_response(cls, blocking_response: AppBlockingResponse) -> dict[str, Any]:
         raise NotImplementedError
 
     @classmethod
@@ -102,7 +77,7 @@ class AppGenerateResponseConverter(ABC):
         raise NotImplementedError
 
     @classmethod
-    def _get_simple_metadata(cls, metadata: dict) -> dict:
+    def _get_simple_metadata(cls, metadata: dict[str, Any]):
         """
         提取简单的元数据。
 

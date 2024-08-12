@@ -1,3 +1,5 @@
+import os
+
 from flask_login import current_user
 from flask_restful import Resource, reqparse
 
@@ -48,19 +50,22 @@ class RuleGenerateApi(Resource):
         """
         
         parser = reqparse.RequestParser()
-        # 解析请求中的参数
-        parser.add_argument('audiences', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('hoping_to_solve', type=str, required=True, nullable=False, location='json')
+        parser.add_argument('instruction', type=str, required=True, nullable=False, location='json')
+        parser.add_argument('model_config', type=dict, required=True, nullable=False, location='json')
+        parser.add_argument('no_variable', type=bool, required=True, default=False, location='json')
         args = parser.parse_args()
 
-        account = current_user  # 当前登录的用户账号
+        account = current_user
+        PROMPT_GENERATION_MAX_TOKENS = int(os.getenv('PROMPT_GENERATION_MAX_TOKENS', '512'))
 
         try:
             # 尝试根据提供的参数生成规则配置
             rules = LLMGenerator.generate_rule_config(
-                account.current_tenant_id,
-                args['audiences'],
-                args['hoping_to_solve']
+                tenant_id=account.current_tenant_id,
+                instruction=args['instruction'],
+                model_config=args['model_config'],
+                no_variable=args['no_variable'],
+                rule_config_max_tokens=PROMPT_GENERATION_MAX_TOKENS
             )
         except ProviderTokenNotInitError as ex:
             # 处理提供者令牌未初始化异常

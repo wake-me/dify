@@ -184,10 +184,15 @@ class DatasetRetrieveConfigEntity(BaseModel):
 
     query_variable: Optional[str] = None  # 仅当应用模式为补全时有效
 
-    retrieve_strategy: RetrieveStrategy  # 检索策略
-    top_k: Optional[int] = None  # 返回结果的最大数量
-    score_threshold: Optional[float] = None  # 分数阈值，用于过滤结果
-    reranking_model: Optional[dict] = None  # 用于重新排序的模型配置
+    retrieve_strategy: RetrieveStrategy
+    top_k: Optional[int] = None
+    score_threshold: Optional[float] = .0
+    rerank_mode: Optional[str] = 'reranking_model'
+    reranking_model: Optional[dict] = None
+    weights: Optional[dict] = None
+    reranking_enabled: Optional[bool] = True
+
+
 
 
 class DatasetEntity(BaseModel):

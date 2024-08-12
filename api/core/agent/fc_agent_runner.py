@@ -62,6 +62,7 @@ class FunctionCallAgentRunner(BaseAgentRunner):
                 llm_usage.completion_tokens += usage.completion_tokens
                 llm_usage.prompt_price += usage.prompt_price
                 llm_usage.completion_price += usage.completion_price
+                llm_usage.total_price += usage.total_price
 
         model_instance = self.model_instance
 
@@ -361,10 +362,14 @@ class FunctionCallAgentRunner(BaseAgentRunner):
 
         # 遍历结果块中的每个工具调用消息，将每个调用的ID、名称和参数解析并添加到列表中
         for prompt_message in llm_result_chunk.delta.message.tool_calls:
+            args = {}
+            if prompt_message.function.arguments != '':
+                args = json.loads(prompt_message.function.arguments)
+
             tool_calls.append((
                 prompt_message.id,
                 prompt_message.function.name,
-                json.loads(prompt_message.function.arguments),
+                args,
             ))
 
         return tool_calls  # 返回包含所有工具调用信息的列表
@@ -382,11 +387,14 @@ class FunctionCallAgentRunner(BaseAgentRunner):
         tool_calls = []  # 初始化存储工具调用信息的列表
         # 遍历llm_result中的每个工具调用消息
         for prompt_message in llm_result.message.tool_calls:
-            # 将每个工具调用的ID、名称和参数（以JSON字符串形式）加载到列表中
+            args = {}
+            if prompt_message.function.arguments != '':
+                args = json.loads(prompt_message.function.arguments)
+
             tool_calls.append((
                 prompt_message.id,
                 prompt_message.function.name,
-                json.loads(prompt_message.function.arguments),
+                args,
             ))
 
         return tool_calls  # 返回包含工具调用信息的列表

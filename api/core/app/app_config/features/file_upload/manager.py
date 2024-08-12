@@ -1,11 +1,12 @@
-from typing import Optional
+from collections.abc import Mapping
+from typing import Any, Optional
 
 from core.app.app_config.entities import FileExtraConfig
 
 
 class FileUploadConfigManager:
     @classmethod
-    def convert(cls, config: dict, is_vision: bool = True) -> Optional[FileExtraConfig]:
+    def convert(cls, config: Mapping[str, Any], is_vision: bool = True) -> Optional[FileExtraConfig]:
         """
         将模型配置转换为特定于文件上传的额外配置。
 

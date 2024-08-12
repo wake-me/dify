@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 CODE_EXECUTION_ENDPOINT = dify_config.CODE_EXECUTION_ENDPOINT
 CODE_EXECUTION_API_KEY = dify_config.CODE_EXECUTION_API_KEY
 
-CODE_EXECUTION_TIMEOUT= (10, 60)  # 定义代码执行的超时时间，元组中第一个值为尝试次数，第二个值为每次尝试的间隔秒数
+CODE_EXECUTION_TIMEOUT = (10, 60)
 
 class CodeExecutionException(Exception):
     pass  # 定义一个自定义异常，用于处理代码执行过程中的异常
@@ -64,7 +64,7 @@ class CodeExecutor:
 
     @classmethod
     def execute_code(cls, 
-                     language: Literal['python3', 'javascript', 'jinja2'], 
+                     language: CodeLanguage, 
                      preload: str, 
                      code: str, 
                      dependencies: Optional[list[CodeDependency]] = None) -> str:
@@ -112,12 +112,11 @@ class CodeExecutor:
             response = response.json()
         except:
             raise CodeExecutionException('Failed to parse response')
+
+        if (code := response.get('code')) != 0:
+            raise CodeExecutionException(f"Got error code: {code}. Got error msg: {response.get('message')}")
         
         response = CodeExecutionResponse(**response)
-
-        # 检查代码执行结果状态
-        if response.code != 0:
-            raise CodeExecutionException(response.message)
         
         # 检查执行结果中是否有错误信息
         if response.data.error:
@@ -126,7 +125,7 @@ class CodeExecutor:
         return response.data.stdout
 
     @classmethod
-    def execute_workflow_code_template(cls, language: Literal['python3', 'javascript', 'jinja2'], code: str, inputs: dict, dependencies: Optional[list[CodeDependency]] = None) -> dict:
+    def execute_workflow_code_template(cls, language: CodeLanguage, code: str, inputs: dict, dependencies: Optional[list[CodeDependency]] = None) -> dict:
         """
         执行工作流代码模板
         

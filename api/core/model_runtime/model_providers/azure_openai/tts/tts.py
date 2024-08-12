@@ -1,12 +1,8 @@
 import concurrent.futures
 import copy
-from functools import reduce
-from io import BytesIO
 from typing import Optional
 
-from flask import Response
 from openai import AzureOpenAI
-from pydub import AudioSegment
 
 from core.model_runtime.entities.model_entities import AIModelEntity
 from core.model_runtime.errors.invoke import InvokeBadRequestError
@@ -51,8 +47,7 @@ class AzureOpenAIText2SpeechModel(_CommonAzureOpenAI, TTSModel):
         :return: text translated to audio file
         """
         try:
-            # 尝试使用提供的模型、凭证和默认声音合成文本'Hello Dify!'，以验证凭证的有效性
-            self._tts_invoke(
+            self._tts_invoke_streaming(
                 model=model,
                 credentials=credentials,
                 content_text='Hello Dify!',
@@ -61,53 +56,6 @@ class AzureOpenAIText2SpeechModel(_CommonAzureOpenAI, TTSModel):
         except Exception as ex:
             # 如果在验证过程中遇到异常，则抛出凭证验证失败的错误
             raise CredentialsValidateFailedError(str(ex))
-
-    def _tts_invoke(self, model: str, credentials: dict, content_text: str, voice: str) -> Response:
-        """
-        调用文本转语音（TTS）模型
-
-        :param model: 模型名称
-        :param credentials: 模型所需的凭证信息
-        :param content_text: 需要转换为语音的文本内容
-        :param voice: 模型的音色
-        :return: 转换后的音频文件响应对象
-        """
-        # 获取模型的音频类型、单词限制和最大工作线程数
-        audio_type = self._get_model_audio_type(model, credentials)
-        word_limit = self._get_model_word_limit(model, credentials)
-        max_workers = self._get_model_workers_limit(model, credentials)
-        
-        try:
-            sentences = list(self._split_text_into_sentences(org_text=content_text, max_length=word_limit))
-            audio_bytes_list = []
-
-            # Create a thread pool and map the function to the list of sentences
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = [executor.submit(self._process_sentence, sentence=sentence, model=model, voice=voice,
-                                        credentials=credentials) for sentence in sentences]
-                for future in futures:
-                    try:
-                        # 成功的结果将被添加到音频字节列表中
-                        if future.result():
-                            audio_bytes_list.append(future.result())
-                    except Exception as ex:
-                        # 处理任务执行中的错误
-                        raise InvokeBadRequestError(str(ex))
-
-            # 如果有音频片段，则将它们合并为一个音频文件
-            if len(audio_bytes_list) > 0:
-                audio_segments = [AudioSegment.from_file(BytesIO(audio_bytes), format=audio_type) for audio_bytes in
-                                audio_bytes_list if audio_bytes]
-                combined_segment = reduce(lambda x, y: x + y, audio_segments)
-                buffer: BytesIO = BytesIO()
-                # 将合并后的音频导出到内存缓冲区
-                combined_segment.export(buffer, format=audio_type)
-                buffer.seek(0)
-                # 返回音频文件的HTTP响应
-                return Response(buffer.read(), status=200, mimetype=f"audio/{audio_type}")
-        except Exception as ex:
-            # 处理调用过程中的任何异常
-            raise InvokeBadRequestError(str(ex))
 
     def _tts_invoke_streaming(self, model: str,  credentials: dict, content_text: str,
                               voice: str) -> any:
@@ -155,7 +103,6 @@ class AzureOpenAIText2SpeechModel(_CommonAzureOpenAI, TTSModel):
         :param sentence: 需要转换为语音的文本内容。
         :return: 返回转换后的音频文件内容，如果转换成功则为bytes类型。
         """
-        # 将认证信息转换为模型实例所需的参数
         credentials_kwargs = self._to_credential_kwargs(credentials)
         # 创建Azure OpenAI客户端实例
         client = AzureOpenAI(**credentials_kwargs)

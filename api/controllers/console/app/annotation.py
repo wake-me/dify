@@ -41,21 +41,7 @@ class AnnotationReplyActionApi(Resource):
     @account_initialization_required
     @cloud_edition_billing_resource_check('annotation')
     def post(self, app_id, action):
-        """
-        处理POST请求，根据传入的action启用或禁用应用的注释功能。
-
-        检查当前用户在ta表中的角色是否为管理员或所有者，否则抛出Forbidden异常。
-
-        参数:
-        - app_id: 应用的ID，需要转换为字符串类型。
-        - action: 操作类型，'enable' 或 'disable'。
-
-        返回:
-        - 操作结果和HTTP状态码200，如果操作不被支持，则抛出ValueError异常。
-        """
-
-        # 检查用户角色是否为管理员或所有者
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         app_id = str(app_id)
@@ -88,23 +74,7 @@ class AppAnnotationSettingDetailApi(Resource):
     @login_required
     @account_initialization_required
     def get(self, app_id):
-        """
-        获取指定应用的注解设置详情
-        
-        Args:
-            app_id (int): 应用的ID，需要转换为字符串格式进行处理
-            
-        Returns:
-            tuple: 包含应用注解设置详情和HTTP状态码的元组
-                - 应用注解设置详情: 由AppAnnotationService.get_app_annotation_setting_by_app_id方法返回的具体设置信息
-                - HTTP状态码: 成功时为200
-        
-        Raises:
-            Forbidden: 如果当前用户不是管理员或所有者，则抛出权限禁止异常
-        """
-        
-        # 检查当前用户是否具有管理员或所有者角色，否则抛出权限异常
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         app_id = str(app_id)  # 将app_id转换为字符串格式
@@ -131,15 +101,7 @@ class AppAnnotationSettingUpdateApi(Resource):
     @login_required
     @account_initialization_required
     def post(self, app_id, annotation_setting_id):
-        """
-        检查权限，接收并处理更新应用注解设置的请求
-
-        权限要求:
-        当前用户在ta表中的角色必须是admin或owner
-        """
-
-        # 检查用户是否有权限进行操作
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         # 将传入的app_id和annotation_setting_id转换为字符串格式
@@ -166,20 +128,7 @@ class AnnotationReplyActionStatusApi(Resource):
     @account_initialization_required
     @cloud_edition_billing_resource_check('annotation')
     def get(self, app_id, job_id, action):
-        """
-        处理获取注释回复动作状态的GET请求
-
-        参数:
-        app_id: 应用ID，字符串类型，用于标识请求的应用
-        job_id: 任务ID，字符串类型，用于标识请求的任务
-        action: 动作标识，字符串类型，标识具体的注释回复动作
-
-        返回值:
-        一个包含任务ID、任务状态和错误信息（如果有）的字典，以及HTTP状态码200
-        如果任务不存在或用户权限不足，则抛出相应的异常
-        """
-        # 检查当前用户是否为管理员或所有者
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         job_id = str(job_id)
@@ -215,21 +164,7 @@ class AnnotationListApi(Resource):
     @login_required
     @account_initialization_required
     def get(self, app_id):
-        """
-        获取指定应用的注解列表
-        
-        Args:
-            app_id (int): 应用的ID，用于查询特定应用的注解列表
-            
-        Returns:
-            response (dict): 包含注解列表、是否有更多、限制数、总数量和页码的字典，以及HTTP状态码200
-            
-        Raises:
-            Forbidden: 如果当前用户不是管理员或所有者，则抛出权限禁止异常
-        """
-        
-        # 检查当前用户是否具有管理员或所有者角色
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         # 从请求参数中获取页码和限制数，并提供默认值；获取搜索关键字
@@ -264,20 +199,7 @@ class AnnotationExportApi(Resource):
     @login_required
     @account_initialization_required
     def get(self, app_id):
-        """
-        处理应用注解的导出请求。
-
-        Args:
-            app_id (int): 应用的ID，用于指定要导出注解的应用。
-
-        Returns:
-            tuple: 包含注解数据的响应字典和HTTP状态码200。
-
-        Raises:
-            Forbidden: 如果当前用户不是管理员或应用所有者，则抛出权限禁止异常。
-        """
-        # 检查当前用户是否具有管理员或所有者角色
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         app_id = str(app_id)  # 将app_id转换为字符串格式
@@ -310,19 +232,7 @@ class AnnotationCreateApi(Resource):
     @cloud_edition_billing_resource_check('annotation')
     @marshal_with(annotation_fields)
     def post(self, app_id):
-        """
-        创建一个新的应用注解
-        
-        检查用户权限，确保只有管理员或所有者可以创建注解。解析请求中的注解内容并插入数据库。
-        
-        参数:
-        - app_id: 应用的ID，将被转换为字符串格式
-        
-        返回:
-        - 插入的注解信息
-        """
-        # 检查当前用户是否为管理员或所有者
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         app_id = str(app_id)  # 确保app_id是字符串格式
@@ -350,26 +260,7 @@ class AnnotationUpdateDeleteApi(Resource):
     @cloud_edition_billing_resource_check('annotation')
     @marshal_with(annotation_fields)
     def post(self, app_id, annotation_id):
-        """
-        更新应用的注解。
-        
-        参数:
-        - app_id: 应用的ID，字符串类型。
-        - annotation_id: 注解的ID，字符串类型。
-        
-        请求体参数:
-        - question: 更新的问句，字符串类型。
-        - answer: 更新的答案，字符串类型。
-        
-        返回值:
-        - 更新后的注解信息。
-        
-        异常:
-        - Forbidden: 当前用户不是管理员或所有者时引发。
-        """
-        
-        # 检查用户角色是否为管理员或所有者
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         app_id = str(app_id)
@@ -386,22 +277,7 @@ class AnnotationUpdateDeleteApi(Resource):
     @login_required
     @account_initialization_required
     def delete(self, app_id, annotation_id):
-        """
-        删除指定应用的注解。
-        
-        参数:
-        - app_id: 应用的ID，字符串类型。
-        - annotation_id: 注解的ID，字符串类型。
-        
-        返回值:
-        - 删除操作的结果信息，以及HTTP状态码200。
-        
-        异常:
-        - Forbidden: 当前用户不是管理员或所有者时引发。
-        """
-        
-        # 检查用户角色是否为管理员或所有者
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         app_id = str(app_id)
@@ -435,8 +311,7 @@ class AnnotationBatchImportApi(Resource):
     @account_initialization_required
     @cloud_edition_billing_resource_check('annotation')
     def post(self, app_id):
-        # 检查当前用户是否具有管理员或所有者角色
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         app_id = str(app_id)
@@ -467,15 +342,7 @@ class AnnotationBatchImportStatusApi(Resource):
     @account_initialization_required
     @cloud_edition_billing_resource_check('annotation')
     def get(self, app_id, job_id):
-        """
-        查询特定应用和任务的批处理注释导入状态。
-        
-        :param app_id: 应用ID，用于指定查询的应用。
-        :param job_id: 任务ID，用于指定查询的任务。
-        :return: 返回任务状态和错误信息（如果有），以及HTTP状态码200。
-        """
-        # 检查当前用户是否为管理员或所有者
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         job_id = str(job_id)
@@ -512,22 +379,7 @@ class AnnotationHitHistoryListApi(Resource):
     @login_required
     @account_initialization_required
     def get(self, app_id, annotation_id):
-        """
-        获取指定应用和注解的命中历史列表。
-        
-        Args:
-            app_id (int): 应用的ID。
-            annotation_id (int): 注解的ID。
-        
-        Returns:
-            dict: 包含注解命中历史列表的数据、是否还有更多、限制数、总数量和页码的信息。
-        
-        Raises:
-            Forbidden: 如果当前用户不是管理员或所有者，则抛出权限禁止异常。
-        """
-        
-        # 检查当前用户是否具有管理员或所有者角色
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
 
         # 从请求参数中获取页码和限制数量，默认值分别为1和20

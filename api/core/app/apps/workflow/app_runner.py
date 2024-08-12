@@ -10,6 +10,7 @@ from core.app.entities.app_invoke_entities import (
     InvokeFrom,
     WorkflowAppGenerateEntity,
 )
+from core.workflow.callbacks.base_workflow_callback import WorkflowCallback
 from core.workflow.entities.node_entities import SystemVariable
 from core.workflow.nodes.base_node import UserFrom
 from core.workflow.workflow_engine_manager import WorkflowEngineManager
@@ -61,8 +62,7 @@ class WorkflowAppRunner:
         # 关闭数据库会话
         db.session.close()
 
-        # 设置工作流回调，用于处理工作流事件
-        workflow_callbacks = [WorkflowEventTriggerCallback(
+        workflow_callbacks: list[WorkflowCallback] = [WorkflowEventTriggerCallback(
             queue_manager=queue_manager,
             workflow=workflow
         )]

@@ -72,8 +72,13 @@ class DatasetConfigManager:
         if len(dataset_ids) == 0:
             return None
 
-        # 提取并处理数据集配置
-        dataset_configs = config.get('dataset_configs', {'retrieval_model': 'single'})
+        # dataset configs
+        if 'dataset_configs' in config and config.get('dataset_configs'):
+            dataset_configs = config.get('dataset_configs')
+        else:
+            dataset_configs = {
+                'retrieval_model': 'multiple'
+            }
         query_variable = config.get('dataset_query_variable')
 
         # 根据检索模型类型构造并返回 DatasetEntity 实例
@@ -97,9 +102,11 @@ class DatasetConfigManager:
                     retrieve_strategy=DatasetRetrieveConfigEntity.RetrieveStrategy.value_of(
                         dataset_configs['retrieval_model']
                     ),
-                    top_k=dataset_configs.get('top_k'),
+                    top_k=dataset_configs.get('top_k', 4),
                     score_threshold=dataset_configs.get('score_threshold'),
-                    reranking_model=dataset_configs.get('reranking_model')
+                    reranking_model=dataset_configs.get('reranking_model'),
+                    weights=dataset_configs.get('weights'),
+                    reranking_enabled=dataset_configs.get('reranking_enabled', True),
                 )
             )
 
@@ -134,14 +141,6 @@ class DatasetConfigManager:
         if not isinstance(config["dataset_configs"], dict):
             raise ValueError("dataset_configs must be of object type")
 
-        # 如果设置了多种检索模型，确保重排模型也被设置，并且为字典类型
-        if config["dataset_configs"]['retrieval_model'] == 'multiple':
-            if not config["dataset_configs"]['reranking_model']:
-                raise ValueError("reranking_model has not been set")
-            if not isinstance(config["dataset_configs"]['reranking_model'], dict):
-                raise ValueError("reranking_model must be of object type")
-
-        # 再次验证"dataset_configs"必须为字典类型，确保配置的正确性
         if not isinstance(config["dataset_configs"], dict):
             raise ValueError("dataset_configs must be of object type")
 

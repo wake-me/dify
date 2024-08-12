@@ -6,6 +6,7 @@ from typing import Any, Optional
 from flask import Flask, current_app
 from pydantic import BaseModel, ConfigDict
 
+from configs import dify_config
 from core.app.apps.base_app_queue_manager import AppQueueManager, PublishFrom
 from core.app.entities.queue_entities import QueueMessageReplaceEvent
 from core.moderation.base import ModerationAction, ModerationOutputsResult
@@ -20,11 +21,8 @@ class ModerationRule(BaseModel):
     config: dict[str, Any]  # 规则配置字典
 
 class OutputModeration(BaseModel):
-    # 输出中介类，用于处理和中介相关的输出逻辑
-    DEFAULT_BUFFER_SIZE: int = 300  # 默认缓冲区大小
-
-    tenant_id: str  # 租户ID
-    app_id: str  # 应用ID
+    tenant_id: str
+    app_id: str
 
     rule: ModerationRule  # 中介规则
     queue_manager: AppQueueManager  # 队列管理器
@@ -100,15 +98,10 @@ class OutputModeration(BaseModel):
         return final_output
 
     def start_thread(self) -> threading.Thread:
-        """
-        启动工作线程
-        Returns:
-            threading.Thread: 启动的工作线程
-        """
-        buffer_size = int(current_app.config.get('MODERATION_BUFFER_SIZE', self.DEFAULT_BUFFER_SIZE))
+        buffer_size = dify_config.MODERATION_BUFFER_SIZE
         thread = threading.Thread(target=self.worker, kwargs={
             'flask_app': current_app._get_current_object(),
-            'buffer_size': buffer_size if buffer_size > 0 else self.DEFAULT_BUFFER_SIZE
+            'buffer_size': buffer_size if buffer_size > 0 else dify_config.MODERATION_BUFFER_SIZE
         })
 
         thread.start()

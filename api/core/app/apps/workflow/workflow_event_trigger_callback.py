@@ -14,20 +14,13 @@ from core.app.entities.queue_entities import (
     QueueWorkflowStartedEvent,
     QueueWorkflowSucceededEvent,
 )
-from core.workflow.callbacks.base_workflow_callback import BaseWorkflowCallback
+from core.workflow.callbacks.base_workflow_callback import WorkflowCallback
 from core.workflow.entities.base_node_data_entities import BaseNodeData
 from core.workflow.entities.node_entities import NodeType
 from models.workflow import Workflow
 
 
-class WorkflowEventTriggerCallback(BaseWorkflowCallback):
-    """
-    工作流事件触发回调类，用于在工作流的不同阶段触发相应的事件。
-
-    Attributes:
-        queue_manager (AppQueueManager): 队列管理器，用于发布事件。
-        workflow (Workflow): 当前工作流实例。
-    """
+class WorkflowEventTriggerCallback(WorkflowCallback):
 
     def __init__(self, queue_manager: AppQueueManager, workflow: Workflow):
         """

@@ -120,7 +120,7 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
         self._stream_generate_routes = self._get_stream_generate_routes()
         self._conversation_name_generate_thread = None
 
-    def process(self) -> Union[ChatbotAppBlockingResponse, Generator[ChatbotAppStreamResponse, None, None]]:
+    def process(self):
         """
         处理生成任务流水线。
         
@@ -148,8 +148,7 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
             # 否则，转换并返回阻塞响应
             return self._to_blocking_response(generator)
 
-    def _to_blocking_response(self, generator: Generator[StreamResponse, None, None]) \
-            -> ChatbotAppBlockingResponse:
+    def _to_blocking_response(self, generator: Generator[StreamResponse, None, None]) -> ChatbotAppBlockingResponse:
         """
         处理阻塞响应。
         :param generator: 一个生成器，产生StreamResponse类型的对象。
@@ -184,8 +183,7 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
         # 如果生成器提前终止，抛出异常
         raise Exception('Queue listening stopped unexpectedly.')
 
-    def _to_stream_response(self, generator: Generator[StreamResponse, None, None]) \
-            -> Generator[ChatbotAppStreamResponse, None, None]:
+    def _to_stream_response(self, generator: Generator[StreamResponse, None, None]) -> Generator[ChatbotAppStreamResponse, Any, None]:
         """
         将生成器中的流响应转换为特定的ChatbotAppStreamResponse格式。
         
@@ -261,7 +259,16 @@ class AdvancedChatAppGenerateTaskPipeline(BasedGenerateTaskPipeline, WorkflowCyc
         :return: 生成器，返回流式响应对象
         """
         for message in self._queue_manager.listen():
-            if publisher:
+            if (message.event
+                    and hasattr(message.event, 'metadata')
+                    and message.event.metadata
+                    and message.event.metadata.get('is_answer_previous_node', False)
+                    and publisher):
+                publisher.publish(message=message)
+            elif (hasattr(message.event, 'execution_metadata')
+                  and message.event.execution_metadata
+                  and message.event.execution_metadata.get('is_answer_previous_node', False)
+                  and publisher):
                 publisher.publish(message=message)
             event = message.event
 

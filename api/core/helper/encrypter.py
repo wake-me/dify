@@ -6,31 +6,18 @@ from models.account import Tenant
 
 
 def obfuscated_token(token: str):
-    """
-    隐形化令牌函数，将令牌的中间部分用星号隐藏。
-    
-    参数:
-    token: str - 需要被隐形化的令牌字符串。
-    
-    返回:
-    str - 隐形化后的令牌字符串，只显示前后各三个字符，中间用星号代替。
-    """
-    return token[:6] + '*' * (len(token) - 8) + token[-2:]
+    if not token:
+        return token
+    if len(token) <= 8:
+        return '*' * 20
+    return token[:6] + '*' * 12 + token[-2:]
 
 def encrypt_token(tenant_id: str, token: str):
-    """
-    对令牌进行加密，使用RSA算法并结合租户的公钥。
-    
-    参数:
-    tenant_id: str - 租户的唯一标识符。
-    token: str - 需要被加密的令牌。
-    
-    返回:
-    str - 加密后的令牌，使用base64编码表示。
-    """
-    tenant = db.session.query(Tenant).filter(Tenant.id == tenant_id).first()  # 根据租户ID查询租户信息
-    encrypted_token = rsa.encrypt(token, tenant.encrypt_public_key)  # 使用RSA算法加密令牌
-    return base64.b64encode(encrypted_token).decode()  # 对加密后的令牌进行base64编码
+    if not (tenant := db.session.query(Tenant).filter(Tenant.id == tenant_id).first()):
+        raise ValueError(f'Tenant with id {tenant_id} not found')
+    encrypted_token = rsa.encrypt(token, tenant.encrypt_public_key)
+    return base64.b64encode(encrypted_token).decode()
+
 
 def decrypt_token(tenant_id: str, token: str):
     """

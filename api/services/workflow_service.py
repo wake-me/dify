@@ -1,10 +1,12 @@
 import json
 import time
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Optional
 
 from core.app.apps.advanced_chat.app_config_manager import AdvancedChatAppConfigManager
 from core.app.apps.workflow.app_config_manager import WorkflowAppConfigManager
+from core.app.segments import Variable
 from core.model_runtime.utils.encoders import jsonable_encoder
 from core.workflow.entities.node_entities import NodeType
 from core.workflow.errors import WorkflowNodeRunFailedError
@@ -73,11 +75,16 @@ class WorkflowService:
 
         return workflow  # 返回查询结果，可能是 Workflow 对象或 None
 
-    def sync_draft_workflow(self, app_model: App,
-                            graph: dict,
-                            features: dict,
-                            unique_hash: Optional[str],
-                            account: Account) -> Workflow:
+    def sync_draft_workflow(
+        self,
+        *,
+        app_model: App,
+        graph: dict,
+        features: dict,
+        unique_hash: Optional[str],
+        account: Account,
+        environment_variables: Sequence[Variable],
+    ) -> Workflow:
         """
         Sync draft workflow
         :raises WorkflowHashNotEqualError
@@ -86,10 +93,8 @@ class WorkflowService:
         # 根据 app_model 获取草稿工作流
         workflow = self.get_draft_workflow(app_model=app_model)
 
-        if workflow:
-            # validate unique hash
-            if workflow.unique_hash != unique_hash:
-                raise WorkflowHashNotEqualError()
+        if workflow and workflow.unique_hash != unique_hash:
+            raise WorkflowHashNotEqualError()
 
         # validate features structure
         self.validate_features_structure(
@@ -106,7 +111,8 @@ class WorkflowService:
                 version='draft',
                 graph=json.dumps(graph),
                 features=json.dumps(features),
-                created_by=account.id
+                created_by=account.id,
+                environment_variables=environment_variables
             )
             db.session.add(workflow)
         # 如果找到草稿工作流，则更新其信息
@@ -115,6 +121,7 @@ class WorkflowService:
             workflow.features = json.dumps(features)
             workflow.updated_by = account.id
             workflow.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            workflow.environment_variables = environment_variables
 
         # 提交数据库会话更改
         db.session.commit()
@@ -157,7 +164,8 @@ class WorkflowService:
             version=str(datetime.now(timezone.utc).replace(tzinfo=None)),
             graph=draft_workflow.graph,
             features=draft_workflow.features,
-            created_by=account.id
+            created_by=account.id,
+            environment_variables=draft_workflow.environment_variables
         )
 
         # 将新工作流实例添加到数据库并提交更改
@@ -367,3 +375,25 @@ class WorkflowService:
         else:
             # 如果应用模式既不是高级聊天也不是工作流，则认为模式无效，抛出异常
             raise ValueError(f"Invalid app mode: {app_model.mode}")
+
+    @classmethod
+    def get_elapsed_time(cls, workflow_run_id: str) -> float:
+        """
+        Get elapsed time
+        """
+        elapsed_time = 0.0
+
+        # fetch workflow node execution by workflow_run_id
+        workflow_nodes = (
+            db.session.query(WorkflowNodeExecution)
+            .filter(WorkflowNodeExecution.workflow_run_id == workflow_run_id)
+            .order_by(WorkflowNodeExecution.created_at.asc())
+            .all()
+        )
+        if not workflow_nodes:
+            return elapsed_time
+        
+        for node in workflow_nodes:
+            elapsed_time += node.elapsed_time
+
+        return elapsed_time

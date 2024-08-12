@@ -6,8 +6,7 @@ import os
 import time
 from typing import Optional
 
-from flask import current_app
-
+from configs import dify_config
 from extensions.ext_storage import storage
 
 # 定义支持的图片扩展名列表，并将其转换为大写形式以方便后续比较
@@ -36,8 +35,7 @@ class UploadFileParser:
         if upload_file.extension not in IMAGE_EXTENSIONS:
             return None
 
-        # 根据配置和参数决定返回数据的形式
-        if current_app.config['MULTIMODAL_SEND_IMAGE_FORMAT'] == 'url' or force_url:
+        if dify_config.MULTIMODAL_SEND_IMAGE_FORMAT == 'url' or force_url:
             return cls.get_signed_temp_image_url(upload_file.id)
         else:
             try:
@@ -58,15 +56,14 @@ class UploadFileParser:
         :param upload_file_id: 上传文件的ID。
         :return: 带签名的临时URL。
         """
-        # 获取基础URL并构建图像预览URL
-        base_url = current_app.config.get('FILES_URL')
+        base_url = dify_config.FILES_URL
         image_preview_url = f'{base_url}/files/{upload_file_id}/image-preview'
 
         # 生成签名所需的时间戳、随机数和签名字符串，并进行编码
         timestamp = str(int(time.time()))
         nonce = os.urandom(16).hex()
         data_to_sign = f"image-preview|{upload_file_id}|{timestamp}|{nonce}"
-        secret_key = current_app.config['SECRET_KEY'].encode()
+        secret_key = dify_config.SECRET_KEY.encode()
         sign = hmac.new(secret_key, data_to_sign.encode(), hashlib.sha256).digest()
         encoded_sign = base64.urlsafe_b64encode(sign).decode()
 
@@ -86,7 +83,7 @@ class UploadFileParser:
         """
         # 构建用于重新计算签名的数据字符串
         data_to_sign = f"image-preview|{upload_file_id}|{timestamp}|{nonce}"
-        secret_key = current_app.config['SECRET_KEY'].encode()
+        secret_key = dify_config.SECRET_KEY.encode()
         recalculated_sign = hmac.new(secret_key, data_to_sign.encode(), hashlib.sha256).digest()
         recalculated_encoded_sign = base64.urlsafe_b64encode(recalculated_sign).decode()
 
@@ -95,4 +92,4 @@ class UploadFileParser:
             return False
 
         current_time = int(time.time())
-        return current_time - int(timestamp) <= current_app.config.get('FILES_ACCESS_TIMEOUT')
+        return current_time - int(timestamp) <= dify_config.FILES_ACCESS_TIMEOUT

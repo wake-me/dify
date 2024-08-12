@@ -1,6 +1,7 @@
-from typing import Optional, Union
+from collections.abc import Mapping
+from typing import Any
 
-from core.app.app_config.entities import AppAdditionalFeatures, EasyUIBasedAppModelConfigFrom
+from core.app.app_config.entities import AppAdditionalFeatures
 from core.app.app_config.features.file_upload.manager import FileUploadConfigManager
 from core.app.app_config.features.more_like_this.manager import MoreLikeThisConfigManager
 from core.app.app_config.features.opening_statement.manager import OpeningStatementConfigManager
@@ -10,31 +11,12 @@ from core.app.app_config.features.suggested_questions_after_answer.manager impor
     SuggestedQuestionsAfterAnswerConfigManager,
 )
 from core.app.app_config.features.text_to_speech.manager import TextToSpeechConfigManager
-from models.model import AppMode, AppModelConfig
+from models.model import AppMode
 
 
 class BaseAppConfigManager:
-
     @classmethod
-    def convert_to_config_dict(cls, config_from: EasyUIBasedAppModelConfigFrom,
-                                app_model_config: Union[AppModelConfig, dict],
-                                config_dict: Optional[dict] = None) -> dict:
-        """
-        将应用模型配置转换为配置字典
-        :param config_from: 应用模型配置的来源
-        :param app_model_config: 应用模型配置，可以是AppModelConfig实例或其字典表示
-        :param config_dict: 应用模型配置字典，如果提供，则将结果存储在此字典中
-        :return: 转换后的配置字典
-        """
-        if config_from != EasyUIBasedAppModelConfigFrom.ARGS:
-            # 当配置来源不是命令行参数时，将应用模型配置转换为字典并复制到config_dict中
-            app_model_config_dict = app_model_config.to_dict() if isinstance(app_model_config, AppModelConfig) else app_model_config
-            config_dict = app_model_config_dict.copy()
-
-        return config_dict
-
-    @classmethod
-    def convert_features(cls, config_dict: dict, app_mode: AppMode) -> AppAdditionalFeatures:
+    def convert_features(cls, config_dict: Mapping[str, Any], app_mode: AppMode) -> AppAdditionalFeatures:
         """
         将应用配置转换为应用模型配置
 
@@ -42,8 +24,7 @@ class BaseAppConfigManager:
         :param app_mode: 应用模式
         :return: 返回应用附加功能对象，包含各种配置转换后的结果
         """
-        # 复制配置字典，以避免原始配置被修改
-        config_dict = config_dict.copy()
+        config_dict = dict(config_dict.items())
 
         # 初始化附加功能对象
         additional_features = AppAdditionalFeatures()

@@ -1,6 +1,7 @@
 import jwt
-from flask import current_app
 from werkzeug.exceptions import Unauthorized
+
+from configs import dify_config
 
 
 class PassportService:
@@ -8,11 +9,8 @@ class PassportService:
     PassportService 类用于处理护照服务相关的操作，包括发行和验证JWT token。
     """
     def __init__(self):
-        """
-        初始化方法，从当前应用配置中获取密钥。
-        """
-        self.sk = current_app.config.get('SECRET_KEY')
-    
+        self.sk = dify_config.SECRET_KEY
+
     def issue(self, payload):
         """
         发行JWT token。
@@ -24,7 +22,7 @@ class PassportService:
         - 编码后的JWT token字符串。
         """
         return jwt.encode(payload, self.sk, algorithm='HS256')
-    
+
     def verify(self, token):
         """
         验证JWT token。

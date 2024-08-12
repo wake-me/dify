@@ -1,18 +1,16 @@
-import hashlib
 import logging
 import re
-import subprocess
-import uuid
 from abc import abstractmethod
 from typing import Optional
 
 from pydantic import ConfigDict
 
 from core.model_runtime.entities.model_entities import ModelPropertyKey, ModelType
-from core.model_runtime.errors.invoke import InvokeBadRequestError
 from core.model_runtime.model_providers.__base.ai_model import AIModel
 
 logger = logging.getLogger(__name__)
+
+
 class TTSModel(AIModel):
     """
     TTS模型类，用于语音合成模型的管理。
@@ -38,8 +36,6 @@ class TTSModel(AIModel):
         :return: 转换后的音频文件。
         """
         try:
-            logger.info(f"Invoke TTS model: {model} , invoke content : {content_text}")
-            self._is_ffmpeg_installed()
             return self._invoke(model=model, credentials=credentials, user=user,
                                 content_text=content_text, voice=voice, tenant_id=tenant_id)
         except Exception as e:
@@ -79,7 +75,8 @@ class TTSModel(AIModel):
             voices = model_schema.model_properties[ModelPropertyKey.VOICES]
             # 如果指定了语言，则筛选出对应语言的声音列表；否则返回所有声音列表
             if language:
-                return [{'name': d['name'], 'value': d['mode']} for d in voices if language and language in d.get('language')]
+                return [{'name': d['name'], 'value': d['mode']} for d in voices if
+                        language and language in d.get('language')]
             else:
                 return [{'name': d['name'], 'value': d['mode']} for d in voices]
 
@@ -165,51 +162,3 @@ class TTSModel(AIModel):
         if one_sentence != '':
             result.append(one_sentence)
         return result
-
-    @staticmethod
-    def _is_ffmpeg_installed():
-        """
-        检查ffmpeg是否已安装。
-        
-        无参数。
-        
-        返回值:
-        - 返回True如果ffmpeg已安装并可使用。
-        - 如果ffmpeg未安装或无法使用，将抛出InvokeBadRequestError异常。
-        """
-        try:
-            output = subprocess.check_output("ffmpeg -version", shell=True)  # 尝试通过命令行获取ffmpeg版本信息
-            if "ffmpeg version" in output.decode("utf-8"):  # 检查输出中是否包含"ffmpeg version"字符串
-                return True
-            else:
-                # 如果版本信息不存在，抛出ffmpeg未安装的异常，并提供解决方法的链接
-                raise InvokeBadRequestError("ffmpeg is not installed, "
-                                            "details: https://docs.dify.ai/getting-started/install-self-hosted"
-                                            "/install-faq#id-14.-what-to-do-if-this-error-occurs-in-text-to-speech")
-        except Exception:
-            # 如果尝试获取ffmpeg版本时发生任何异常，同样抛出ffmpeg未安装的异常
-            raise InvokeBadRequestError("ffmpeg is not installed, "
-                                        "details: https://docs.dify.ai/getting-started/install-self-hosted"
-                                        "/install-faq#id-14.-what-to-do-if-this-error-occurs-in-text-to-speech")
-
-    # Todo: To improve the streaming function
-    @staticmethod
-    def _get_file_name(file_content: str) -> str:
-        """
-        根据文件内容生成唯一的文件名。
-        
-        参数:
-        file_content: str - 文件的内容，用于生成唯一标识。
-        
-        返回值:
-        str - 唯一的文件名，基于文件内容的SHA-256散列值和UUID生成。
-        """
-        # 生成文件内容的SHA-256散列值
-        hash_object = hashlib.sha256(file_content.encode())
-        hex_digest = hash_object.hexdigest()
-
-        # 定义命名空间UUID，用于生成基于散列值的唯一UUID
-        namespace_uuid = uuid.UUID('a5da6ef9-b303-596f-8e88-bf8fa40f4b31')
-        # 生成基于命名空间和散列值的唯一UUID
-        unique_uuid = uuid.uuid5(namespace_uuid, hex_digest)
-        return str(unique_uuid)

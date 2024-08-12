@@ -294,9 +294,7 @@ class DatasetDocumentSegmentAddApi(Resource):
         document = DocumentService.get_document(dataset_id, document_id)
         if not document:
             raise NotFound('Document not found.')
-        
-        # 检查用户角色是否为admin或owner
-        if not current_user.is_admin_or_owner:
+        if not current_user.is_editor:
             raise Forbidden()
         
         # 检查高质索引技术对应的嵌入模型设置
@@ -465,9 +463,8 @@ class DatasetDocumentSegmentUpdateApi(Resource):
         ).first()
         if not segment:
             raise NotFound('Segment not found.')
-        
-        # 检查用户是否有权限执行此操作
-        if not current_user.is_admin_or_owner:
+        # The role of the current user in the ta table must be admin or owner
+        if not current_user.is_editor:
             raise Forbidden()
         
         # 检查用户对数据集的权限

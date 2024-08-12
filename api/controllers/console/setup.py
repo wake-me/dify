@@ -1,8 +1,9 @@
 from functools import wraps
 
-from flask import current_app, request
+from flask import request
 from flask_restful import Resource, reqparse
 
+from configs import dify_config
 from libs.helper import email, get_remote_ip, str_len
 from libs.password import valid_password
 from models.model import DifySetup
@@ -20,17 +21,7 @@ class SetupApi(Resource):
     """
 
     def get(self):
-        """
-        获取当前设置的状态。
-        
-        如果是自托管版本，检查设置是否完成；如果不是，直接认为设置已完成。
-        
-        返回值:
-            - 如果设置已完成，返回设置完成的步骤和时间；
-            - 如果设置未开始，返回未开始状态；
-            - 如果不是自托管版本，返回设置已完成状态。
-        """
-        if current_app.config['EDITION'] == 'SELF_HOSTED':
+        if dify_config.EDITION == 'SELF_HOSTED':
             setup_status = get_setup_status()
             if setup_status:
                 return {
@@ -122,15 +113,7 @@ def setup_required(view):
 
 
 def get_setup_status():
-    """
-    获取设置的状态。
-    
-    如果是自托管版本，则从数据库中查询设置状态；如果不是，认为设置已经完成。
-    
-    返回值:
-        - 设置状态。对于自托管版本，是数据库中的第一条设置记录；对于其他版本，返回True。
-    """
-    if current_app.config['EDITION'] == 'SELF_HOSTED':
+    if dify_config.EDITION == 'SELF_HOSTED':
         return DifySetup.query.first()
     else:
         return True

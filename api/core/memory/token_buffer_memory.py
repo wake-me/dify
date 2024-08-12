@@ -111,8 +111,7 @@ class TokenBufferMemory:
 
         if curr_message_tokens > max_token_limit:
             pruned_memory = []
-            # 从消息列表前端开始删除，直到令牌数符合限制或消息列表为空
-            while curr_message_tokens > max_token_limit and prompt_messages:
+            while curr_message_tokens > max_token_limit and len(prompt_messages)>1:
                 pruned_memory.append(prompt_messages.pop(0))
                 curr_message_tokens = self.model_instance.get_llm_num_tokens(
                     prompt_messages

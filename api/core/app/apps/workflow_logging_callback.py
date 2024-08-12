@@ -2,7 +2,7 @@ from typing import Optional
 
 from core.app.entities.queue_entities import AppQueueEvent
 from core.model_runtime.utils.encoders import jsonable_encoder
-from core.workflow.callbacks.base_workflow_callback import BaseWorkflowCallback
+from core.workflow.callbacks.base_workflow_callback import WorkflowCallback
 from core.workflow.entities.base_node_data_entities import BaseNodeData
 from core.workflow.entities.node_entities import NodeType
 
@@ -17,10 +17,7 @@ _TEXT_COLOR_MAPPING = {
     "red": "31;1",       # 红色，高亮
 }
 
-class WorkflowLoggingCallback(BaseWorkflowCallback):
-    """
-    WorkflowLoggingCallback 类负责在工作流执行的不同阶段打印日志信息。
-    """
+class WorkflowLoggingCallback(WorkflowCallback):
 
     def __init__(self) -> None:
         """

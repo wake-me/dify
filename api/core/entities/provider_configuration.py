@@ -8,6 +8,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
 
+from constants import HIDDEN_VALUE
 from core.entities.model_entities import ModelStatus, ModelWithProviderEntity, SimpleModelProviderEntity
 from core.entities.provider_entities import (
     CustomConfiguration,
@@ -229,8 +230,8 @@ class ProviderConfiguration(BaseModel):
             # 加密凭证信息
             for key, value in credentials.items():
                 if key in provider_credential_secret_variables:
-                    # 如果发送的是[__HIDDEN__]，则将其替换为原始值
-                    if value == '[__HIDDEN__]' and key in original_credentials:
+                    # if send [__HIDDEN__] in secret input, it will be same as original value
+                    if value == HIDDEN_VALUE and key in original_credentials:
                         credentials[key] = encrypter.decrypt_token(self.tenant_id, original_credentials[key])
 
         # 验证并调整凭证信息
@@ -384,8 +385,8 @@ class ProviderConfiguration(BaseModel):
             # 解密凭证信息
             for key, value in credentials.items():
                 if key in provider_credential_secret_variables:
-                    # 如果发送的是隐秘信息标志，则用原始值替换
-                    if value == '[__HIDDEN__]' and key in original_credentials:
+                    # if send [__HIDDEN__] in secret input, it will be same as original value
+                    if value == HIDDEN_VALUE and key in original_credentials:
                         credentials[key] = encrypter.decrypt_token(self.tenant_id, original_credentials[key])
 
         # 验证并更新凭证信息

@@ -1,7 +1,11 @@
 from typing import Any
 
 from core.llm_generator.output_parser.errors import OutputParserException
-from core.llm_generator.prompts import RULE_CONFIG_GENERATE_TEMPLATE
+from core.llm_generator.prompts import (
+    RULE_CONFIG_PARAMETER_GENERATE_TEMPLATE,
+    RULE_CONFIG_PROMPT_GENERATE_TEMPLATE,
+    RULE_CONFIG_STATEMENT_GENERATE_TEMPLATE,
+)
 from libs.json_in_md_parser import parse_and_check_json_markdown
 
 
@@ -11,14 +15,8 @@ class RuleConfigGeneratorOutputParser:
     用于解析并验证规则配置生成器的输出，确保其格式正确无误。
     """
 
-    def get_format_instructions(self) -> str:
-        """
-        获取格式说明文本。
-        
-        返回：
-            str: 返回规则配置生成的模板格式说明。
-        """
-        return RULE_CONFIG_GENERATE_TEMPLATE
+    def get_format_instructions(self) -> tuple[str, str, str]:
+        return RULE_CONFIG_PROMPT_GENERATE_TEMPLATE, RULE_CONFIG_PARAMETER_GENERATE_TEMPLATE, RULE_CONFIG_STATEMENT_GENERATE_TEMPLATE
 
     def parse(self, text: str) -> Any:
         """

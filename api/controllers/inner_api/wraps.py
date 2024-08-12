@@ -28,7 +28,7 @@ def inner_api_only(view):
         # 验证请求头中的'X-Inner-Api-Key'
         inner_api_key = request.headers.get('X-Inner-Api-Key')
         if not inner_api_key or inner_api_key != dify_config.INNER_API_KEY:
-            abort(404)
+            abort(401)
 
         return view(*args, **kwargs)
 

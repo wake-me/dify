@@ -113,8 +113,7 @@ class Account(UserMixin, db.Model):
         return self._current_tenant
 
     @current_tenant.setter
-    def current_tenant(self, value):
-        # 设置当前租户，同时更新租户的当前角色
+    def current_tenant(self, value: "Tenant"):
         tenant = value
         ta = TenantAccountJoin.query.filter_by(tenant_id=tenant.id, account_id=self.id).first()
         if ta:
@@ -136,8 +135,7 @@ class Account(UserMixin, db.Model):
         return self._current_tenant.id
 
     @current_tenant_id.setter
-    def current_tenant_id(self, value):
-        # 根据提供的租户ID设置当前租户
+    def current_tenant_id(self, value: str):
         try:
             tenant_account_join = db.session.query(Tenant, TenantAccountJoin) \
                 .filter(Tenant.id == value) \

@@ -1,3 +1,4 @@
+import contextvars
 import logging
 import os
 import threading
@@ -8,6 +9,7 @@ from typing import Union
 from flask import Flask, current_app
 from pydantic import ValidationError
 
+import contexts
 from core.app.app_config.features.file_upload.manager import FileUploadConfigManager
 from core.app.apps.advanced_chat.app_config_manager import AdvancedChatAppConfigManager
 from core.app.apps.advanced_chat.app_runner import AdvancedChatAppRunner
@@ -94,7 +96,8 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
         )
 
         # get tracing instance
-        trace_manager = TraceQueueManager(app_id=app_model.id)
+        user_id = user.id if isinstance(user, Account) else user.session_id
+        trace_manager = TraceQueueManager(app_model.id, user_id)
 
         if invoke_from == InvokeFrom.DEBUGGER:
             # always enable retriever resource in debugger mode
@@ -114,6 +117,7 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
             extras=extras,
             trace_manager=trace_manager
         )
+        contexts.tenant_id.set(application_generate_entity.app_config.tenant_id)
 
         return self._generate(
             app_model=app_model,
@@ -180,6 +184,7 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
                 inputs=args['inputs']
             )
         )
+        contexts.tenant_id.set(application_generate_entity.app_config.tenant_id)
 
         return self._generate(
             app_model=app_model,
@@ -232,6 +237,8 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
             'queue_manager': queue_manager,
             'conversation_id': conversation.id,
             'message_id': message.id,
+            'user': user,
+            'context': contextvars.copy_context()
         })
         worker_thread.start()
 
@@ -255,7 +262,9 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
                          application_generate_entity: AdvancedChatAppGenerateEntity,
                          queue_manager: AppQueueManager,
                          conversation_id: str,
-                         message_id: str) -> None:
+                         message_id: str,
+                         user: Account,
+                         context: contextvars.Context) -> None:
         """
         在新线程中生成工作器。
         :param flask_app: Flask应用实例
@@ -265,6 +274,8 @@ class AdvancedChatAppGenerator(MessageBasedAppGenerator):
         :param message_id: 消息ID
         :return: 无返回值
         """
+        for var, val in context.items():
+            var.set(val)
         with flask_app.app_context():
             try:
                 runner = AdvancedChatAppRunner()

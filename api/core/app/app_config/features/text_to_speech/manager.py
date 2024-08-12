@@ -3,16 +3,14 @@ from core.app.app_config.entities import TextToSpeechEntity
 
 class TextToSpeechConfigManager:
     @classmethod
-    def convert(cls, config: dict) -> bool:
+    def convert(cls, config: dict):
         """
         将模型配置转换为语音合成配置。
 
         :param config: 模型配置参数
         :return: 返回是否启用了语音合成的布尔值
         """
-        # 初始化语音合成标志为False
-        text_to_speech = False
-        # 尝试从配置中获取语音合成字典
+        text_to_speech = None
         text_to_speech_dict = config.get('text_to_speech')
         # 如果语音合成字典存在且启用标志为真，则启用语音合成
         if text_to_speech_dict:

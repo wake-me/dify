@@ -1,8 +1,9 @@
 import os
 
-from flask import current_app, session
+from flask import session
 from flask_restful import Resource, reqparse
 
+from configs import dify_config
 from libs.helper import str_len
 from models.model import DifySetup
 from services.account_service import TenantService
@@ -60,16 +61,9 @@ class InitValidateAPI(Resource):
         return {'result': 'success'}, 201  # 返回成功状态和HTTP 201创建响应码
 
 def get_init_validate_status():
-    """
-    获取初始化验证的状态。
-    
-    返回:
-        - 如果当前是自托管版本，并且初始化密码已设置，则返回会话中的初始化验证状态或数据库中的第一条设置记录；
-        - 如果当前不是自托管版本，总是返回True。
-    """
-    if current_app.config['EDITION'] == 'SELF_HOSTED':  # 如果是自托管版本
-        if os.environ.get('INIT_PASSWORD'):  # 并且初始化密码已设置
-            return session.get('is_init_validated') or DifySetup.query.first()  # 返回会话或数据库中的初始化状态
+    if dify_config.EDITION == 'SELF_HOSTED':
+        if os.environ.get('INIT_PASSWORD'):
+            return session.get('is_init_validated') or DifySetup.query.first()
     
     return True  # 如果不是自托管版本，返回True表示初始化已完成或未开始
 

@@ -89,10 +89,17 @@ class MarkdownExtractor(BaseExtractor):
         # 用于当前标题和文本内容的临时变量
         current_header = None
         current_text = ""
+        code_block_flag = False
 
         # 遍历分割后的每行文本
         for line in lines:
-            # 检查当前行是否为标题
+            if line.startswith("```"):
+                code_block_flag = not code_block_flag
+                current_text += line + "\n"
+                continue
+            if code_block_flag:
+                current_text += line + "\n"
+                continue
             header_match = re.match(r"^#+\s", line)
             if header_match:
                 # 如果是标题，则将之前的标题和文本内容添加到结果列表中
