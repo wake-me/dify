@@ -27,10 +27,10 @@ from models.provider import Provider, ProviderModel
 from services.account_service import RegisterService, TenantService
 
 
-@click.command('reset-password', help='Reset the account password.')
-@click.option('--email', prompt=True, help='The email address of the account whose password you need to reset')
-@click.option('--new-password', prompt=True, help='the new password.')
-@click.option('--password-confirm', prompt=True, help='the new password confirm.')
+@click.command("reset-password", help="Reset the account password.")
+@click.option("--email", prompt=True, help="The email address of the account whose password you need to reset")
+@click.option("--new-password", prompt=True, help="the new password.")
+@click.option("--password-confirm", prompt=True, help="the new password confirm.")
 def reset_password(email, new_password, password_confirm):
     """
     重置账号密码
@@ -42,25 +42,21 @@ def reset_password(email, new_password, password_confirm):
     """
     # 验证新密码和确认密码是否匹配
     if str(new_password).strip() != str(password_confirm).strip():
-        click.echo(click.style('sorry. The two passwords do not match.', fg='red'))
+        click.echo(click.style("sorry. The two passwords do not match.", fg="red"))
         return
 
-    # 查询指定电子邮件地址的账号
-    account = db.session.query(Account). \
-        filter(Account.email == email). \
-        one_or_none()
+    account = db.session.query(Account).filter(Account.email == email).one_or_none()
 
     # 账号不存在时的处理
     if not account:
-        click.echo(click.style('sorry. the account: [{}] not exist .'.format(email), fg='red'))
+        click.echo(click.style("sorry. the account: [{}] not exist .".format(email), fg="red"))
         return
 
     # 验证新密码是否符合要求
     try:
         valid_password(new_password)
     except:
-        click.echo(
-            click.style('sorry. The passwords must match {} '.format(password_pattern), fg='red'))
+        click.echo(click.style("sorry. The passwords must match {} ".format(password_pattern), fg="red"))
         return
 
     # 生成密码盐并加密密码
@@ -72,13 +68,13 @@ def reset_password(email, new_password, password_confirm):
     account.password = base64_password_hashed
     account.password_salt = base64_salt
     db.session.commit()
-    click.echo(click.style('Congratulations! Password has been reset.', fg='green'))
+    click.echo(click.style("Congratulations! Password has been reset.", fg="green"))
 
 
-@click.command('reset-email', help='Reset the account email.')
-@click.option('--email', prompt=True, help='The old email address of the account whose email you need to reset')
-@click.option('--new-email', prompt=True, help='the new email.')
-@click.option('--email-confirm', prompt=True, help='the new email confirm.')
+@click.command("reset-email", help="Reset the account email.")
+@click.option("--email", prompt=True, help="The old email address of the account whose email you need to reset")
+@click.option("--new-email", prompt=True, help="the new email.")
+@click.option("--email-confirm", prompt=True, help="the new email confirm.")
 def reset_email(email, new_email, email_confirm):
     """
     替换账号电子邮件地址
@@ -89,46 +85,48 @@ def reset_email(email, new_email, email_confirm):
     """
     # 验证新电子邮件和确认电子邮件是否匹配
     if str(new_email).strip() != str(email_confirm).strip():
-        click.echo(click.style('Sorry, new email and confirm email do not match.', fg='red'))
+        click.echo(click.style("Sorry, new email and confirm email do not match.", fg="red"))
         return
 
-    # 查询指定电子邮件地址的账号
-    account = db.session.query(Account). \
-        filter(Account.email == email). \
-        one_or_none()
+    account = db.session.query(Account).filter(Account.email == email).one_or_none()
 
     # 账号不存在时的处理
     if not account:
-        click.echo(click.style('sorry. the account: [{}] not exist .'.format(email), fg='red'))
+        click.echo(click.style("sorry. the account: [{}] not exist .".format(email), fg="red"))
         return
 
     # 验证新电子邮件地址的有效性
     try:
         email_validate(new_email)
     except:
-        click.echo(
-            click.style('sorry. {} is not a valid email. '.format(email), fg='red'))
+        click.echo(click.style("sorry. {} is not a valid email. ".format(email), fg="red"))
         return
 
     account.email = new_email
     db.session.commit()
-    click.echo(click.style('Congratulations!, email has been reset.', fg='green'))
+    click.echo(click.style("Congratulations!, email has been reset.", fg="green"))
 
 
-@click.command('reset-encrypt-key-pair', help='Reset the asymmetric key pair of workspace for encrypt LLM credentials. '
-                                              'After the reset, all LLM credentials will become invalid, '
-                                              'requiring re-entry.'
-                                              'Only support SELF_HOSTED mode.')
-@click.confirmation_option(prompt=click.style('Are you sure you want to reset encrypt key pair?'
-                                              ' this operation cannot be rolled back!', fg='red'))
+@click.command(
+    "reset-encrypt-key-pair",
+    help="Reset the asymmetric key pair of workspace for encrypt LLM credentials. "
+    "After the reset, all LLM credentials will become invalid, "
+    "requiring re-entry."
+    "Only support SELF_HOSTED mode.",
+)
+@click.confirmation_option(
+    prompt=click.style(
+        "Are you sure you want to reset encrypt key pair?" " this operation cannot be rolled back!", fg="red"
+    )
+)
 def reset_encrypt_key_pair():
     """
     重置工作空间的加密密钥对，用于加密LLM凭据。
     重置后，所有LLM凭据将变得无效，需要重新输入。
     仅支持SELF_HOSTED模式。
     """
-    if dify_config.EDITION != 'SELF_HOSTED':
-        click.echo(click.style('Sorry, only support SELF_HOSTED mode.', fg='red'))
+    if dify_config.EDITION != "SELF_HOSTED":
+        click.echo(click.style("Sorry, only support SELF_HOSTED mode.", fg="red"))
         return
 
     # 从数据库中查询所有租户信息
@@ -136,94 +134,78 @@ def reset_encrypt_key_pair():
     for tenant in tenants:
         # 如果没有找到租户信息，则报错并退出
         if not tenant:
-            click.echo(click.style('Sorry, no workspace found. Please enter /install to initialize.', fg='red'))
+            click.echo(click.style("Sorry, no workspace found. Please enter /install to initialize.", fg="red"))
             return
 
         # 为当前租户生成新的密钥对
         tenant.encrypt_public_key = generate_key_pair(tenant.id)
 
-        # 删除当前租户的所有自定义提供商和模型提供者信息
-        db.session.query(Provider).filter(Provider.provider_type == 'custom', Provider.tenant_id == tenant.id).delete()
+        db.session.query(Provider).filter(Provider.provider_type == "custom", Provider.tenant_id == tenant.id).delete()
         db.session.query(ProviderModel).filter(ProviderModel.tenant_id == tenant.id).delete()
         db.session.commit()
 
-        # 提示密钥对重置成功
-        click.echo(click.style('Congratulations! '
-                               'the asymmetric key pair of workspace {} has been reset.'.format(tenant.id), fg='green'))
+        click.echo(
+            click.style(
+                "Congratulations! " "the asymmetric key pair of workspace {} has been reset.".format(tenant.id),
+                fg="green",
+            )
+        )
 
 
-@click.command('vdb-migrate', help='migrate vector db.')
-@click.option('--scope', default='all', prompt=False, help='The scope of vector database to migrate, Default is All.')
+@click.command("vdb-migrate", help="migrate vector db.")
+@click.option("--scope", default="all", prompt=False, help="The scope of vector database to migrate, Default is All.")
 def vdb_migrate(scope: str):
-    """
-    根据指定的范围执行数据库迁移。
-    
-    参数:
-    scope: 字符串，指定迁移的范围，可以是'knowledge'、'annotation'或'all'。
-    
-    返回值:
-    无返回值。
-    """
-    # 根据范围决定是否迁移知识向量数据库
-    if scope in ['knowledge', 'all']:
+    if scope in ["knowledge", "all"]:
         migrate_knowledge_vector_database()
-    # 根据范围决定是否迁移注释向量数据库
-    if scope in ['annotation', 'all']:
+    if scope in ["annotation", "all"]:
         migrate_annotation_vector_database()
 
 
 def migrate_annotation_vector_database():
     """
-    迁移注解数据到目标向量数据库。
-    此函数遍历所有状态为正常的app，为每个app的注解数据创建向量索引。如果app没有启用注解设置或者相应的集合绑定不存在，则跳过该app。
-    对于每个启用注解的app，它会删除旧的向量索引（如果存在），然后创建一个新的向量索引，包含所有的注解文档。
-
-    参数:
-    无
-
-    返回值:
-    无
+    Migrate annotation datas to target vector database .
     """
-    # 开始迁移注解数据
-    click.echo(click.style('Start migrate annotation data.', fg='green'))
-    create_count = 0  # 成功创建索引的app数量
-    skipped_count = 0  # 被跳过的app数量
-    total_count = 0  # 处理的app总数量
-    page = 1  # 分页查询的起始页码
-
+    click.echo(click.style("Start migrate annotation data.", fg="green"))
+    create_count = 0
+    skipped_count = 0
+    total_count = 0
+    page = 1
     while True:
         try:
-            # 查询状态为正常的app信息
-            apps = db.session.query(App).filter(
-                App.status == 'normal'
-            ).order_by(App.created_at.desc()).paginate(page=page, per_page=50)
+            # get apps info
+            apps = (
+                db.session.query(App)
+                .filter(App.status == "normal")
+                .order_by(App.created_at.desc())
+                .paginate(page=page, per_page=50)
+            )
         except NotFound:
             break  # 未找到app时结束循环
 
         page += 1  # 更新页码以获取下一页app信息
         for app in apps:
-            total_count += 1  # 更新处理的app总数量
-            # 处理单个app的注解数据
-            click.echo(f'Processing the {total_count} app {app.id}. '
-                       + f'{create_count} created, {skipped_count} skipped.')
+            total_count = total_count + 1
+            click.echo(
+                f"Processing the {total_count} app {app.id}. " + f"{create_count} created, {skipped_count} skipped."
+            )
             try:
-                # 尝试创建app的注解索引
-                click.echo('Create app annotation index: {}'.format(app.id))
-                app_annotation_setting = db.session.query(AppAnnotationSetting).filter(
-                    AppAnnotationSetting.app_id == app.id
-                ).first()
+                click.echo("Create app annotation index: {}".format(app.id))
+                app_annotation_setting = (
+                    db.session.query(AppAnnotationSetting).filter(AppAnnotationSetting.app_id == app.id).first()
+                )
 
                 if not app_annotation_setting:
-                    skipped_count += 1  # 如果app没有启用注解设置，则跳过
-                    click.echo('App annotation setting is disabled: {}'.format(app.id))
+                    skipped_count = skipped_count + 1
+                    click.echo("App annotation setting is disabled: {}".format(app.id))
                     continue
-
-                # 获取集合绑定信息
-                dataset_collection_binding = db.session.query(DatasetCollectionBinding).filter(
-                    DatasetCollectionBinding.id == app_annotation_setting.collection_binding_id
-                ).first()
+                # get dataset_collection_binding info
+                dataset_collection_binding = (
+                    db.session.query(DatasetCollectionBinding)
+                    .filter(DatasetCollectionBinding.id == app_annotation_setting.collection_binding_id)
+                    .first()
+                )
                 if not dataset_collection_binding:
-                    click.echo('App annotation collection binding is not exist: {}'.format(app.id))
+                    click.echo("App annotation collection binding is not exist: {}".format(app.id))
                     continue
 
                 # 查询app的注解信息
@@ -232,10 +214,10 @@ def migrate_annotation_vector_database():
                 dataset = Dataset(
                     id=app.id,
                     tenant_id=app.tenant_id,
-                    indexing_technique='high_quality',
+                    indexing_technique="high_quality",
                     embedding_model_provider=dataset_collection_binding.provider_name,
                     embedding_model=dataset_collection_binding.model_name,
-                    collection_binding_id=dataset_collection_binding.id
+                    collection_binding_id=dataset_collection_binding.id,
                 )
                 documents = []
                 # 如果有注解数据，则创建文档对象
@@ -243,62 +225,57 @@ def migrate_annotation_vector_database():
                     for annotation in annotations:
                         document = Document(
                             page_content=annotation.question,
-                            metadata={
-                                "annotation_id": annotation.id,
-                                "app_id": app.id,
-                                "doc_id": annotation.id
-                            }
+                            metadata={"annotation_id": annotation.id, "app_id": app.id, "doc_id": annotation.id},
                         )
                         documents.append(document)
 
-                # 创建向量对象
-                vector = Vector(dataset, attributes=['doc_id', 'annotation_id', 'app_id'])
+                vector = Vector(dataset, attributes=["doc_id", "annotation_id", "app_id"])
                 click.echo(f"Start to migrate annotation, app_id: {app.id}.")
 
                 try:
-                    vector.delete()  # 尝试删除旧的索引
-                    click.echo(
-                        click.style(f'Successfully delete vector index for app: {app.id}.',
-                                    fg='green'))
+                    vector.delete()
+                    click.echo(click.style(f"Successfully delete vector index for app: {app.id}.", fg="green"))
                 except Exception as e:
-                    click.echo(
-                        click.style(f'Failed to delete vector index for app {app.id}.',
-                                    fg='red'))
+                    click.echo(click.style(f"Failed to delete vector index for app {app.id}.", fg="red"))
                     raise e
 
                 if documents:
                     try:
-                        # 创建新的向量索引
-                        click.echo(click.style(
-                            f'Start to created vector index with {len(documents)} annotations for app {app.id}.',
-                            fg='green'))
-                        vector.create(documents)
                         click.echo(
-                            click.style(f'Successfully created vector index for app {app.id}.', fg='green'))
+                            click.style(
+                                f"Start to created vector index with {len(documents)} annotations for app {app.id}.",
+                                fg="green",
+                            )
+                        )
+                        vector.create(documents)
+                        click.echo(click.style(f"Successfully created vector index for app {app.id}.", fg="green"))
                     except Exception as e:
-                        click.echo(click.style(f'Failed to created vector index for app {app.id}.', fg='red'))
+                        click.echo(click.style(f"Failed to created vector index for app {app.id}.", fg="red"))
                         raise e
-
-                click.echo(f'Successfully migrated app annotation {app.id}.')
-                create_count += 1  # 更新成功创建索引的app数量
+                click.echo(f"Successfully migrated app annotation {app.id}.")
+                create_count += 1
             except Exception as e:
                 click.echo(
-                    click.style('Create app annotation index error: {} {}'.format(e.__class__.__name__, str(e)),
-                                fg='red'))
+                    click.style(
+                        "Create app annotation index error: {} {}".format(e.__class__.__name__, str(e)), fg="red"
+                    )
+                )
                 continue
 
     # 迁移完成
     click.echo(
-        click.style(f'Congratulations! Create {create_count} app annotation indexes, and skipped {skipped_count} apps.',
-                    fg='green'))
+        click.style(
+            f"Congratulations! Create {create_count} app annotation indexes, and skipped {skipped_count} apps.",
+            fg="green",
+        )
+    )
 
 
 def migrate_knowledge_vector_database():
     """
     将知识向量数据库中的数据迁移到目标向量数据库中。
     """
-    # 开始迁移向量数据库
-    click.echo(click.style('Start migrate vector db.', fg='green'))
+    click.echo(click.style("Start migrate vector db.", fg="green"))
     create_count = 0
     skipped_count = 0
     total_count = 0
@@ -306,92 +283,77 @@ def migrate_knowledge_vector_database():
     page = 1
     while True:
         try:
-            # 查询满足条件的数据集
-            datasets = db.session.query(Dataset).filter(Dataset.indexing_technique == 'high_quality') \
-                .order_by(Dataset.created_at.desc()).paginate(page=page, per_page=50)
+            datasets = (
+                db.session.query(Dataset)
+                .filter(Dataset.indexing_technique == "high_quality")
+                .order_by(Dataset.created_at.desc())
+                .paginate(page=page, per_page=50)
+            )
         except NotFound:
             break  # 未找到数据，结束循环
 
         page += 1  # 分页递增
         for dataset in datasets:
-            total_count += 1  # 总计数递增
-            # 处理单个数据集
-            click.echo(f'Processing the {total_count} dataset {dataset.id}. '
-                       + f'{create_count} created, {skipped_count} skipped.')
+            total_count = total_count + 1
+            click.echo(
+                f"Processing the {total_count} dataset {dataset.id}. "
+                + f"{create_count} created, {skipped_count} skipped."
+            )
             try:
-                # 创建数据集向量索引
-                click.echo('Create dataset vdb index: {}'.format(dataset.id))
+                click.echo("Create dataset vdb index: {}".format(dataset.id))
                 if dataset.index_struct_dict:
-                    if dataset.index_struct_dict['type'] == vector_type:
-                        skipped_count += 1
-                        continue  # 类型匹配，跳过处理
-
-                # 根据向量存储类型设置索引结构
-                collection_name = ''
+                    if dataset.index_struct_dict["type"] == vector_type:
+                        skipped_count = skipped_count + 1
+                        continue
+                collection_name = ""
                 if vector_type == VectorType.WEAVIATE:
                     dataset_id = dataset.id
                     collection_name = Dataset.gen_collection_name_by_id(dataset_id)
-                    index_struct_dict = {
-                        "type": VectorType.WEAVIATE,
-                        "vector_store": {"class_prefix": collection_name}
-                    }
+                    index_struct_dict = {"type": VectorType.WEAVIATE, "vector_store": {"class_prefix": collection_name}}
                     dataset.index_struct = json.dumps(index_struct_dict)
                 elif vector_type == VectorType.QDRANT:
                     if dataset.collection_binding_id:
-                        dataset_collection_binding = db.session.query(DatasetCollectionBinding). \
-                            filter(DatasetCollectionBinding.id == dataset.collection_binding_id). \
-                            one_or_none()
+                        dataset_collection_binding = (
+                            db.session.query(DatasetCollectionBinding)
+                            .filter(DatasetCollectionBinding.id == dataset.collection_binding_id)
+                            .one_or_none()
+                        )
                         if dataset_collection_binding:
                             collection_name = dataset_collection_binding.collection_name
                         else:
-                            raise ValueError('Dataset Collection Bindings is not exist!')
+                            raise ValueError("Dataset Collection Bindings is not exist!")
                     else:
                         dataset_id = dataset.id
                         collection_name = Dataset.gen_collection_name_by_id(dataset_id)
-                    index_struct_dict = {
-                        "type": VectorType.QDRANT,
-                        "vector_store": {"class_prefix": collection_name}
-                    }
+                    index_struct_dict = {"type": VectorType.QDRANT, "vector_store": {"class_prefix": collection_name}}
                     dataset.index_struct = json.dumps(index_struct_dict)
 
                 elif vector_type == VectorType.MILVUS:
                     dataset_id = dataset.id
                     collection_name = Dataset.gen_collection_name_by_id(dataset_id)
-                    index_struct_dict = {
-                        "type": VectorType.MILVUS,
-                        "vector_store": {"class_prefix": collection_name}
-                    }
+                    index_struct_dict = {"type": VectorType.MILVUS, "vector_store": {"class_prefix": collection_name}}
                     dataset.index_struct = json.dumps(index_struct_dict)
                 elif vector_type == VectorType.RELYT:
                     dataset_id = dataset.id
                     collection_name = Dataset.gen_collection_name_by_id(dataset_id)
-                    index_struct_dict = {
-                        "type": 'relyt',
-                        "vector_store": {"class_prefix": collection_name}
-                    }
+                    index_struct_dict = {"type": "relyt", "vector_store": {"class_prefix": collection_name}}
                     dataset.index_struct = json.dumps(index_struct_dict)
                 elif vector_type == VectorType.TENCENT:
                     dataset_id = dataset.id
                     collection_name = Dataset.gen_collection_name_by_id(dataset_id)
-                    index_struct_dict = {
-                        "type": VectorType.TENCENT,
-                        "vector_store": {"class_prefix": collection_name}
-                    }
+                    index_struct_dict = {"type": VectorType.TENCENT, "vector_store": {"class_prefix": collection_name}}
                     dataset.index_struct = json.dumps(index_struct_dict)
                 elif vector_type == VectorType.PGVECTOR:
                     dataset_id = dataset.id
                     collection_name = Dataset.gen_collection_name_by_id(dataset_id)
-                    index_struct_dict = {
-                        "type": VectorType.PGVECTOR,
-                        "vector_store": {"class_prefix": collection_name}
-                    }
+                    index_struct_dict = {"type": VectorType.PGVECTOR, "vector_store": {"class_prefix": collection_name}}
                     dataset.index_struct = json.dumps(index_struct_dict)
                 elif vector_type == VectorType.OPENSEARCH:
                     dataset_id = dataset.id
                     collection_name = Dataset.gen_collection_name_by_id(dataset_id)
                     index_struct_dict = {
                         "type": VectorType.OPENSEARCH,
-                        "vector_store": {"class_prefix": collection_name}
+                        "vector_store": {"class_prefix": collection_name},
                     }
                     dataset.index_struct = json.dumps(index_struct_dict)
                 elif vector_type == VectorType.ANALYTICDB:
@@ -399,8 +361,13 @@ def migrate_knowledge_vector_database():
                     collection_name = Dataset.gen_collection_name_by_id(dataset_id)
                     index_struct_dict = {
                         "type": VectorType.ANALYTICDB,
-                        "vector_store": {"class_prefix": collection_name}
+                        "vector_store": {"class_prefix": collection_name},
                     }
+                    dataset.index_struct = json.dumps(index_struct_dict)
+                elif vector_type == VectorType.ELASTICSEARCH:
+                    dataset_id = dataset.id
+                    index_name = Dataset.gen_collection_name_by_id(dataset_id)
+                    index_struct_dict = {"type": "elasticsearch", "vector_store": {"class_prefix": index_name}}
                     dataset.index_struct = json.dumps(index_struct_dict)
                 else:
                     raise ValueError(f"Vector store {vector_type} is not supported.")
@@ -412,30 +379,41 @@ def migrate_knowledge_vector_database():
                 try:
                     vector.delete()  # 删除旧索引
                     click.echo(
-                        click.style(f'Successfully delete vector index {collection_name} for dataset {dataset.id}.',
-                                    fg='green'))
+                        click.style(
+                            f"Successfully delete vector index {collection_name} for dataset {dataset.id}.", fg="green"
+                        )
+                    )
                 except Exception as e:
                     click.echo(
-                        click.style(f'Failed to delete vector index {collection_name} for dataset {dataset.id}.',
-                                    fg='red'))
+                        click.style(
+                            f"Failed to delete vector index {collection_name} for dataset {dataset.id}.", fg="red"
+                        )
+                    )
                     raise e
 
-                # 处理数据集文档
-                dataset_documents = db.session.query(DatasetDocument).filter(
-                    DatasetDocument.dataset_id == dataset.id,
-                    DatasetDocument.indexing_status == 'completed',
-                    DatasetDocument.enabled == True,
-                    DatasetDocument.archived == False,
-                ).all()
+                dataset_documents = (
+                    db.session.query(DatasetDocument)
+                    .filter(
+                        DatasetDocument.dataset_id == dataset.id,
+                        DatasetDocument.indexing_status == "completed",
+                        DatasetDocument.enabled == True,
+                        DatasetDocument.archived == False,
+                    )
+                    .all()
+                )
 
                 documents = []
                 segments_count = 0
                 for dataset_document in dataset_documents:
-                    segments = db.session.query(DocumentSegment).filter(
-                        DocumentSegment.document_id == dataset_document.id,
-                        DocumentSegment.status == 'completed',
-                        DocumentSegment.enabled == True
-                    ).all()
+                    segments = (
+                        db.session.query(DocumentSegment)
+                        .filter(
+                            DocumentSegment.document_id == dataset_document.id,
+                            DocumentSegment.status == "completed",
+                            DocumentSegment.enabled == True,
+                        )
+                        .all()
+                    )
 
                     for segment in segments:
                         document = Document(
@@ -445,7 +423,7 @@ def migrate_knowledge_vector_database():
                                 "doc_hash": segment.index_node_hash,
                                 "document_id": segment.document_id,
                                 "dataset_id": segment.dataset_id,
-                            }
+                            },
                         )
 
                         documents.append(document)
@@ -453,39 +431,45 @@ def migrate_knowledge_vector_database():
 
                 if documents:
                     try:
-                        click.echo(click.style(
-                            f'Start to created vector index with {len(documents)} documents of {segments_count} segments for dataset {dataset.id}.',
-                            fg='green'))
-                        vector.create(documents)  # 创建新索引
                         click.echo(
-                            click.style(f'Successfully created vector index for dataset {dataset.id}.', fg='green'))
+                            click.style(
+                                f"Start to created vector index with {len(documents)} documents of {segments_count} segments for dataset {dataset.id}.",
+                                fg="green",
+                            )
+                        )
+                        vector.create(documents)
+                        click.echo(
+                            click.style(f"Successfully created vector index for dataset {dataset.id}.", fg="green")
+                        )
                     except Exception as e:
-                        click.echo(click.style(f'Failed to created vector index for dataset {dataset.id}.', fg='red'))
+                        click.echo(click.style(f"Failed to created vector index for dataset {dataset.id}.", fg="red"))
                         raise e
                 # 提交数据库更改
                 db.session.add(dataset)
                 db.session.commit()
-                click.echo(f'Successfully migrated dataset {dataset.id}.')
+                click.echo(f"Successfully migrated dataset {dataset.id}.")
                 create_count += 1
             except Exception as e:
                 db.session.rollback()
                 click.echo(
-                    click.style('Create dataset index error: {} {}'.format(e.__class__.__name__, str(e)),
-                                fg='red'))
-                continue  # 异常跳过当前数据集
+                    click.style("Create dataset index error: {} {}".format(e.__class__.__name__, str(e)), fg="red")
+                )
+                continue
 
     # 完成迁移
     click.echo(
-        click.style(f'Congratulations! Create {create_count} dataset indexes, and skipped {skipped_count} datasets.',
-                    fg='green'))
+        click.style(
+            f"Congratulations! Create {create_count} dataset indexes, and skipped {skipped_count} datasets.", fg="green"
+        )
+    )
 
 
-@click.command('convert-to-agent-apps', help='Convert Agent Assistant to Agent App.')
+@click.command("convert-to-agent-apps", help="Convert Agent Assistant to Agent App.")
 def convert_to_agent_apps():
     """
     Convert Agent Assistant to Agent App.
     """
-    click.echo(click.style('Start convert to agent apps.', fg='green'))
+    click.echo(click.style("Start convert to agent apps.", fg="green"))
 
     proceeded_app_ids = []
 
@@ -520,7 +504,7 @@ def convert_to_agent_apps():
                 break
 
         for app in apps:
-            click.echo('Converting app: {}'.format(app.id))
+            click.echo("Converting app: {}".format(app.id))
 
             try:
                 app.mode = AppMode.AGENT_CHAT.value
@@ -532,137 +516,139 @@ def convert_to_agent_apps():
                 )
 
                 db.session.commit()
-                click.echo(click.style('Converted app: {}'.format(app.id), fg='green'))
+                click.echo(click.style("Converted app: {}".format(app.id), fg="green"))
             except Exception as e:
-                click.echo(
-                    click.style('Convert app error: {} {}'.format(e.__class__.__name__,
-                                                                  str(e)), fg='red'))
+                click.echo(click.style("Convert app error: {} {}".format(e.__class__.__name__, str(e)), fg="red"))
 
-    click.echo(click.style('Congratulations! Converted {} agent apps.'.format(len(proceeded_app_ids)), fg='green'))
+    click.echo(click.style("Congratulations! Converted {} agent apps.".format(len(proceeded_app_ids)), fg="green"))
 
 
-@click.command('add-qdrant-doc-id-index', help='add qdrant doc_id index.')
-@click.option('--field', default='metadata.doc_id', prompt=False, help='index field , default is metadata.doc_id.')
+@click.command("add-qdrant-doc-id-index", help="add qdrant doc_id index.")
+@click.option("--field", default="metadata.doc_id", prompt=False, help="index field , default is metadata.doc_id.")
 def add_qdrant_doc_id_index(field: str):
-    click.echo(click.style('Start add qdrant doc_id index.', fg='green'))
+    click.echo(click.style("Start add qdrant doc_id index.", fg="green"))
     vector_type = dify_config.VECTOR_STORE
     if vector_type != "qdrant":
-        click.echo(click.style('Sorry, only support qdrant vector store.', fg='red'))
+        click.echo(click.style("Sorry, only support qdrant vector store.", fg="red"))
         return
     create_count = 0
 
     try:
         bindings = db.session.query(DatasetCollectionBinding).all()
         if not bindings:
-            click.echo(click.style('Sorry, no dataset collection bindings found.', fg='red'))
+            click.echo(click.style("Sorry, no dataset collection bindings found.", fg="red"))
             return
         import qdrant_client
         from qdrant_client.http.exceptions import UnexpectedResponse
         from qdrant_client.http.models import PayloadSchemaType
 
         from core.rag.datasource.vdb.qdrant.qdrant_vector import QdrantConfig
+
         for binding in bindings:
             if dify_config.QDRANT_URL is None:
-                raise ValueError('Qdrant url is required.')
+                raise ValueError("Qdrant url is required.")
             qdrant_config = QdrantConfig(
                 endpoint=dify_config.QDRANT_URL,
                 api_key=dify_config.QDRANT_API_KEY,
                 root_path=current_app.root_path,
                 timeout=dify_config.QDRANT_CLIENT_TIMEOUT,
                 grpc_port=dify_config.QDRANT_GRPC_PORT,
-                prefer_grpc=dify_config.QDRANT_GRPC_ENABLED
+                prefer_grpc=dify_config.QDRANT_GRPC_ENABLED,
             )
             try:
                 client = qdrant_client.QdrantClient(**qdrant_config.to_qdrant_params())
                 # create payload index
-                client.create_payload_index(binding.collection_name, field,
-                                            field_schema=PayloadSchemaType.KEYWORD)
+                client.create_payload_index(binding.collection_name, field, field_schema=PayloadSchemaType.KEYWORD)
                 create_count += 1
             except UnexpectedResponse as e:
                 # Collection does not exist, so return
                 if e.status_code == 404:
-                    click.echo(click.style(f'Collection not found, collection_name:{binding.collection_name}.', fg='red'))
+                    click.echo(
+                        click.style(f"Collection not found, collection_name:{binding.collection_name}.", fg="red")
+                    )
                     continue
                 # Some other error occurred, so re-raise the exception
                 else:
-                    click.echo(click.style(f'Failed to create qdrant index, collection_name:{binding.collection_name}.', fg='red'))
+                    click.echo(
+                        click.style(
+                            f"Failed to create qdrant index, collection_name:{binding.collection_name}.", fg="red"
+                        )
+                    )
 
     except Exception as e:
-        click.echo(click.style('Failed to create qdrant client.', fg='red'))
+        click.echo(click.style("Failed to create qdrant client.", fg="red"))
 
-    click.echo(
-        click.style(f'Congratulations! Create {create_count} collection indexes.',
-                    fg='green'))
+    click.echo(click.style(f"Congratulations! Create {create_count} collection indexes.", fg="green"))
 
 
-@click.command('create-tenant', help='Create account and tenant.')
-@click.option('--email', prompt=True, help='The email address of the tenant account.')
-@click.option('--language', prompt=True, help='Account language, default: en-US.')
+@click.command("create-tenant", help="Create account and tenant.")
+@click.option("--email", prompt=True, help="The email address of the tenant account.")
+@click.option("--language", prompt=True, help="Account language, default: en-US.")
 def create_tenant(email: str, language: Optional[str] = None):
     """
     Create tenant account
     """
     if not email:
-        click.echo(click.style('Sorry, email is required.', fg='red'))
+        click.echo(click.style("Sorry, email is required.", fg="red"))
         return
 
     # Create account
     email = email.strip()
 
-    if '@' not in email:
-        click.echo(click.style('Sorry, invalid email address.', fg='red'))
+    if "@" not in email:
+        click.echo(click.style("Sorry, invalid email address.", fg="red"))
         return
 
-    account_name = email.split('@')[0]
+    account_name = email.split("@")[0]
 
     if language not in languages:
-        language = 'en-US'
+        language = "en-US"
 
     # generate random password
     new_password = secrets.token_urlsafe(16)
 
     # register account
-    account = RegisterService.register(
-        email=email,
-        name=account_name,
-        password=new_password,
-        language=language
-    )
+    account = RegisterService.register(email=email, name=account_name, password=new_password, language=language)
 
     TenantService.create_owner_tenant_if_not_exist(account)
 
-    click.echo(click.style('Congratulations! Account and tenant created.\n'
-                           'Account: {}\nPassword: {}'.format(email, new_password), fg='green'))
+    click.echo(
+        click.style(
+            "Congratulations! Account and tenant created.\n" "Account: {}\nPassword: {}".format(email, new_password),
+            fg="green",
+        )
+    )
 
 
-@click.command('upgrade-db', help='upgrade the database')
+@click.command("upgrade-db", help="upgrade the database")
 def upgrade_db():
-    click.echo('Preparing database migration...')
-    lock = redis_client.lock(name='db_upgrade_lock', timeout=60)
+    click.echo("Preparing database migration...")
+    lock = redis_client.lock(name="db_upgrade_lock", timeout=60)
     if lock.acquire(blocking=False):
         try:
-            click.echo(click.style('Start database migration.', fg='green'))
+            click.echo(click.style("Start database migration.", fg="green"))
 
             # run db migration
             import flask_migrate
+
             flask_migrate.upgrade()
 
-            click.echo(click.style('Database migration successful!', fg='green'))
+            click.echo(click.style("Database migration successful!", fg="green"))
 
         except Exception as e:
-            logging.exception(f'Database migration failed, error: {e}')
+            logging.exception(f"Database migration failed, error: {e}")
         finally:
             lock.release()
     else:
-        click.echo('Database migration skipped')
+        click.echo("Database migration skipped")
 
 
-@click.command('fix-app-site-missing', help='Fix app related site missing issue.')
+@click.command("fix-app-site-missing", help="Fix app related site missing issue.")
 def fix_app_site_missing():
     """
     Fix app related site missing issue.
     """
-    click.echo(click.style('Start fix app related site missing issue.', fg='green'))
+    click.echo(click.style("Start fix app related site missing issue.", fg="green"))
 
     failed_app_ids = []
     while True:
@@ -693,15 +679,14 @@ where sites.id is null limit 1000"""
                         app_was_created.send(app, account=account)
                 except Exception as e:
                     failed_app_ids.append(app_id)
-                    click.echo(click.style('Fix app {} related site missing issue failed!'.format(app_id), fg='red'))
-                    logging.exception(f'Fix app related site missing issue failed, error: {e}')
+                    click.echo(click.style("Fix app {} related site missing issue failed!".format(app_id), fg="red"))
+                    logging.exception(f"Fix app related site missing issue failed, error: {e}")
                     continue
 
             if not processed_count:
                 break
 
-
-    click.echo(click.style('Congratulations! Fix app related site missing issue successful!', fg='green'))
+    click.echo(click.style("Congratulations! Fix app related site missing issue successful!", fg="green"))
 
 
 def register_commands(app):

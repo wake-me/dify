@@ -44,7 +44,7 @@ class UnstructuredWordExtractor(BaseExtractor):
 
         # 将unstructured包的版本号转换为元组格式，便于比较
         unstructured_version = tuple(
-            [int(x) for x in __unstructured_version__.split(".")]
+            int(x) for x in __unstructured_version__.split(".")
         )
 
         # 检查文件扩展名以确定是否为.doc文件

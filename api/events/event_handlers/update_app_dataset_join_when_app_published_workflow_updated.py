@@ -21,16 +21,12 @@ def handle(sender, **kwargs):
     - 无。
     """
     app = sender
-    published_workflow = kwargs.get('published_workflow')
-    published_workflow = cast(Workflow, published_workflow)  # 将获取到的工作流对象转换为Workflow类型
+    published_workflow = kwargs.get("published_workflow")
+    published_workflow = cast(Workflow, published_workflow)
 
     # 从发布的工作流中获取数据集ID集合
     dataset_ids = get_dataset_ids_from_workflow(published_workflow)
-
-    # 查询当前应用程序与数据集的关联关系
-    app_dataset_joins = db.session.query(AppDatasetJoin).filter(
-        AppDatasetJoin.app_id == app.id
-    ).all()
+    app_dataset_joins = db.session.query(AppDatasetJoin).filter(AppDatasetJoin.app_id == app.id).all()
 
     removed_dataset_ids = []
     if not app_dataset_joins:
@@ -49,17 +45,13 @@ def handle(sender, **kwargs):
     if removed_dataset_ids:
         for dataset_id in removed_dataset_ids:
             db.session.query(AppDatasetJoin).filter(
-                AppDatasetJoin.app_id == app.id,
-                AppDatasetJoin.dataset_id == dataset_id
+                AppDatasetJoin.app_id == app.id, AppDatasetJoin.dataset_id == dataset_id
             ).delete()
 
     # 处理新增的数据集ID，建立其与应用的关联
     if added_dataset_ids:
         for dataset_id in added_dataset_ids:
-            app_dataset_join = AppDatasetJoin(
-                app_id=app.id,
-                dataset_id=dataset_id
-            )
+            app_dataset_join = AppDatasetJoin(app_id=app.id, dataset_id=dataset_id)
             db.session.add(app_dataset_join)
 
     # 提交数据库会话，保存所有更改
@@ -81,19 +73,19 @@ def get_dataset_ids_from_workflow(published_workflow: Workflow) -> set:
     if not graph:
         return dataset_ids
 
-    nodes = graph.get('nodes', [])
+    nodes = graph.get("nodes", [])
 
-    # 获取所有知识检索节点
-    knowledge_retrieval_nodes = [node for node in nodes
-                                 if node.get('data', {}).get('type') == NodeType.KNOWLEDGE_RETRIEVAL.value]
+    # fetch all knowledge retrieval nodes
+    knowledge_retrieval_nodes = [
+        node for node in nodes if node.get("data", {}).get("type") == NodeType.KNOWLEDGE_RETRIEVAL.value
+    ]
 
     if not knowledge_retrieval_nodes:
         return dataset_ids
 
     for node in knowledge_retrieval_nodes:
         try:
-            # 尝试从节点数据中提取数据集ID
-            node_data = KnowledgeRetrievalNodeData(**node.get('data', {}))
+            node_data = KnowledgeRetrievalNodeData(**node.get("data", {}))
             dataset_ids.update(node_data.dataset_ids)
         except Exception as e:
             # 如果解析失败，则跳过该节点

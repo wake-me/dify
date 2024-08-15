@@ -111,22 +111,15 @@ class ModelFeature(Enum):
 
 class DefaultParameterName(Enum):
     """
-    定义参数模板变量的枚举类。
-    
-    TEMPERATURE - 温度
-    TOP_P - Top P
-    PRESENCE_PENALTY - 存在惩罚
-    FREQUENCY_PENALTY - 频率惩罚
-    MAX_TOKENS - 最大令牌数
-    RESPONSE_FORMAT - 响应格式
+    Enum class for parameter template variable.
     """
-
-    TEMPERATURE = "temperature"  # 温度
-    TOP_P = "top_p"  # Top P
-    PRESENCE_PENALTY = "presence_penalty"  # 存在惩罚
-    FREQUENCY_PENALTY = "frequency_penalty"  # 频率惩罚
-    MAX_TOKENS = "max_tokens"  # 最大令牌数
-    RESPONSE_FORMAT = "response_format"  # 响应格式
+    TEMPERATURE = "temperature"
+    TOP_P = "top_p"
+    PRESENCE_PENALTY = "presence_penalty"
+    FREQUENCY_PENALTY = "frequency_penalty"
+    MAX_TOKENS = "max_tokens"
+    RESPONSE_FORMAT = "response_format"
+    JSON_SCHEMA = "json_schema"
 
     @classmethod
     def value_of(cls, value: Any) -> 'DefaultParameterName':
@@ -150,10 +143,11 @@ class ParameterType(Enum):
     STRING   - 字符串型
     BOOLEAN - 布尔型
     """
-    FLOAT = "float"  # 浮点型
-    INT = "int"  # 整型
-    STRING = "string"  # 字符串型
-    BOOLEAN = "boolean"  # 布尔型
+    FLOAT = "float"
+    INT = "int"
+    STRING = "string"
+    BOOLEAN = "boolean"
+    TEXT = "text"
 
 
 class ModelPropertyKey(Enum):

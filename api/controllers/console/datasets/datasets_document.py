@@ -259,13 +259,20 @@ class DatasetDocumentListApi(Resource):
                 .subquery()
 
             query = query.outerjoin(sub_query, sub_query.c.document_id == Document.id) \
-                .order_by(sort_logic(db.func.coalesce(sub_query.c.total_hit_count, 0)))
+                .order_by(
+                    sort_logic(db.func.coalesce(sub_query.c.total_hit_count, 0)),
+                    sort_logic(Document.position),
+                )
         elif sort == 'created_at':
-            # 对于创建时间排序，直接按照时间排序
-            query = query.order_by(sort_logic(Document.created_at))
+            query = query.order_by(
+                sort_logic(Document.created_at),
+                sort_logic(Document.position),
+            )
         else:
-            # 默认按照创建时间降序排序
-            query = query.order_by(desc(Document.created_at))
+            query = query.order_by(
+                desc(Document.created_at),
+                desc(Document.position),
+            )
 
         # 进行分页查询，并获取当前页的文档列表
         paginated_documents = query.paginate(

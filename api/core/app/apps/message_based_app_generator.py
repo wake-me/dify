@@ -300,7 +300,7 @@ class MessageBasedAppGenerator(BaseAppGenerator):
 
         return introduction
 
-    def _get_conversation(self, conversation_id: str) -> Conversation:
+    def _get_conversation(self, conversation_id: str):
         """
         通过对话id获取对话信息
         :param conversation_id: 对话的唯一标识符
@@ -312,6 +312,9 @@ class MessageBasedAppGenerator(BaseAppGenerator):
             .filter(Conversation.id == conversation_id)
             .first()
         )
+
+        if not conversation:
+            raise ConversationNotExistsError()
 
         return conversation
 

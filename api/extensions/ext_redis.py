@@ -16,20 +16,21 @@ def init_app(app):
     
     # 根据是否使用SSL选择连接类
     connection_class = Connection
-    if app.config.get('REDIS_USE_SSL'):
+    if app.config.get("REDIS_USE_SSL"):
         connection_class = SSLConnection
 
-    # 配置并创建Redis连接池
-    redis_client.connection_pool = redis.ConnectionPool(**{
-        'host': app.config.get('REDIS_HOST'),
-        'port': app.config.get('REDIS_PORT'),
-        'username': app.config.get('REDIS_USERNAME'),
-        'password': app.config.get('REDIS_PASSWORD'),
-        'db': app.config.get('REDIS_DB'),
-        'encoding': 'utf-8',
-        'encoding_errors': 'strict',
-        'decode_responses': False
-    }, connection_class=connection_class)
+    redis_client.connection_pool = redis.ConnectionPool(
+        **{
+            "host": app.config.get("REDIS_HOST"),
+            "port": app.config.get("REDIS_PORT"),
+            "username": app.config.get("REDIS_USERNAME"),
+            "password": app.config.get("REDIS_PASSWORD"),
+            "db": app.config.get("REDIS_DB"),
+            "encoding": "utf-8",
+            "encoding_errors": "strict",
+            "decode_responses": False,
+        },
+        connection_class=connection_class,
+    )
 
-    # 将Redis客户端绑定到应用扩展
-    app.extensions['redis'] = redis_client
+    app.extensions["redis"] = redis_client

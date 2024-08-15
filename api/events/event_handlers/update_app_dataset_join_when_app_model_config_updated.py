@@ -8,15 +8,12 @@ from models.model import AppModelConfig
 @app_model_config_was_updated.connect
 def handle(sender, **kwargs):
     app = sender
-    app_model_config = kwargs.get('app_model_config')
+    app_model_config = kwargs.get("app_model_config")
 
     # 从新的模型配置中获取数据集 ID 列表
     dataset_ids = get_dataset_ids_from_model_config(app_model_config)
 
-    # 查询当前 app 已经关联的数据集 ID
-    app_dataset_joins = db.session.query(AppDatasetJoin).filter(
-        AppDatasetJoin.app_id == app.id
-    ).all()
+    app_dataset_joins = db.session.query(AppDatasetJoin).filter(AppDatasetJoin.app_id == app.id).all()
 
     removed_dataset_ids = []
     if not app_dataset_joins:
@@ -34,17 +31,13 @@ def handle(sender, **kwargs):
     if removed_dataset_ids:
         for dataset_id in removed_dataset_ids:
             db.session.query(AppDatasetJoin).filter(
-                AppDatasetJoin.app_id == app.id,
-                AppDatasetJoin.dataset_id == dataset_id
+                AppDatasetJoin.app_id == app.id, AppDatasetJoin.dataset_id == dataset_id
             ).delete()
 
     # 处理新增的数据集
     if added_dataset_ids:
         for dataset_id in added_dataset_ids:
-            app_dataset_join = AppDatasetJoin(
-                app_id=app.id,
-                dataset_id=dataset_id
-            )
+            app_dataset_join = AppDatasetJoin(app_id=app.id, dataset_id=dataset_id)
             db.session.add(app_dataset_join)
 
     # 提交数据库会话更改
@@ -59,8 +52,7 @@ def get_dataset_ids_from_model_config(app_model_config: AppModelConfig) -> set:
 
     agent_mode = app_model_config.agent_mode_dict
 
-    # 从工具配置中获取数据集 ID
-    tools = agent_mode.get('tools', []) or []
+    tools = agent_mode.get("tools", []) or []
     for tool in tools:
         if len(list(tool.keys())) != 1:
             continue
@@ -72,11 +64,11 @@ def get_dataset_ids_from_model_config(app_model_config: AppModelConfig) -> set:
 
     # 从数据集配置中获取数据集 ID
     dataset_configs = app_model_config.dataset_configs_dict
-    datasets = dataset_configs.get('datasets', {}) or {}
-    for dataset in datasets.get('datasets', []) or []:
+    datasets = dataset_configs.get("datasets", {}) or {}
+    for dataset in datasets.get("datasets", []) or []:
         keys = list(dataset.keys())
-        if len(keys) == 1 and keys[0] == 'dataset':
-            if dataset['dataset'].get('id'):
-                dataset_ids.add(dataset['dataset'].get('id'))
+        if len(keys) == 1 and keys[0] == "dataset":
+            if dataset["dataset"].get("id"):
+                dataset_ids.add(dataset["dataset"].get("id"))
 
     return dataset_ids

@@ -27,43 +27,41 @@ class Mail:
         return self._client is not None
 
     def init_app(self, app: Flask):
-        if app.config.get('MAIL_TYPE'):
-            if app.config.get('MAIL_DEFAULT_SEND_FROM'):
-                self._default_send_from = app.config.get('MAIL_DEFAULT_SEND_FROM')
-            
-            if app.config.get('MAIL_TYPE') == 'resend':
-                api_key = app.config.get('RESEND_API_KEY')
-                if not api_key:
-                    raise ValueError('RESEND_API_KEY is not set')
+        if app.config.get("MAIL_TYPE"):
+            if app.config.get("MAIL_DEFAULT_SEND_FROM"):
+                self._default_send_from = app.config.get("MAIL_DEFAULT_SEND_FROM")
 
-                api_url = app.config.get('RESEND_API_URL')
+            if app.config.get("MAIL_TYPE") == "resend":
+                api_key = app.config.get("RESEND_API_KEY")
+                if not api_key:
+                    raise ValueError("RESEND_API_KEY is not set")
+
+                api_url = app.config.get("RESEND_API_URL")
                 if api_url:
                     resend.api_url = api_url
 
                 resend.api_key = api_key
                 self._client = resend.Emails
-            elif mail_type == 'smtp':
-                # SMTP邮件类型配置
+            elif app.config.get("MAIL_TYPE") == "smtp":
                 from libs.smtp import SMTPClient
-                if not app.config.get('SMTP_SERVER') or not app.config.get('SMTP_PORT'):
-                    raise ValueError('SMTP_SERVER and SMTP_PORT are required for smtp mail type')
-                if not app.config.get('SMTP_USE_TLS') and app.config.get('SMTP_OPPORTUNISTIC_TLS'):
-                    raise ValueError('SMTP_OPPORTUNISTIC_TLS is not supported without enabling SMTP_USE_TLS')
+
+                if not app.config.get("SMTP_SERVER") or not app.config.get("SMTP_PORT"):
+                    raise ValueError("SMTP_SERVER and SMTP_PORT are required for smtp mail type")
+                if not app.config.get("SMTP_USE_TLS") and app.config.get("SMTP_OPPORTUNISTIC_TLS"):
+                    raise ValueError("SMTP_OPPORTUNISTIC_TLS is not supported without enabling SMTP_USE_TLS")
                 self._client = SMTPClient(
-                    server=app.config.get('SMTP_SERVER'),
-                    port=app.config.get('SMTP_PORT'),
-                    username=app.config.get('SMTP_USERNAME'),
-                    password=app.config.get('SMTP_PASSWORD'),
-                    _from=app.config.get('MAIL_DEFAULT_SEND_FROM'),
-                    use_tls=app.config.get('SMTP_USE_TLS'),
-                    opportunistic_tls=app.config.get('SMTP_OPPORTUNISTIC_TLS')
+                    server=app.config.get("SMTP_SERVER"),
+                    port=app.config.get("SMTP_PORT"),
+                    username=app.config.get("SMTP_USERNAME"),
+                    password=app.config.get("SMTP_PASSWORD"),
+                    _from=app.config.get("MAIL_DEFAULT_SEND_FROM"),
+                    use_tls=app.config.get("SMTP_USE_TLS"),
+                    opportunistic_tls=app.config.get("SMTP_OPPORTUNISTIC_TLS"),
                 )
             else:
-                # 不支持的邮件类型
-                raise ValueError('Unsupported mail type {}'.format(app.config.get('MAIL_TYPE')))
+                raise ValueError("Unsupported mail type {}".format(app.config.get("MAIL_TYPE")))
         else:
-            logging.warning('MAIL_TYPE is not set')
-            
+            logging.warning("MAIL_TYPE is not set")
 
     def send(self, to: str, subject: str, html: str, from_: Optional[str] = None):
         """
@@ -79,31 +77,32 @@ class Mail:
             ValueError: 当邮件客户端未初始化、发件人地址未设置、收件人地址、邮件主题或HTML内容为空时抛出。
         """
         if not self._client:
-            raise ValueError('Mail client is not initialized')
+            raise ValueError("Mail client is not initialized")
 
         # 设置发件人地址
         if not from_ and self._default_send_from:
             from_ = self._default_send_from
 
         if not from_:
-            raise ValueError('mail from is not set')
+            raise ValueError("mail from is not set")
 
         if not to:
-            raise ValueError('mail to is not set')
+            raise ValueError("mail to is not set")
 
         if not subject:
-            raise ValueError('mail subject is not set')
+            raise ValueError("mail subject is not set")
 
         if not html:
-            raise ValueError('mail html is not set')
+            raise ValueError("mail html is not set")
 
-        # 发送邮件
-        self._client.send({
-            "from": from_,
-            "to": to,
-            "subject": subject,
-            "html": html
-        })
+        self._client.send(
+            {
+                "from": from_,
+                "to": to,
+                "subject": subject,
+                "html": html,
+            }
+        )
 
 
 def init_app(app: Flask):

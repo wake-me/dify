@@ -1,11 +1,10 @@
 import enum
 import json
 import os
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from core.app.app_config.entities import PromptTemplateEntity
 from core.app.entities.app_invoke_entities import ModelConfigWithCredentialsEntity
-from core.file.file_obj import FileVar
 from core.memory.token_buffer_memory import TokenBufferMemory
 from core.model_runtime.entities.message_entities import (
     PromptMessage,
@@ -17,6 +16,9 @@ from core.prompt.entities.advanced_prompt_entities import MemoryConfig
 from core.prompt.prompt_transform import PromptTransform
 from core.prompt.utils.prompt_template_parser import PromptTemplateParser
 from models.model import AppMode
+
+if TYPE_CHECKING:
+    from core.file.file_obj import FileVar
 
 
 class ModelMode(enum.Enum):
@@ -53,7 +55,7 @@ class SimplePromptTransform(PromptTransform):
                    prompt_template_entity: PromptTemplateEntity,
                    inputs: dict,
                    query: str,
-                   files: list[FileVar],
+                   files: list["FileVar"],
                    context: Optional[str],
                    memory: Optional[TokenBufferMemory],
                    model_config: ModelConfigWithCredentialsEntity) -> \
@@ -199,31 +201,14 @@ class SimplePromptTransform(PromptTransform):
         }
 
     def _get_chat_model_prompt_messages(self, app_mode: AppMode,
-                                            pre_prompt: str,
-                                            inputs: dict,
-                                            query: str,
-                                            context: Optional[str],
-                                            files: list[FileVar],
-                                            memory: Optional[TokenBufferMemory],
-                                            model_config: ModelConfigWithCredentialsEntity) \
-                -> tuple[list[PromptMessage], Optional[list[str]]]:
-        """
-        获取聊天模型的提示消息。
-
-        参数:
-        app_mode - 应用模式。
-        pre_prompt - 预提示文本。
-        inputs - 输入字典。
-        query - 查询字符串。
-        context - 上下文信息，可选。
-        files - 文件列表。
-        memory - 令牌缓冲区记忆，可选。
-        model_config - 带有凭证的模型配置实体。
-
-        返回值:
-        返回一个包含提示消息的元组，以及一个可选的字符串列表。
-        """
-
+                                        pre_prompt: str,
+                                        inputs: dict,
+                                        query: str,
+                                        context: Optional[str],
+                                        files: list["FileVar"],
+                                        memory: Optional[TokenBufferMemory],
+                                        model_config: ModelConfigWithCredentialsEntity) \
+            -> tuple[list[PromptMessage], Optional[list[str]]]:
         prompt_messages = []
 
         # 获取提示信息
@@ -261,31 +246,15 @@ class SimplePromptTransform(PromptTransform):
         return prompt_messages, None
 
     def _get_completion_model_prompt_messages(self, app_mode: AppMode,
-                                                pre_prompt: str,
-                                                inputs: dict,
-                                                query: str,
-                                                context: Optional[str],
-                                                files: list[FileVar],
-                                                memory: Optional[TokenBufferMemory],
-                                                model_config: ModelConfigWithCredentialsEntity) \
-                -> tuple[list[PromptMessage], Optional[list[str]]]:
-        """
-        获取完成模型的提示信息和停止符。
-
-        参数:
-        app_mode: 应用模式。
-        pre_prompt: 预提示文本。
-        inputs: 输入字典。
-        query: 查询字符串。
-        context: 上下文信息，可选。
-        files: 文件列表。
-        memory: 令牌缓冲区记忆，可选。
-        model_config: 带有凭证的模型配置实体。
-
-        返回值:
-        提示信息列表和可选的停止符列表的元组。
-        """
-        # 获取初始提示和规则
+                                              pre_prompt: str,
+                                              inputs: dict,
+                                              query: str,
+                                              context: Optional[str],
+                                              files: list["FileVar"],
+                                              memory: Optional[TokenBufferMemory],
+                                              model_config: ModelConfigWithCredentialsEntity) \
+            -> tuple[list[PromptMessage], Optional[list[str]]]:
+        # get prompt
         prompt, prompt_rules = self.get_prompt_str_and_rules(
             app_mode=app_mode,
             model_config=model_config,
@@ -333,17 +302,7 @@ class SimplePromptTransform(PromptTransform):
 
         return [self.get_last_user_message(prompt, files)], stops
 
-    def get_last_user_message(self, prompt: str, files: list[FileVar]) -> UserPromptMessage:
-        """
-        根据提供的提示信息和文件列表，获取最后一个用户消息。
-        
-        参数:
-        - prompt: str，给用户的提示信息。
-        - files: list[FileVar]，包含文件变量的列表，每个文件变量应提供一个提示消息内容。
-        
-        返回值:
-        - UserPromptMessage，包含用户提示消息的对象。
-        """
+    def get_last_user_message(self, prompt: str, files: list["FileVar"]) -> UserPromptMessage:
         if files:
             # 如果有文件，构建包含提示信息和每个文件的提示内容的消息列表
             prompt_message_contents = [TextPromptMessageContent(data=prompt)]

@@ -20,9 +20,9 @@ def handle(sender, **kwargs):
     app = sender
     # 创建一个安装应用的记录
     installed_app = InstalledApp(
-        tenant_id=app.tenant_id,  # 应用所属的租户ID
-        app_id=app.id,  # 应用的ID
-        app_owner_tenant_id=app.tenant_id  # 应用所有者的租户ID
+        tenant_id=app.tenant_id,
+        app_id=app.id,
+        app_owner_tenant_id=app.tenant_id,
     )
     # 将新创建的安装应用记录添加到数据库会话中
     db.session.add(installed_app)

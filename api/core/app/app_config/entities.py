@@ -3,8 +3,9 @@ from typing import Any, Optional
 
 from pydantic import BaseModel
 
+from core.file.file_obj import FileExtraConfig
 from core.model_runtime.entities.message_entities import PromptMessageRole
-from models.model import AppMode
+from models import AppMode
 
 
 class ModelConfigEntity(BaseModel):
@@ -245,16 +246,6 @@ class TracingConfigEntity(BaseModel):
     tracing_provider: str
 
 
-class FileExtraConfig(BaseModel):
-    """
-    文件上传额外配置实体类。
-    该类用于定义文件上传时的额外配置信息。
-    
-    属性:
-    - image_config: 可选的字典，存储关于图片上传的额外配置信息，键值对形式。
-    """
-
-    image_config: Optional[dict[str, Any]] = None
 
 class AppAdditionalFeatures(BaseModel):
     """

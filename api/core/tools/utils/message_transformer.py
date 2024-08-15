@@ -1,7 +1,7 @@
 import logging
 from mimetypes import guess_extension
 
-from core.file.file_obj import FileTransferMethod, FileType, FileVar
+from core.file.file_obj import FileTransferMethod, FileType
 from core.tools.entities.tool_entities import ToolInvokeMessage
 from core.tools.tool_file_manager import ToolFileManager
 
@@ -42,12 +42,12 @@ class ToolFileMessageTransformer:
                 # 尝试下载并转换图像消息为IMAGE_LINK类型
                 try:
                     file = ToolFileManager.create_file_by_url(
-                        user_id=user_id, 
+                        user_id=user_id,
                         tenant_id=tenant_id,
                         conversation_id=conversation_id,
                         file_url=message.message
                     )
-                    
+
                     url = f'/files/tools/{file.id}{guess_extension(file.mimetype) or ".png"}'
 
                     result.append(ToolInvokeMessage(
@@ -71,14 +71,14 @@ class ToolFileMessageTransformer:
                 
                 if isinstance(message.message, str):
                     message.message = message.message.encode('utf-8')
-                
+
                 file = ToolFileManager.create_file_by_raw(
                     user_id=user_id, tenant_id=tenant_id,
                     conversation_id=conversation_id,
                     file_binary=message.message,
                     mimetype=mimetype
                 )
-                                                            
+
                 url = cls.get_tool_file_url(file.id, guess_extension(file.mimetype))
 
                 # 根据MIME类型判断消息类型：如果是图像则为IMAGE_LINK，否则为LINK
@@ -97,7 +97,7 @@ class ToolFileMessageTransformer:
                         meta=message.meta.copy() if message.meta is not None else {},
                     ))
             elif message.type == ToolInvokeMessage.MessageType.FILE_VAR:
-                file_var: FileVar = message.meta.get('file_var')
+                file_var = message.meta.get('file_var')
                 if file_var:
                     if file_var.transfer_method == FileTransferMethod.TOOL_FILE:
                         url = cls.get_tool_file_url(file_var.related_id, file_var.extension)
@@ -120,7 +120,7 @@ class ToolFileMessageTransformer:
                 result.append(message)
 
         return result
-    
+
     @classmethod
     def get_tool_file_url(cls, tool_file_id: str, extension: str) -> str:
         return f'/files/tools/{tool_file_id}{extension or ".bin"}'

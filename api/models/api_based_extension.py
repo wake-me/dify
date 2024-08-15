@@ -3,7 +3,8 @@ import enum
 
 # 导入数据库扩展模块
 from extensions.ext_database import db
-from models import StringUUID
+
+from .types import StringUUID
 
 
 # 定义基于API的扩展点枚举类

@@ -14,7 +14,7 @@ def handle(sender, **kwargs):
     :param **kwargs: 关键字参数，包含应用生成实体等额外信息。
     """
     message = sender
-    application_generate_entity = kwargs.get('application_generate_entity')
+    application_generate_entity = kwargs.get("application_generate_entity")
 
     if not isinstance(application_generate_entity, ChatAppGenerateEntity | AgentChatAppGenerateEntity):
         return
@@ -50,7 +50,8 @@ def handle(sender, **kwargs):
         elif quota_unit == QuotaUnit.CREDITS:
             # 如果配额单位是CREDITS，使用量默认为1，但如果模型是gpt-4，则使用量为20
             used_quota = 1
-            if 'gpt-4' in model_config.model:
+
+            if "gpt-4" in model_config.model:
                 used_quota = 20
         else:
             # 对于其他配额单位，默认使用量为1
@@ -64,6 +65,6 @@ def handle(sender, **kwargs):
             Provider.provider_name == model_config.provider,
             Provider.provider_type == ProviderType.SYSTEM.value,
             Provider.quota_type == system_configuration.current_quota_type.value,
-            Provider.quota_limit > Provider.quota_used
-        ).update({'quota_used': Provider.quota_used + used_quota})
+            Provider.quota_limit > Provider.quota_used,
+        ).update({"quota_used": Provider.quota_used + used_quota})
         db.session.commit()

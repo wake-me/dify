@@ -6,7 +6,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict
 
 from core.helper.module_import_helper import load_single_subclass_from_source
-from core.helper.position_helper import get_position_map, sort_to_dict_by_position_map
+from core.helper.position_helper import get_provider_position_map, sort_to_dict_by_position_map
 from core.model_runtime.entities.model_entities import ModelType
 from core.model_runtime.entities.provider_entities import ProviderConfig, ProviderEntity, SimpleProviderEntity
 from core.model_runtime.model_providers.__base.model_provider import ModelProvider
@@ -238,8 +238,8 @@ class ModelProviderFactory:
             and os.path.isdir(os.path.join(model_providers_path, model_provider_dir))
         ]
 
-        # 获取_position.yaml文件中的位置映射信息
-        position_map = get_position_map(model_providers_path)
+        # get _position.yaml file path
+        position_map = get_provider_position_map(model_providers_path)
 
         # 遍历所有模型提供者目录路径
         model_providers: list[ModelProviderExtension] = []

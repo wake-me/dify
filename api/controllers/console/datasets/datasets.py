@@ -817,7 +817,7 @@ class DatasetRetrievalSettingApi(Resource):
                         RetrievalMethod.SEMANTIC_SEARCH.value
                     ]
                 }
-            case VectorType.QDRANT | VectorType.WEAVIATE | VectorType.OPENSEARCH | VectorType.ANALYTICDB | VectorType.MYSCALE | VectorType.ORACLE:
+            case VectorType.QDRANT | VectorType.WEAVIATE | VectorType.OPENSEARCH | VectorType.ANALYTICDB | VectorType.MYSCALE | VectorType.ORACLE | VectorType.ELASTICSEARCH:
                 return {
                     'retrieval_method': [
                         RetrievalMethod.SEMANTIC_SEARCH.value,
@@ -854,7 +854,7 @@ class DatasetRetrievalSettingMockApi(Resource):
                         RetrievalMethod.SEMANTIC_SEARCH.value
                     ]
                 }
-            case VectorType.QDRANT | VectorType.WEAVIATE | VectorType.OPENSEARCH| VectorType.ANALYTICDB | VectorType.MYSCALE | VectorType.ORACLE:
+            case VectorType.QDRANT | VectorType.WEAVIATE | VectorType.OPENSEARCH| VectorType.ANALYTICDB | VectorType.MYSCALE | VectorType.ORACLE | VectorType.ELASTICSEARCH:
                 return {
                     'retrieval_method': [
                         RetrievalMethod.SEMANTIC_SEARCH.value,

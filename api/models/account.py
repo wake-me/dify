@@ -7,7 +7,8 @@ from flask_login import UserMixin
 
 # 导入数据库扩展
 from extensions.ext_database import db
-from models import StringUUID
+
+from .types import StringUUID
 
 
 #

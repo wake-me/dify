@@ -21,16 +21,15 @@ class HiddenAPIKey(fields.Raw):
         api_key = obj.api_key
         # 判断API密钥长度并隐藏中间字符
         if len(api_key) <= 8:
-            # 如果密钥长度小于等于8个字符，显示首尾字符，中间用星号隐藏
-            return api_key[0] + '******' + api_key[-1]
+            return api_key[0] + "******" + api_key[-1]
+        # If the api_key is greater than 8 characters, show the first three and the last three characters
         else:
-            # 如果密钥长度大于8个字符，显示开头三个和末尾三个字符，中间用星号隐藏
-            return api_key[:3] + '******' + api_key[-3:]
+            return api_key[:3] + "******" + api_key[-3:]
 
 api_based_extension_fields = {
-    'id': fields.String,  # 扩展的ID
-    'name': fields.String,  # 扩展的名称
-    'api_endpoint': fields.String,  # API的端点地址
-    'api_key': HiddenAPIKey,  # 使用HiddenAPIKey类隐藏API密钥
-    'created_at': TimestampField  # 创建时间戳
+    "id": fields.String,
+    "name": fields.String,
+    "api_endpoint": fields.String,
+    "api_key": HiddenAPIKey,
+    "created_at": TimestampField,
 }

@@ -1,14 +1,19 @@
 import enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
-from core.app.app_config.entities import FileExtraConfig
 from core.file.tool_file_parser import ToolFileParser
 from core.file.upload_file_parser import UploadFileParser
 from core.model_runtime.entities.message_entities import ImagePromptMessageContent
 from extensions.ext_database import db
-from models.model import UploadFile
+
+
+class FileExtraConfig(BaseModel):
+    """
+    File Upload Entity.
+    """
+    image_config: Optional[dict[str, Any]] = None
 
 
 class FileType(enum.Enum):
@@ -180,11 +185,7 @@ class FileVar(BaseModel):
             )
 
     def _get_data(self, force_url: bool = False) -> Optional[str]:
-        """
-        根据文件类型和传输方法获取文件数据，可能是远程URL或Base64编码的数据
-        :param force_url: 是否强制获取URL
-        :return: 文件数据或URL
-        """
+        from models.model import UploadFile
         if self.type == FileType.IMAGE:
             if self.transfer_method == FileTransferMethod.REMOTE_URL:
                 return self.url
