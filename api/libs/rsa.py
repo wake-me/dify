@@ -94,8 +94,7 @@ def get_decrypt_decoding(tenant_id):
     # 构建私钥文件路径
     filepath = "privkeys/{tenant_id}".format(tenant_id=tenant_id) + "/private.pem"
 
-    # 构造缓存键，并尝试从Redis获取私钥
-    cache_key = 'tenant_privkey:{hash}'.format(hash=hashlib.sha3_256(filepath.encode()).hexdigest())
+    cache_key = "tenant_privkey:{hash}".format(hash=hashlib.sha3_256(filepath.encode()).hexdigest())
     private_key = redis_client.get(cache_key)
     if not private_key:
         # 如果私钥不在缓存中，则从文件系统加载
@@ -116,23 +115,13 @@ def get_decrypt_decoding(tenant_id):
 
 
 def decrypt_token_with_decoding(encrypted_text, rsa_key, cipher_rsa):
-    """
-    使用RSA解密令牌文本。
-    如果令牌文本以特定前缀开始，则采用Hybrid加密方式解密；否则，直接使用RSA解密。
-    
-    :param encrypted_text: 被加密的文本字符串。
-    :param rsa_key: 用于解密的RSA密钥。
-    :param cipher_rsa: 实现RSA加密解密操作的对象。
-    :return: 解密后的文本字符串。
-    """
-    if encrypted_text.startswith(prefix_hybrid):  # 检查是否使用Hybrid加密方式
-        encrypted_text = encrypted_text[len(prefix_hybrid):]  # 移除前缀
+    if encrypted_text.startswith(prefix_hybrid):
+        encrypted_text = encrypted_text[len(prefix_hybrid) :]
 
-        # 分解加密后的文本，获取AES密钥、nonce、tag和密文
-        enc_aes_key = encrypted_text[:rsa_key.size_in_bytes()]
-        nonce = encrypted_text[rsa_key.size_in_bytes():rsa_key.size_in_bytes() + 16]
-        tag = encrypted_text[rsa_key.size_in_bytes() + 16:rsa_key.size_in_bytes() + 32]
-        ciphertext = encrypted_text[rsa_key.size_in_bytes() + 32:]
+        enc_aes_key = encrypted_text[: rsa_key.size_in_bytes()]
+        nonce = encrypted_text[rsa_key.size_in_bytes() : rsa_key.size_in_bytes() + 16]
+        tag = encrypted_text[rsa_key.size_in_bytes() + 16 : rsa_key.size_in_bytes() + 32]
+        ciphertext = encrypted_text[rsa_key.size_in_bytes() + 32 :]
 
         # 使用RSA解密AES密钥
         aes_key = cipher_rsa.decrypt(enc_aes_key)

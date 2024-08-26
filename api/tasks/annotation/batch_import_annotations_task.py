@@ -18,13 +18,13 @@ from services.dataset_service import DatasetCollectionBindingService
 def batch_import_annotations_task(job_id: str, content_list: list[dict], app_id: str, tenant_id: str,
                                   user_id: str):
     """
-    批量导入注解任务。
-    :param job_id: 任务ID
-    :param content_list: 内容列表，列表中的每个元素都是一个字典，包含'question'和'answer'键值对
-    :param tenant_id: 租户ID
-    :param app_id: 应用ID
-    :param user_id: 用户ID
-    :return: 无返回值
+    Add annotation to index.
+    :param job_id: job_id
+    :param content_list: content list
+    :param app_id: app id
+    :param tenant_id: tenant id
+    :param user_id: user_id
+
     """
     # 记录任务开始信息
     logging.info(click.style('Start batch import annotation: {}'.format(job_id), fg='green'))

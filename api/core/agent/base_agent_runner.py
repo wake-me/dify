@@ -62,24 +62,22 @@ class BaseAgentRunner(AppRunner):
                  model_instance: ModelInstance = None
                  ) -> None:
         """
-        初始化BaseAgentRunner，负责管理对话代理的运行环境和状态。
-
-        :param tenant_id: 租户ID。
-        :param application_generate_entity: 代理聊天应用生成实体，用于应用相关的配置和数据处理。
-        :param conversation: 对话实例，包含对话的历史和状态。
-        :param app_config: 代理聊天应用配置，包含应用的设置和数据。
-        :param model_config: 模型配置，包含模型的详细设置和认证信息。
-        :param config: 数据集配置，用于指定数据集的相关设置。
-        :param queue_manager: 队列管理器，用于消息和任务的队列管理。
-        :param message: 当前消息实例，包含消息内容和相关元数据。
-        :param user_id: 用户ID，标识发起对话的用户。
-        :param memory: 令牌缓冲区记忆，用于存储对话过程中的临时状态和数据（可选）。
-        :param prompt_messages: 提示消息列表，用于对话中的各种提示信息（可选）。
-        :param variables_pool: 工具运行时变量池，用于存储和管理变量（可选）。
-        :param db_variables: 工具对话变量，用于存储对话过程中的持久化变量（可选）。
-        :param model_instance: 模型实例，包含模型的具体实现和认证信息（可选）。
+        Agent runner
+        :param tenant_id: tenant id
+        :param application_generate_entity: application generate entity
+        :param conversation: conversation
+        :param app_config: app generate entity
+        :param model_config: model config
+        :param config: dataset config
+        :param queue_manager: queue manager
+        :param message: message
+        :param user_id: user id
+        :param memory: memory
+        :param prompt_messages: prompt messages
+        :param variables_pool: variables pool
+        :param db_variables: db variables
+        :param model_instance: model instance
         """
-        # 初始化各种属性，包括消息、用户ID、配置等
         self.tenant_id = tenant_id
         self.application_generate_entity = application_generate_entity
         self.conversation = conversation
@@ -542,7 +540,7 @@ class BaseAgentRunner(AppRunner):
                         try:
                             tool_responses = json.loads(agent_thought.observation)
                         except Exception as e:
-                            tool_responses = { tool: agent_thought.observation for tool in tools }
+                            tool_responses = dict.fromkeys(tools, agent_thought.observation)
 
                         for tool in tools:
                             # 为工具调用生成一个唯一标识符

@@ -291,14 +291,12 @@ class ModelInstance:
         """
         调用大型语言TTS（文本转语音）模型
 
-        :param content_text: 需要翻译的文本内容
-        :param tenant_id: 用户租户ID
-        :param user: 唯一用户ID，可选
-        :param voice: 模型音色
-        :param streaming: 输出是否为流式
-        :return: 给定音频文件的文本
+        :param content_text: text content to be translated
+        :param tenant_id: user tenant id
+        :param voice: model timbre
+        :param user: unique user id
+        :return: text for given audio file
         """
-        # 检查模型类型实例是否为TTSModel类型
         if not isinstance(self.model_type_instance, TTSModel):
             raise Exception("Model type instance is not TTSModel")
 
@@ -399,12 +397,21 @@ class ModelManager:
         # 根据提供者模型包和模型名称创建模型实例
         return ModelInstance(provider_model_bundle, model)
 
+    def get_default_provider_model_name(self, tenant_id: str, model_type: ModelType) -> tuple[str, str]:
+        """
+        Return first provider and the first model in the provider
+        :param tenant_id: tenant id
+        :param model_type: model type
+        :return: provider name, model name
+        """
+        return self._provider_manager.get_first_provider_first_model(tenant_id, model_type)
+
     def get_default_model_instance(self, tenant_id: str, model_type: ModelType) -> ModelInstance:
         """
-        获取默认模型实例。
-        :param tenant_id: 租户ID。
-        :param model_type: 模型类型。
-        :return: 返回默认的模型实例。
+        Get default model instance
+        :param tenant_id: tenant id
+        :param model_type: model type
+        :return:
         """
         # 获取默认模型实体
         default_model_entity = self._provider_manager.get_default_model(
@@ -434,6 +441,10 @@ class LBModelManager:
                  managed_credentials: Optional[dict] = None) -> None:
         """
         Load balancing model manager
+        :param tenant_id: tenant_id
+        :param provider: provider
+        :param model_type: model_type
+        :param model: model name
         :param load_balancing_configs: all load balancing configurations
         :param managed_credentials: credentials if load balancing configuration name is __inherit__
         """
@@ -531,7 +542,6 @@ class LBModelManager:
             self._model,
             config.id
         )
-
 
         res = redis_client.exists(cooldown_cache_key)
         res = cast(bool, res)

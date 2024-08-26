@@ -545,6 +545,7 @@ class ConvertToWorkflowApi(Resource):
             # 解析请求中携带的参数
             parser = reqparse.RequestParser()
             parser.add_argument('name', type=str, required=False, nullable=True, location='json')
+            parser.add_argument('icon_type', type=str, required=False, nullable=True, location='json')
             parser.add_argument('icon', type=str, required=False, nullable=True, location='json')
             parser.add_argument('icon_background', type=str, required=False, nullable=True, location='json')
             args = parser.parse_args()

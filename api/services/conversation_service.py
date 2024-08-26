@@ -1,6 +1,7 @@
+from datetime import datetime, timezone
 from typing import Optional, Union
 
-from sqlalchemy import or_
+from sqlalchemy import asc, desc, or_
 
 from core.app.entities.app_invoke_entities import InvokeFrom
 from core.llm_generator.llm_generator import LLMGenerator
@@ -28,7 +29,8 @@ class ConversationService:
                               last_id: Optional[str], limit: int,
                               invoke_from: InvokeFrom,
                               include_ids: Optional[list] = None,
-                              exclude_ids: Optional[list] = None) -> InfiniteScrollPagination:
+                              exclude_ids: Optional[list] = None,
+                              sort_by: str = '-updated_at') -> InfiniteScrollPagination:
         if not user:
             return InfiniteScrollPagination(data=[], limit=limit, has_more=False)
 
@@ -50,32 +52,29 @@ class ConversationService:
         if exclude_ids is not None:
             base_query = base_query.filter(~Conversation.id.in_(exclude_ids))
 
-        if last_id:
-            last_conversation = base_query.filter(
-                Conversation.id == last_id,
-            ).first()
+        # define sort fields and directions
+        sort_field, sort_direction = cls._get_sort_params(sort_by)
 
-            # 如果找不到基于last_id的对话，则抛出异常
+        if last_id:
+            last_conversation = base_query.filter(Conversation.id == last_id).first()
             if not last_conversation:
                 raise LastConversationNotExistsError()
 
-            # 执行查询，获取符合条件的对话列表
-            conversations = base_query.filter(
-                Conversation.created_at < last_conversation.created_at,
-                Conversation.id != last_conversation.id
-            ).order_by(Conversation.created_at.desc()).limit(limit).all()
-        else:
-            # 如果没有提供last_id，则直接按照创建时间倒序查询
-            conversations = base_query.order_by(Conversation.created_at.desc()).limit(limit).all()
+            # build filters based on sorting
+            filter_condition = cls._build_filter_condition(sort_field, sort_direction, last_conversation)
+            base_query = base_query.filter(filter_condition)
+
+        base_query = base_query.order_by(sort_direction(getattr(Conversation, sort_field)))
+
+        conversations = base_query.limit(limit).all()
 
         # 判断是否还有更多的对话需要加载
         has_more = False
         if len(conversations) == limit:
-            current_page_first_conversation = conversations[-1]
-            rest_count = base_query.filter(
-                Conversation.created_at < current_page_first_conversation.created_at,
-                Conversation.id != current_page_first_conversation.id
-            ).count()
+            current_page_last_conversation = conversations[-1]
+            rest_filter_condition = cls._build_filter_condition(sort_field, sort_direction,
+                                                                current_page_last_conversation, is_next_page=True)
+            rest_count = base_query.filter(rest_filter_condition).count()
 
             if rest_count > 0:
                 has_more = True
@@ -86,6 +85,21 @@ class ConversationService:
             limit=limit,
             has_more=has_more
         )
+
+    @classmethod
+    def _get_sort_params(cls, sort_by: str) -> tuple[str, callable]:
+        if sort_by.startswith('-'):
+            return sort_by[1:], desc
+        return sort_by, asc
+
+    @classmethod
+    def _build_filter_condition(cls, sort_field: str, sort_direction: callable, reference_conversation: Conversation,
+                                is_next_page: bool = False):
+        field_value = getattr(reference_conversation, sort_field)
+        if (sort_direction == desc and not is_next_page) or (sort_direction == asc and is_next_page):
+            return getattr(Conversation, sort_field) < field_value
+        else:
+            return getattr(Conversation, sort_field) > field_value
 
     @classmethod
     def rename(cls, app_model: App, conversation_id: str,
@@ -112,6 +126,7 @@ class ConversationService:
         else:
             # 否则，更新会话名称并提交到数据库
             conversation.name = name
+            conversation.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
         return conversation  # 返回更新后的会话对象
@@ -135,9 +150,9 @@ class ConversationService:
         # 尝试获取对话的第一条消息
         message = db.session.query(Message) \
             .filter(
-                Message.app_id == app_model.id,
-                Message.conversation_id == conversation.id
-            ).order_by(Message.created_at.asc()).first()
+            Message.app_id == app_model.id,
+            Message.conversation_id == conversation.id
+        ).order_by(Message.created_at.asc()).first()
 
         # 如果第一条消息不存在，则抛出异常
         if not message:

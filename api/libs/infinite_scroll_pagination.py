@@ -1,4 +1,3 @@
-
 class InfiniteScrollPagination:
     """
     无限滚动分页类。

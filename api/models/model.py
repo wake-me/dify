@@ -61,6 +61,11 @@ class AppMode(Enum):
         # 如果传入的值没有对应的枚举实例，则抛出异常
         raise ValueError(f'invalid mode value {value}')
 
+
+class IconType(Enum):
+    IMAGE = "image"
+    EMOJI = "emoji"
+
 class App(db.Model):
     """
     App 类表示一个应用程序模型，它在数据库中映射为一个表。
@@ -103,6 +108,7 @@ class App(db.Model):
     name = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=False, server_default=db.text("''::character varying"))
     mode = db.Column(db.String(255), nullable=False)
+    icon_type = db.Column(db.String(255), nullable=True)
     icon = db.Column(db.String(255))
     icon_background = db.Column(db.String(255))
     app_model_config_id = db.Column(StringUUID, nullable=True)
@@ -1797,6 +1803,7 @@ class Site(db.Model):
     id = db.Column(StringUUID, server_default=db.text('uuid_generate_v4()'))
     app_id = db.Column(StringUUID, nullable=False)
     title = db.Column(db.String(255), nullable=False)
+    icon_type = db.Column(db.String(255), nullable=True)
     icon = db.Column(db.String(255))
     icon_background = db.Column(db.String(255))
     description = db.Column(db.Text)
@@ -2136,9 +2143,7 @@ class MessageAgentThought(db.Model):
                 }
         except Exception as e:
             if self.observation:
-                return {
-                    tool: self.observation for tool in tools
-                }
+                return dict.fromkeys(tools, self.observation)
 
 
 class DatasetRetrieverResource(db.Model):

@@ -192,8 +192,7 @@ if you are not sure about the structure.
                 stream=stream,
                 user=user
             )
-        
-        # 从模型参数中移除响应格式设置，并更新停止词
+
         model_parameters.pop("response_format")
         stop = stop or []
         stop.extend(["\n```", "```\n"])
@@ -260,11 +259,11 @@ if you are not sure about the structure.
                     prompt_messages=prompt_messages,
                     input_generator=new_generator()
                 )
-        
+
         return response
 
-    def _code_block_mode_stream_processor(self, model: str, prompt_messages: list[PromptMessage], 
-                                        input_generator: Generator[LLMResultChunk, None, None]
+    def _code_block_mode_stream_processor(self, model: str, prompt_messages: list[PromptMessage],
+                                          input_generator: Generator[LLMResultChunk, None, None]
                                         ) -> Generator[LLMResultChunk, None, None]:
         """
         Code block模式流处理器，确保响应是一个带有输出Markdown引用的代码块。
@@ -325,9 +324,9 @@ if you are not sure about the structure.
                     )
                 )
 
-    def _code_block_mode_stream_processor_with_backtick(self, model: str, prompt_messages: list, 
-                                            input_generator:  Generator[LLMResultChunk, None, None]) \
-                                        ->  Generator[LLMResultChunk, None, None]:
+    def _code_block_mode_stream_processor_with_backtick(self, model: str, prompt_messages: list,
+                                        input_generator:  Generator[LLMResultChunk, None, None]) \
+                                    ->  Generator[LLMResultChunk, None, None]:
         """
         Code block模式流处理器，确保响应是一个带有输出Markdown引用的代码块。此版本跳过开头三反引号后跟随的语言标识符。
 
@@ -490,7 +489,7 @@ if you are not sure about the structure.
         :return: 全部响应或流式响应片段生成器结果
         """
         raise NotImplementedError
-    
+
     @abstractmethod
     def get_num_tokens(self, model: str, credentials: dict, prompt_messages: list[PromptMessage],
                     tools: Optional[list[PromptMessageTool]] = None) -> int:
@@ -847,7 +846,14 @@ if you are not sure about the structure.
                 if not isinstance(parameter_value, str):
                     raise ValueError(f"Model Parameter {parameter_name} should be string.")
 
-                # 验证字符串参数是否符合指定选项
+                # validate options
+                if parameter_rule.options and parameter_value not in parameter_rule.options:
+                    raise ValueError(f"Model Parameter {parameter_name} should be one of {parameter_rule.options}.")
+            elif parameter_rule.type == ParameterType.TEXT:
+                if not isinstance(parameter_value, str):
+                    raise ValueError(f"Model Parameter {parameter_name} should be text.")
+
+                # validate options
                 if parameter_rule.options and parameter_value not in parameter_rule.options:
                     raise ValueError(f"Model Parameter {parameter_name} should be one of {parameter_rule.options}.")
             else:

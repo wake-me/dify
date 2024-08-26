@@ -271,13 +271,12 @@ class AppRunner:
                             stream: bool,
                             agent: bool = False) -> None:
         """
-        处理调用结果。
-        
-        :param invoke_result: 调用结果，可以是LLMResult类型或Generator类型。
-        :param queue_manager: 应用程序队列管理器，用于管理消息队列。
-        :param stream: 布尔值，指示结果是否以流的形式返回。
-        :param agent: 布尔值，标识是否为代理调用，默认为False。
-        :return: 无返回值。
+        Handle invoke result
+        :param invoke_result: invoke result
+        :param queue_manager: application queue manager
+        :param stream: stream
+        :param agent: agent
+        :return:
         """
         # 根据结果是否以流的形式返回，选择不同的处理方法
         if not stream:
@@ -297,10 +296,11 @@ class AppRunner:
                                         queue_manager: AppQueueManager,
                                         agent: bool) -> None:
         """
-        处理直接调用结果
-        :param invoke_result: 调用结果
-        :param queue_manager: 应用程序队列管理器
-        :return: 无返回值
+        Handle invoke result direct
+        :param invoke_result: invoke result
+        :param queue_manager: application queue manager
+        :param agent: agent
+        :return:
         """
         # 向队列管理器发布调用结果结束事件
         queue_manager.publish(
@@ -313,11 +313,11 @@ class AppRunner:
                                     queue_manager: AppQueueManager,
                                     agent: bool) -> None:
         """
-        处理调用结果流。
-        :param invoke_result: 调用结果，是一个生成器，逐个返回调用结果项。
-        :param queue_manager: 应用队列管理器，用于发布消息到不同的队列。
-        :param agent: 布尔值，指示是否是代理调用。
-        :return: 无返回值。
+        Handle invoke result
+        :param invoke_result: invoke result
+        :param queue_manager: application queue manager
+        :param agent: agent
+        :return:
         """
         # 初始化变量
         model = None

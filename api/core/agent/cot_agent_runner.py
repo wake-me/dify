@@ -316,10 +316,12 @@ class CotAgentRunner(BaseAgentRunner, ABC):
                               trace_manager: Optional[TraceQueueManager] = None
                               ) -> tuple[str, ToolInvokeMeta]:
         """
-        处理调用工具的动作。
-        :param action: 动作对象，包含要执行的动作名称和参数。
-        :param tool_instances: 工具实例字典， key 为工具名称，value 为工具实例。
-        :return: 一个元组，包含工具执行后的观察结果和调用元数据。
+        handle invoke action
+        :param action: action
+        :param tool_instances: tool instances
+        :param message_file_ids: message file ids
+        :param trace_manager: trace manager
+        :return: observation, meta
         """
         # 解析动作信息，尝试调用相应的工具
         tool_call_name = action.action_name

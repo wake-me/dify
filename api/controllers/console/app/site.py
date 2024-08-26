@@ -25,7 +25,7 @@ def parse_app_site_args():
     parser = reqparse.RequestParser()
     # 添加应用程序标题参数
     parser.add_argument('title', type=str, required=False, location='json')
-    # 添加应用程序图标参数
+    parser.add_argument('icon_type', type=str, required=False, location='json')
     parser.add_argument('icon', type=str, required=False, location='json')
     # 添加应用程序图标背景颜色参数
     parser.add_argument('icon_background', type=str, required=False, location='json')
@@ -77,6 +77,7 @@ class AppSite(Resource):
         # 遍历需要更新的属性列表，并根据请求参数更新站点和应用信息
         for attr_name in [
             'title',
+            'icon_type',
             'icon',
             'icon_background',
             'description',

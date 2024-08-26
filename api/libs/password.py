@@ -5,6 +5,7 @@ import re
 
 password_pattern = r"^(?=.*[a-zA-Z])(?=.*\d).{8,}$"
 
+
 def valid_password(password):
     """
     验证密码是否符合规定格式。
@@ -22,21 +23,11 @@ def valid_password(password):
     if re.match(pattern, password) is not None:
         return password
 
-    raise ValueError('Not a valid password.')
+    raise ValueError("Not a valid password.")
 
 
 def hash_password(password_str, salt_byte):
-    """
-    使用 pbkdf2_hmac 算法对密码进行哈希处理。
-    
-    参数:
-    - password_str: 待哈希处理的密码字符串。
-    - salt_byte: 盐值，用于加强哈希算法的随机性，为字节串。
-    
-    返回值:
-    - 返回经过 pbkdf2_hmac 哈希算法处理后的密码的十六进制字符串表示。
-    """
-    dk = hashlib.pbkdf2_hmac('sha256', password_str.encode('utf-8'), salt_byte, 10000)
+    dk = hashlib.pbkdf2_hmac("sha256", password_str.encode("utf-8"), salt_byte, 10000)
     return binascii.hexlify(dk)
 
 

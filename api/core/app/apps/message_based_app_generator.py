@@ -1,6 +1,7 @@
 import json
 import logging
 from collections.abc import Generator
+from datetime import datetime, timezone
 from typing import Optional, Union
 
 from sqlalchemy import and_
@@ -36,17 +37,17 @@ logger = logging.getLogger(__name__)
 class MessageBasedAppGenerator(BaseAppGenerator):
 
     def _handle_response(
-        self, application_generate_entity: Union[
-            ChatAppGenerateEntity,
-            CompletionAppGenerateEntity,
-            AgentChatAppGenerateEntity,
-            AdvancedChatAppGenerateEntity
-        ],
-        queue_manager: AppQueueManager,
-        conversation: Conversation,
-        message: Message,
-        user: Union[Account, EndUser],
-        stream: bool = False,
+            self, application_generate_entity: Union[
+                ChatAppGenerateEntity,
+                CompletionAppGenerateEntity,
+                AgentChatAppGenerateEntity,
+                AdvancedChatAppGenerateEntity
+            ],
+            queue_manager: AppQueueManager,
+            conversation: Conversation,
+            message: Message,
+            user: Union[Account, EndUser],
+            stream: bool = False,
     ) -> Union[
         ChatbotAppBlockingResponse,
         CompletionAppBlockingResponse,
@@ -164,9 +165,10 @@ class MessageBasedAppGenerator(BaseAppGenerator):
                                 conversation: Optional[Conversation] = None) \
                 -> tuple[Conversation, Message]:
         """
-        初始化生成记录
-        :param application_generate_entity: 应用生成实体，包含应用配置和用户信息等
-        :return: 返回一个元组，包含对话和消息实体
+        Initialize generate records
+        :param application_generate_entity: application generate entity
+        :conversation conversation
+        :return:
         """
         # 获取应用配置
         app_config = application_generate_entity.app_config
@@ -224,6 +226,9 @@ class MessageBasedAppGenerator(BaseAppGenerator):
             db.session.add(conversation)
             db.session.commit()
             db.session.refresh(conversation)
+        else:
+            conversation.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.session.commit()
 
         # 创建消息实体并保存到数据库
         message = Message(

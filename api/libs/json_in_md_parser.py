@@ -20,15 +20,16 @@ def parse_json_markdown(json_string: str) -> dict:
     end_index = json_string.find("```", start_index + len("```json"))
 
     if start_index != -1 and end_index != -1:
-        # 从Markdown格式中提取JSON字符串
-        extracted_content = json_string[start_index + len("```json"):end_index].strip()
-        # 解析JSON字符串为Python字典
+        extracted_content = json_string[start_index + len("```json") : end_index].strip()
+
+        # Parse the JSON string into a Python dictionary
         parsed = json.loads(extracted_content)
     elif start_index != -1 and end_index == -1 and json_string.endswith("``"):
         # 处理仅有一侧```标记的情况
         end_index = json_string.find("``", start_index + len("```json"))
-        extracted_content = json_string[start_index + len("```json"):end_index].strip()
-        # 解析JSON字符串为Python字典
+        extracted_content = json_string[start_index + len("```json") : end_index].strip()
+
+        # Parse the JSON string into a Python dictionary
         parsed = json.loads(extracted_content)
     elif json_string.startswith("{"):
         # 直接处理以{开始的JSON字符串
@@ -61,7 +62,6 @@ def parse_and_check_json_markdown(text: str, expected_keys: list[str]) -> dict:
     for key in expected_keys:  # 遍历预期的键列表
         if key not in json_obj:  # 如果 JSON 对象中缺少某个预期键
             raise OutputParserException(
-                f"Got invalid return object. Expected key `{key}` "
-                f"to be present, but got {json_obj}"
+                f"Got invalid return object. Expected key `{key}` " f"to be present, but got {json_obj}"
             )
     return json_obj

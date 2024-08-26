@@ -97,50 +97,34 @@ class PromptTemplateEntity(BaseModel):
             # 如果传入的值无效，则抛出异常
             raise ValueError(f'invalid prompt type value {value}')
 
-    prompt_type: PromptType  # 提示类型的枚举实例
-    simple_prompt_template: Optional[str] = None  # 简单提示模板，可为空
-    advanced_chat_prompt_template: Optional[AdvancedChatPromptTemplateEntity] = None  # 高级聊天提示模板，可为空
-    advanced_completion_prompt_template: Optional[AdvancedCompletionPromptTemplateEntity] = None  # 高级完成提示模板，可为空
+    prompt_type: PromptType
+    simple_prompt_template: Optional[str] = None
+    advanced_chat_prompt_template: Optional[AdvancedChatPromptTemplateEntity] = None
+    advanced_completion_prompt_template: Optional[AdvancedCompletionPromptTemplateEntity] = None
+
+
+class VariableEntityType(str, Enum):
+    TEXT_INPUT = "text-input"
+    SELECT = "select"
+    PARAGRAPH = "paragraph"
+    NUMBER = "number"
+    EXTERNAL_DATA_TOOL = "external-data-tool"
+
 
 class VariableEntity(BaseModel):
     """
     变量实体类，用于定义一种变量的结构，包括变量的基本信息和约束条件。
     """
-    class Type(Enum):
-        """
-        变量类型枚举，定义了变量可能的输入类型。
-        """
-        TEXT_INPUT = 'text-input'  # 文本输入
-        SELECT = 'select'  # 下拉选择
-        PARAGRAPH = 'paragraph'  # 段落输入
-        NUMBER = 'number'  # 数字输入
-
-        @classmethod
-        def value_of(cls, value: str) -> 'VariableEntity.Type':
-            """
-            根据字符串值获取对应的变量类型枚举实例。
-
-            :param value: 字符串类型的变量值。
-            :return: 对应的变量类型枚举实例。
-            """
-            for mode in cls:
-                if mode.value == value:
-                    return mode
-            raise ValueError(f'invalid variable type value {value}')  # 若找不到匹配的类型，则抛出异常
 
     variable: str
     label: str
     description: Optional[str] = None
-    type: Type
+    type: VariableEntityType
     required: bool = False
     max_length: Optional[int] = None
     options: Optional[list[str]] = None
     default: Optional[str] = None
     hint: Optional[str] = None
-
-    @property
-    def name(self) -> str:
-        return self.variable
 
 
 class ExternalDataVariableEntity(BaseModel):

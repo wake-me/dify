@@ -30,6 +30,7 @@ class ModelProviderService:
     """
     Model Provider Service
     """
+
     def __init__(self) -> None:
         # 初始化ProviderManager对象，用于管理提供者
         self.provider_manager = ProviderManager()
@@ -395,19 +396,21 @@ class ModelProviderService:
             tenant_id=tenant_id,
             model_type=model_type_enum
         )
-
-        # 如果获取结果不为空，构造并返回一个详细的默认模型响应对象，否则返回None
-        return DefaultModelResponse(
-            model=result.model,
-            model_type=result.model_type,
-            provider=SimpleProviderEntityResponse(
-                provider=result.provider.provider,
-                label=result.provider.label,
-                icon_small=result.provider.icon_small,
-                icon_large=result.provider.icon_large,
-                supported_model_types=result.provider.supported_model_types
-            )
-        ) if result else None
+        try:
+            return DefaultModelResponse(
+                model=result.model,
+                model_type=result.model_type,
+                provider=SimpleProviderEntityResponse(
+                    provider=result.provider.provider,
+                    label=result.provider.label,
+                    icon_small=result.provider.icon_small,
+                    icon_large=result.provider.icon_large,
+                    supported_model_types=result.provider.supported_model_types
+                )
+            ) if result else None
+        except Exception as e:
+            logger.info(f"get_default_model_of_model_type error: {e}")
+            return None
 
     def update_default_model_of_model_type(self, tenant_id: str, model_type: str, provider: str, model: str) -> None:
         """
