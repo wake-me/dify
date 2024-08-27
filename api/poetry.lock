@@ -696,6 +696,11 @@ files = [
 [package.dependencies]
 cryptography = "*"
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "azure-ai-inference"
 version = "1.0.0b3"
@@ -711,6 +716,11 @@ files = [
 azure-core = ">=1.30.0"
 isodate = ">=0.6.1"
 typing-extensions = ">=4.6.0"
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "azure-ai-ml"
@@ -748,6 +758,11 @@ typing-extensions = "*"
 designer = ["mldesigner"]
 mount = ["azureml-dataprep-rslex (>=2.22.0)"]
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "azure-common"
 version = "1.1.28"
@@ -758,6 +773,11 @@ files = [
     {file = "azure-common-1.1.28.zip", hash = "sha256:4ac0cd3214e36b6a1b6a442686722a5d8cc449603aa833f3f0f40bda836704a3"},
     {file = "azure_common-1.1.28-py2.py3-none-any.whl", hash = "sha256:5c12d3dcf4ec20599ca6b0d3e09e86e146353d443e7fcc050c9a19c1f9df20ad"},
 ]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "azure-core"
@@ -800,6 +820,11 @@ cryptography = ">=2.5"
 msal = ">=1.24.0"
 msal-extensions = ">=0.3.0"
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "azure-mgmt-core"
 version = "1.4.0"
@@ -813,6 +838,11 @@ files = [
 
 [package.dependencies]
 azure-core = ">=1.26.2,<2.0.0"
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "azure-storage-blob"
@@ -830,6 +860,11 @@ azure-core = ">=1.23.1,<2.0.0"
 cryptography = ">=2.1.4"
 msrest = ">=0.6.21"
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "azure-storage-file-datalake"
 version = "12.8.0"
@@ -845,6 +880,11 @@ files = [
 azure-core = ">=1.23.1,<2.0.0"
 azure-storage-blob = ">=12.13.0,<13.0.0"
 msrest = ">=0.6.21"
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "azure-storage-file-share"
@@ -865,6 +905,11 @@ typing-extensions = ">=4.6.0"
 
 [package.extras]
 aio = ["azure-core[aio] (>=1.28.0)"]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "backoff"
@@ -4815,6 +4860,11 @@ files = [
 [package.dependencies]
 ply = "*"
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "jsonschema"
 version = "4.23.0"
@@ -4836,6 +4886,11 @@ rpds-py = ">=0.7.1"
 format = ["fqdn", "idna", "isoduration", "jsonpointer (>1.13)", "rfc3339-validator", "rfc3987", "uri-template", "webcolors (>=1.11)"]
 format-nongpl = ["fqdn", "idna", "isoduration", "jsonpointer (>1.13)", "rfc3339-validator", "rfc3986-validator (>0.1.0)", "uri-template", "webcolors (>=24.6.0)"]
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "jsonschema-specifications"
 version = "2023.12.1"
@@ -4849,6 +4904,11 @@ files = [
 
 [package.dependencies]
 referencing = ">=0.31.0"
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "kaleido"
@@ -6370,6 +6430,11 @@ typing-extensions = ">=4.7,<5"
 [package.extras]
 datalib = ["numpy (>=1)", "pandas (>=1.2.3)", "pandas-stubs (>=1.1.0.11)"]
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "opencensus"
 version = "0.11.4"
@@ -6386,6 +6451,11 @@ google-api-core = {version = ">=1.0.0,<3.0.0", markers = "python_version >= \"3.
 opencensus-context = ">=0.1.3"
 six = ">=1.16,<2.0"
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "opencensus-context"
 version = "0.1.3"
@@ -6396,6 +6466,11 @@ files = [
     {file = "opencensus-context-0.1.3.tar.gz", hash = "sha256:a03108c3c10d8c80bb5ddf5c8a1f033161fa61972a9917f9b9b3a18517f0088c"},
     {file = "opencensus_context-0.1.3-py2.py3-none-any.whl", hash = "sha256:073bb0590007af276853009fac7e4bab1d523c3f03baf4cb4511ca38967c6039"},
 ]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "opencensus-ext-azure"
@@ -6415,6 +6490,11 @@ opencensus = ">=0.11.4,<1.0.0"
 psutil = ">=5.6.3"
 requests = ">=2.19.0"
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "opencensus-ext-logging"
 version = "0.1.1"
@@ -6428,6 +6508,11 @@ files = [
 
 [package.dependencies]
 opencensus = ">=0.8.0,<1.0.0"
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "openpyxl"
@@ -7328,12 +7413,17 @@ files = [
     {file = "protobuf-4.25.4.tar.gz", hash = "sha256:0dc4a62cc4052a036ee2204d26fe4d835c62827c855c8a03f29fe6da146b380d"},
 ]
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "psutil"
 version = "6.0.0"
 description = "Cross-platform lib for process and system monitoring in Python."
 optional = false
-python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,>=2.7"
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
 files = [
     {file = "psutil-6.0.0-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:a021da3e881cd935e64a3d0a20983bda0bb4cf80e4f74fa9bfcb1bc5785360c6"},
     {file = "psutil-6.0.0-cp27-cp27m-manylinux2010_i686.whl", hash = "sha256:1287c2b95f1c0a364d23bc6f2ea2365a8d4d9b726a3be7294296ff7ba97c17f0"},
@@ -7356,6 +7446,11 @@ files = [
 
 [package.extras]
 test = ["enum34", "ipaddress", "mock", "pywin32", "wmi"]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "psycopg2-binary"
@@ -7789,6 +7884,11 @@ azure-key-vault = ["azure-identity (>=1.16.0)", "azure-keyvault-secrets (>=4.8.0
 toml = ["tomli (>=2.0.1)"]
 yaml = ["pyyaml (>=6.0.1)"]
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "pydash"
 version = "8.0.3"
@@ -7805,6 +7905,11 @@ typing-extensions = ">3.10,<4.6.0 || >4.6.0"
 
 [package.extras]
 dev = ["build", "coverage", "furo", "invoke", "mypy", "pytest", "pytest-cov", "pytest-mypy-testing", "ruff", "sphinx", "sphinx-autodoc-typehints", "tox", "twine", "wheel"]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "pygments"
@@ -8728,6 +8833,11 @@ hiredis = {version = ">1.0.0", optional = true, markers = "extra == \"hiredis\""
 hiredis = ["hiredis (>1.0.0)"]
 ocsp = ["cryptography (>=36.0.1)", "pyopenssl (==20.0.1)", "requests (>=2.26.0)"]
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "referencing"
 version = "0.35.1"
@@ -8742,6 +8852,11 @@ files = [
 [package.dependencies]
 attrs = ">=22.2.0"
 rpds-py = ">=0.7.0"
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "regex"
@@ -8969,13 +9084,13 @@ reference = "mirrors"
 
 [[package]]
 name = "rich"
-version = "13.7.1"
+version = "13.8.0"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
 optional = false
 python-versions = ">=3.7.0"
 files = [
-    {file = "rich-13.7.1-py3-none-any.whl", hash = "sha256:4edbae314f59eb482f54e9e30bf00d33350aaa94f4bfcd4e9e3110e64d0d7222"},
-    {file = "rich-13.7.1.tar.gz", hash = "sha256:9be308cb1fe2f1f57d67ce99e95af38a1e2bc71ad9813b0e247cf7ffbcc3a432"},
+    {file = "rich-13.8.0-py3-none-any.whl", hash = "sha256:2e85306a063b9492dffc86278197a60cbece75bcb766022f3436f567cae11bdc"},
+    {file = "rich-13.8.0.tar.gz", hash = "sha256:a5ac1f1cd448ade0d59cc3356f7db7a7ccda2c8cbae9c7a90c28ff463d3e91f4"},
 ]
 
 [package.dependencies]
@@ -8984,6 +9099,11 @@ pygments = ">=2.13.0,<3.0.0"
 
 [package.extras]
 jupyter = ["ipywidgets (>=7.5.1,<9)"]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "rpds-py"
@@ -9096,6 +9216,11 @@ files = [
     {file = "rpds_py-0.20.0-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:fdfc3a892927458d98f3d55428ae46b921d1f7543b89382fdb483f5640daaec8"},
     {file = "rpds_py-0.20.0.tar.gz", hash = "sha256:d72a210824facfdaf8768cf2d7ca25a042c30320b3020de2fa04640920d4e121"},
 ]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "rsa"
@@ -9797,6 +9922,11 @@ anyio = ">=3.4.0,<5"
 [package.extras]
 full = ["httpx (>=0.22.0)", "itsdangerous", "jinja2", "python-multipart (>=0.0.7)", "pyyaml"]
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "strictyaml"
 version = "1.7.3"
@@ -9810,6 +9940,11 @@ files = [
 
 [package.dependencies]
 python-dateutil = ">=2.6.0"
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "sympy"
@@ -10846,6 +10981,11 @@ files = [
     {file = "vine-5.1.0.tar.gz", hash = "sha256:8b62e981d35c41049211cf62a0a1242d8c1ee9bd15bb196ce38aefd6799e61e0"},
 ]
 
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
+
 [[package]]
 name = "volcengine-python-sdk"
 version = "1.0.98"
@@ -10867,6 +11007,11 @@ urllib3 = ">=1.23"
 
 [package.extras]
 ark = ["anyio (>=3.5.0,<5)", "cached-property", "httpx (>=0.23.0,<1)", "pydantic (>=1.9.0,<3)"]
+
+[package.source]
+type = "legacy"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+reference = "mirrors"
 
 [[package]]
 name = "watchfiles"
@@ -11536,18 +11681,22 @@ reference = "mirrors"
 
 [[package]]
 name = "zipp"
-version = "3.20.0"
+version = "3.20.1"
 description = "Backport of pathlib-compatible object wrapper for zip files"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "zipp-3.20.0-py3-none-any.whl", hash = "sha256:58da6168be89f0be59beb194da1250516fdaa062ccebd30127ac65d30045e10d"},
-    {file = "zipp-3.20.0.tar.gz", hash = "sha256:0145e43d89664cfe1a2e533adc75adafed82fe2da404b4bbb6b026c0157bdb31"},
+    {file = "zipp-3.20.1-py3-none-any.whl", hash = "sha256:9960cd8967c8f85a56f920d5d507274e74f9ff813a0ab8889a5b5be2daf44064"},
+    {file = "zipp-3.20.1.tar.gz", hash = "sha256:c22b14cc4763c5a5b04134207736c107db42e9d3ef2d9779d465f5f1bcba572b"},
 ]
 
 [package.extras]
+check = ["pytest-checkdocs (>=2.4)", "pytest-ruff (>=0.2.1)"]
+cover = ["pytest-cov"]
 doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
-test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more-itertools", "pytest (>=6,!=8.1.*)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ignore-flaky", "pytest-mypy", "pytest-ruff (>=0.2.1)"]
+enabler = ["pytest-enabler (>=2.2)"]
+test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more-itertools", "pytest (>=6,!=8.1.*)", "pytest-ignore-flaky"]
+type = ["pytest-mypy"]
 
 [package.source]
 type = "legacy"
@@ -11579,45 +11728,45 @@ reference = "mirrors"
 
 [[package]]
 name = "zope-interface"
-version = "7.0.1"
+version = "7.0.2"
 description = "Interfaces for Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "zope.interface-7.0.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:ec4e87e6fdc511a535254daa122c20e11959ce043b4e3425494b237692a34f1c"},
-    {file = "zope.interface-7.0.1-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:51d5713e8e38f2d3ec26e0dfdca398ed0c20abda2eb49ffc15a15a23eb8e5f6d"},
-    {file = "zope.interface-7.0.1-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ea8d51e5eb29e57d34744369cd08267637aa5a0fefc9b5d33775ab7ff2ebf2e3"},
-    {file = "zope.interface-7.0.1-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:55bbcc74dc0c7ab489c315c28b61d7a1d03cf938cc99cc58092eb065f120c3a5"},
-    {file = "zope.interface-7.0.1-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:10ebac566dd0cec66f942dc759d46a994a2b3ba7179420f0e2130f88f8a5f400"},
-    {file = "zope.interface-7.0.1-cp310-cp310-win_amd64.whl", hash = "sha256:7039e624bcb820f77cc2ff3d1adcce531932990eee16121077eb51d9c76b6c14"},
-    {file = "zope.interface-7.0.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:03bd5c0db82237bbc47833a8b25f1cc090646e212f86b601903d79d7e6b37031"},
-    {file = "zope.interface-7.0.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:3f52050c6a10d4a039ec6f2c58e5b3ade5cc570d16cf9d102711e6b8413c90e6"},
-    {file = "zope.interface-7.0.1-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:af0b33f04677b57843d529b9257a475d2865403300b48c67654c40abac2f9f24"},
-    {file = "zope.interface-7.0.1-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:696c2a381fc7876b3056711717dba5eddd07c2c9e5ccd50da54029a1293b6e43"},
-    {file = "zope.interface-7.0.1-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f89a420cf5a6f2aa7849dd59e1ff0e477f562d97cf8d6a1ee03461e1eec39887"},
-    {file = "zope.interface-7.0.1-cp311-cp311-win_amd64.whl", hash = "sha256:b59deb0ddc7b431e41d720c00f99d68b52cb9bd1d5605a085dc18f502fe9c47f"},
-    {file = "zope.interface-7.0.1-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:52f5253cca1b35eaeefa51abd366b87f48f8714097c99b131ba61f3fdbbb58e7"},
-    {file = "zope.interface-7.0.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:88d108d004e0df25224de77ce349a7e73494ea2cb194031f7c9687e68a88ec9b"},
-    {file = "zope.interface-7.0.1-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c203d82069ba31e1f3bc7ba530b2461ec86366cd4bfc9b95ec6ce58b1b559c34"},
-    {file = "zope.interface-7.0.1-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:3f3495462bc0438b76536a0e10d765b168ae636092082531b88340dc40dcd118"},
-    {file = "zope.interface-7.0.1-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:192b7a792e3145ed880ff6b1a206fdb783697cfdb4915083bfca7065ec845e60"},
-    {file = "zope.interface-7.0.1-cp312-cp312-win_amd64.whl", hash = "sha256:400d06c9ec8dbcc96f56e79376297e7be07a315605c9a2208720da263d44d76f"},
-    {file = "zope.interface-7.0.1-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:8c1dff87b30fd150c61367d0e2cdc49bb55f8b9fd2a303560bbc24b951573ae1"},
-    {file = "zope.interface-7.0.1-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:f749ca804648d00eda62fe1098f229b082dfca930d8bad8386e572a6eafa7525"},
-    {file = "zope.interface-7.0.1-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4ec212037becf6d2f705b7ed4538d56980b1e7bba237df0d8995cbbed29961dc"},
-    {file = "zope.interface-7.0.1-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:d33cb526efdc235a2531433fc1287fcb80d807d5b401f9b801b78bf22df560dd"},
-    {file = "zope.interface-7.0.1-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:b419f2144e1762ab845f20316f1df36b15431f2622ebae8a6d5f7e8e712b413c"},
-    {file = "zope.interface-7.0.1-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:03f1452d5d1f279184d5bdb663a3dc39902d9320eceb63276240791e849054b6"},
-    {file = "zope.interface-7.0.1-cp38-cp38-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:6ba4b3638d014918b918aa90a9c8370bd74a03abf8fcf9deb353b3a461a59a84"},
-    {file = "zope.interface-7.0.1-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bc0615351221926a36a0fbcb2520fb52e0b23e8c22a43754d9cb8f21358c33c0"},
-    {file = "zope.interface-7.0.1-cp38-cp38-win_amd64.whl", hash = "sha256:ce6cbb852fb8f2f9bb7b9cdca44e2e37bce783b5f4c167ff82cb5f5128163c8f"},
-    {file = "zope.interface-7.0.1-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:5566fd9271c89ad03d81b0831c37d46ae5e2ed211122c998637130159a120cf1"},
-    {file = "zope.interface-7.0.1-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:da0cef4d7e3f19c3bd1d71658d6900321af0492fee36ec01b550a10924cffb9c"},
-    {file = "zope.interface-7.0.1-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f32ca483e6ade23c7caaee9d5ee5d550cf4146e9b68d2fb6c68bac183aa41c37"},
-    {file = "zope.interface-7.0.1-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:da21e7eec49252df34d426c2ee9cf0361c923026d37c24728b0fa4cc0599fd03"},
-    {file = "zope.interface-7.0.1-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9a8195b99e650e6f329ce4e5eb22d448bdfef0406404080812bc96e2a05674cb"},
-    {file = "zope.interface-7.0.1-cp39-cp39-win_amd64.whl", hash = "sha256:19c829d52e921b9fe0b2c0c6a8f9a2508c49678ee1be598f87d143335b6a35dc"},
-    {file = "zope.interface-7.0.1.tar.gz", hash = "sha256:f0f5fda7cbf890371a59ab1d06512da4f2c89a6ea194e595808123c863c38eff"},
+    {file = "zope.interface-7.0.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:093ab9a2c5105d826755c43a76770b69353dbe95ec27a0b5e88ab4f63d7744b8"},
+    {file = "zope.interface-7.0.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:3246cccb9e4ce34c9b32ad55a53098043af5e7185623bf5de8e6ec5d8e71415e"},
+    {file = "zope.interface-7.0.2-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:375258373bc3879a6c509281487063cf14add7129fc867eb1c287c0db46ca007"},
+    {file = "zope.interface-7.0.2-cp310-cp310-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:bf2746931a6f83370fdc4005dbea4e39e3a3d0333da42897040698c1ff282e9c"},
+    {file = "zope.interface-7.0.2-cp310-cp310-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:deac72b653817a68b96079c1428ae84860c76f653af03668a02f97b74f8a465b"},
+    {file = "zope.interface-7.0.2-cp310-cp310-win_amd64.whl", hash = "sha256:9da2fb807a20cd4fe381e23e2f906f0a0f4acece6d9abac65d5fc0a1f8383ed8"},
+    {file = "zope.interface-7.0.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:4f5e39373952e1d689476b6e43d779553b165ce332d0fde9c36d9b095f28d052"},
+    {file = "zope.interface-7.0.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:13aacff95c59000ecd562d9717a87eca8211f6bc74bea6b8ca68e742d1f8f13d"},
+    {file = "zope.interface-7.0.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:67e0ff3f2e02d6131535956b22795be2ec5af6762f4fe682f67eb723fbc16273"},
+    {file = "zope.interface-7.0.2-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:7c47a5068df03f0c9215d3525b166c9d8d4f6d03cbe4e60339818f8c393e3e3e"},
+    {file = "zope.interface-7.0.2-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bceaf7ee95735b0d6ac3f5bba0209d056e686999732dc32bd463a53d4488ccdb"},
+    {file = "zope.interface-7.0.2-cp311-cp311-win_amd64.whl", hash = "sha256:dd28ba1e2deb0c339881ee7755db649433347bdf3c4f3d885f029fcf10aacdf7"},
+    {file = "zope.interface-7.0.2-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:4b671f943d6487d6f1a6bbdce3faffae35e4f74f98ac9b865d2b7370cb6b0bd3"},
+    {file = "zope.interface-7.0.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:b76f6048c1a334e26e5d46fdb4f327d9e7e6b348ad607ee9fdce9c7325b5a635"},
+    {file = "zope.interface-7.0.2-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:40beb36330ef00d2cd50d212a0c74ecd57042b8c8b2b6ebd6247cc98f9808824"},
+    {file = "zope.interface-7.0.2-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:0821efcbdeaf48e12c66b0d19a1f9edec2ed22697ab8885d322c8f82fe5bc892"},
+    {file = "zope.interface-7.0.2-cp312-cp312-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d9ab785a7af39c6968385a9d39b712d2263661fa3780bd38efec0cefdbb84036"},
+    {file = "zope.interface-7.0.2-cp312-cp312-win_amd64.whl", hash = "sha256:e299f672cfad3392b097af885a552a51e60d3b44e8572f1401e87f863f8986b4"},
+    {file = "zope.interface-7.0.2-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:93e5bf8de5a51aaeddd5e1d1c0ac0ca4f995a4f5a832abdc08bb8fbae25ac660"},
+    {file = "zope.interface-7.0.2-cp313-cp313-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:185ef3a7a01fac1151622579a08995aab66590711c1a4f9b605f88129229dba1"},
+    {file = "zope.interface-7.0.2-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:91bb6b5e1a158b751e12458d5618c1af42eb3dc8472b87a613d543d9fb7660e0"},
+    {file = "zope.interface-7.0.2-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:f77d58cfc3af86d062b8cfa7194db74ca78a615d66bbd23b251bad1b1ecf9818"},
+    {file = "zope.interface-7.0.2-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:3ab142cebe69e0f72bf892da040af97f61fd03c09a23ae2fc7de3ab576c5d4cd"},
+    {file = "zope.interface-7.0.2-cp38-cp38-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ba16bb2214f671e29b75f16d7b8b0bb1f75cdc8bce06979fdbf638edf6531586"},
+    {file = "zope.interface-7.0.2-cp38-cp38-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:28f29dd42819d99682e46a8d3cc2ee60461a77554d4320e0e8a37363f04208e0"},
+    {file = "zope.interface-7.0.2-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:797510df26b82cf619a894dac4ff4036d11f6340bec0287c89cecb0b1b1c429e"},
+    {file = "zope.interface-7.0.2-cp38-cp38-win_amd64.whl", hash = "sha256:b9d865209cc9795d0f9f4f63b87a86e7a9e032d3cbbb10b1c13bf27343a4fc54"},
+    {file = "zope.interface-7.0.2-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:08d86319fd7542984d4c0ef7865759dab58616154cb237a5a1ce758687255de0"},
+    {file = "zope.interface-7.0.2-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:22c93492e5d2f09100a4a23cf709b20f0305cdbbad14f9af2f6e9311742bed8e"},
+    {file = "zope.interface-7.0.2-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d20fa14f0f8682ad37a6552712e4493cfb35d66c5fb4f8052af3a50ae6cd4f77"},
+    {file = "zope.interface-7.0.2-cp39-cp39-manylinux_2_5_i686.manylinux1_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:356a9c1c8cfece776f54806157057be759d812168395762f47f046b40901e974"},
+    {file = "zope.interface-7.0.2-cp39-cp39-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:738de1c72390a2caf543247013f617ed15d272e4c19731a998e81dd5a2379f1c"},
+    {file = "zope.interface-7.0.2-cp39-cp39-win_amd64.whl", hash = "sha256:8eab70e404c2416176b4630914cda275ca95678529e54e66ea45d1a0be422994"},
+    {file = "zope.interface-7.0.2.tar.gz", hash = "sha256:f1146bb27a411d0d40cc0e88182a6b0e979d68ab526c8e5ae9e27c06506ed017"},
 ]
 
 [package.dependencies]
@@ -11753,4 +11902,4 @@ reference = "mirrors"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "0b912a7d500c4ff3c7f0c51877e55de70cec5317a990f9e882600e32a30a610e"
+content-hash = "a6759cd60510e3b7406301c65e9823e6e7faba807fe058273df3b85ab1cfbfd3"
