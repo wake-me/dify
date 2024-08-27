@@ -54,7 +54,8 @@ class ModelInstance:
             credentials=self.credentials
         )
 
-    def _fetch_credentials_from_bundle(self, provider_model_bundle: ProviderModelBundle, model: str) -> dict:
+    @staticmethod
+    def _fetch_credentials_from_bundle(provider_model_bundle: ProviderModelBundle, model: str) -> dict:
         """
         从提供者模型捆绑包中获取凭证信息。
         
@@ -75,7 +76,8 @@ class ModelInstance:
 
         return credentials
 
-    def _get_load_balancing_manager(self, configuration: ProviderConfiguration,
+    @staticmethod
+    def _get_load_balancing_manager(configuration: ProviderConfiguration,
                                     model_type: ModelType,
                                     model: str,
                                     credentials: dict) -> Optional["LBModelManager"]:
@@ -547,8 +549,8 @@ class LBModelManager:
         res = cast(bool, res)
         return res
 
-    @classmethod
-    def get_config_in_cooldown_and_ttl(cls, tenant_id: str,
+    @staticmethod
+    def get_config_in_cooldown_and_ttl(tenant_id: str,
                                        provider: str,
                                        model_type: ModelType,
                                        model: str,

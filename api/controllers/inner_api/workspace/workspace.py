@@ -9,10 +9,6 @@ from services.account_service import TenantService
 
 
 class EnterpriseWorkspace(Resource):
-    """
-    企业工作空间资源类，用于处理与企业工作空间相关的API请求。
-    """
-    
     @setup_required
     @inner_api_only
     def post(self):
@@ -27,27 +23,21 @@ class EnterpriseWorkspace(Resource):
         """
         # 解析请求中的参数
         parser = reqparse.RequestParser()
-        parser.add_argument('name', type=str, required=True, location='json')
-        parser.add_argument('owner_email', type=str, required=True, location='json')
+        parser.add_argument("name", type=str, required=True, location="json")
+        parser.add_argument("owner_email", type=str, required=True, location="json")
         args = parser.parse_args()
 
-        # 根据提供的电子邮件地址查找账户
-        account = Account.query.filter_by(email=args['owner_email']).first()
+        account = Account.query.filter_by(email=args["owner_email"]).first()
         if account is None:
-            return {
-                'message': 'owner account not found.'
-            }, 404
+            return {"message": "owner account not found."}, 404
 
-        # 创建租户（企业工作空间）
-        tenant = TenantService.create_tenant(args['name'])
-        # 将账户添加为租户的所有者
-        TenantService.create_tenant_member(tenant, account, role='owner')
+        tenant = TenantService.create_tenant(args["name"])
+        TenantService.create_tenant_member(tenant, account, role="owner")
 
         # 发送租户创建成功的信号
         tenant_was_created.send(tenant)
 
-        return {
-            'message': 'enterprise workspace created.'
-        }
+        return {"message": "enterprise workspace created."}
 
-api.add_resource(EnterpriseWorkspace, '/enterprise/workspace')
+
+api.add_resource(EnterpriseWorkspace, "/enterprise/workspace")

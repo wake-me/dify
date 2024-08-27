@@ -33,7 +33,7 @@ def get_oauth_providers():
             github_oauth = GitHubOAuth(
                 client_id=dify_config.GITHUB_CLIENT_ID,
                 client_secret=dify_config.GITHUB_CLIENT_SECRET,
-                redirect_uri=dify_config.CONSOLE_API_URL + '/console/api/oauth/authorize/github',
+                redirect_uri=dify_config.CONSOLE_API_URL + "/console/api/oauth/authorize/github",
             )
         if not dify_config.GOOGLE_CLIENT_ID or not dify_config.GOOGLE_CLIENT_SECRET:
             google_oauth = None
@@ -41,10 +41,10 @@ def get_oauth_providers():
             google_oauth = GoogleOAuth(
                 client_id=dify_config.GOOGLE_CLIENT_ID,
                 client_secret=dify_config.GOOGLE_CLIENT_SECRET,
-                redirect_uri=dify_config.CONSOLE_API_URL + '/console/api/oauth/authorize/google',
+                redirect_uri=dify_config.CONSOLE_API_URL + "/console/api/oauth/authorize/google",
             )
 
-        OAUTH_PROVIDERS = {'github': github_oauth, 'google': google_oauth}
+        OAUTH_PROVIDERS = {"github": github_oauth, "google": google_oauth}
         return OAUTH_PROVIDERS
 
 class OAuthLogin(Resource):
@@ -70,8 +70,7 @@ class OAuthLogin(Resource):
             
         # 检查是否找到了对应的OAuth提供者配置
         if not oauth_provider:
-            # 如果找不到，返回一个包含错误信息的响应
-            return {'error': 'Invalid provider'}, 400
+            return {"error": "Invalid provider"}, 400
 
         # 获取授权URL，并重定向到该URL
         auth_url = oauth_provider.get_authorization_url()
@@ -96,26 +95,23 @@ class OAuthCallback(Resource):
             # 根据提供者名称获取具体的OAuth提供者实例
             oauth_provider = OAUTH_PROVIDERS.get(provider)
         if not oauth_provider:
-            # 如果不存在指定的提供者，则返回错误信息
-            return {'error': 'Invalid provider'}, 400
+            return {"error": "Invalid provider"}, 400
 
-        # 从请求参数中获取认证代码
-        code = request.args.get('code')
+        code = request.args.get("code")
         try:
             # 使用认证代码获取访问令牌和用户信息
             token = oauth_provider.get_access_token(code)
             user_info = oauth_provider.get_user_info(token)
         except requests.exceptions.HTTPError as e:
-            logging.exception(f'An error occurred during the OAuth process with {provider}: {e.response.text}')
-            return {'error': 'OAuth process failed'}, 400
+            logging.exception(f"An error occurred during the OAuth process with {provider}: {e.response.text}")
+            return {"error": "OAuth process failed"}, 400
 
         # 根据OAuth提供的用户信息生成或更新账户
         account = _generate_account(provider, user_info)
         
         # 检查账户状态
         if account.status == AccountStatus.BANNED.value or account.status == AccountStatus.CLOSED.value:
-            # 如果账户被禁用或已关闭，则返回错误信息
-            return {'error': 'Account is banned or closed.'}, 403
+            return {"error": "Account is banned or closed."}, 403
 
         # 如果账户状态是待处理，则将其状态更新为激活，并记录首次初始化时间
         if account.status == AccountStatus.PENDING.value:
@@ -128,7 +124,8 @@ class OAuthCallback(Resource):
 
         token = AccountService.login(account, ip_address=get_remote_ip(request))
 
-        return redirect(f'{dify_config.CONSOLE_WEB_URL}?console_token={token}')
+        return redirect(f"{dify_config.CONSOLE_WEB_URL}?console_token={token}")
+
 
 def _get_account_by_openid_or_email(provider: str, user_info: OAuthUserInfo) -> Optional[Account]:
     """
@@ -165,8 +162,8 @@ def _generate_account(provider: str, user_info: OAuthUserInfo):
     account = _get_account_by_openid_or_email(provider, user_info)
 
     if not account:
-        # 如果账户不存在，则创建新账户
-        account_name = user_info.name if user_info.name else 'Dify'
+        # Create account
+        account_name = user_info.name if user_info.name else "Dify"
         account = RegisterService.register(
             email=user_info.email, name=account_name, password=None, open_id=user_info.id, provider=provider
         )
@@ -186,5 +183,5 @@ def _generate_account(provider: str, user_info: OAuthUserInfo):
     return account
 
 
-api.add_resource(OAuthLogin, '/oauth/login/<provider>')
-api.add_resource(OAuthCallback, '/oauth/authorize/<provider>')
+api.add_resource(OAuthLogin, "/oauth/login/<provider>")
+api.add_resource(OAuthCallback, "/oauth/authorize/<provider>")

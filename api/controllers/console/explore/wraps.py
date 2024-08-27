@@ -21,34 +21,36 @@ def installed_app_required(view=None):
     def decorator(view):
         @wraps(view)
         def decorated(*args, **kwargs):
-            # 检查路径参数中是否缺失installed_app_id
-            if not kwargs.get('installed_app_id'):
-                raise ValueError('missing installed_app_id in path parameters')
+            if not kwargs.get("installed_app_id"):
+                raise ValueError("missing installed_app_id in path parameters")
 
-            installed_app_id = kwargs.get('installed_app_id')
-            installed_app_id = str(installed_app_id)  # 确保installed_app_id为字符串类型
+            installed_app_id = kwargs.get("installed_app_id")
+            installed_app_id = str(installed_app_id)
 
-            del kwargs['installed_app_id']  # 从关键字参数中删除installed_app_id，避免传入视图函数
+            del kwargs["installed_app_id"]
 
-            # 从数据库中查询对应的已安装应用
-            installed_app = db.session.query(InstalledApp).filter(
-                InstalledApp.id == str(installed_app_id),
-                InstalledApp.tenant_id == current_user.current_tenant_id
-            ).first()
+            installed_app = (
+                db.session.query(InstalledApp)
+                .filter(
+                    InstalledApp.id == str(installed_app_id), InstalledApp.tenant_id == current_user.current_tenant_id
+                )
+                .first()
+            )
 
             # 如果查询不到已安装的应用，则抛出未找到的异常
             if installed_app is None:
-                raise NotFound('Installed app not found')
+                raise NotFound("Installed app not found")
 
             # 如果已安装的应用没有关联的应用信息，则删除该安装记录，并抛出未找到的异常
             if not installed_app.app:
                 db.session.delete(installed_app)
                 db.session.commit()
 
-                raise NotFound('Installed app not found')
+                raise NotFound("Installed app not found")
 
             # 执行原视图函数，并传入验证过的已安装应用实例及其他参数
             return view(installed_app, *args, **kwargs)
+
         return decorated
 
     # 如果提供了view参数，则直接返回装饰后的视图函数；否则返回装饰器函数

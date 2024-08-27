@@ -106,15 +106,8 @@ class HostingConfiguration:
         # 初始化审核配置。
         self.moderation_config = self.init_moderation_config(config)
 
-    def init_azure_openai(self, app_config: Config) -> HostingProvider:
-        """
-        初始化并配置 Azure OpenAI 托管提供商。
-
-        :param app_config: 应用配置，用于获取 Azure OpenAI 的配置信息。
-        :return: 配置好的 HostingProvider 实例。
-        """
-
-        # 默认配额单位为次数。
+    @staticmethod
+    def init_azure_openai(app_config: Config) -> HostingProvider:
         quota_unit = QuotaUnit.TIMES
 
         # 检查是否启用了 Azure OpenAI 托管服务。
@@ -224,20 +217,8 @@ class HostingConfiguration:
             quota_unit=quota_unit,
         )
 
-    def init_anthropic(self, app_config: Config) -> HostingProvider:
-        """
-        初始化Anthropic托管设置。
-
-        根据应用程序配置决定是否启用Anthropic的试用和付费配额，并配置相应的API凭证和配额限制。
-
-        参数:
-        - app_config: Config 类型，包含应用程序的配置信息。
-
-        返回值:
-        - HostingProvider 实例，配置了Anthropic的托管设置，包括是否启用、凭证信息、配额单位和具体的配额限制。
-        """
-
-        # 初始化配额单位和空的配额列表
+    @staticmethod
+    def init_anthropic(app_config: Config) -> HostingProvider:
         quota_unit = QuotaUnit.TOKENS
         quotas = []
 
@@ -277,19 +258,9 @@ class HostingConfiguration:
             quota_unit=quota_unit,
         )
 
-    def init_minimax(self, app_config: Config) -> HostingProvider:
-        """
-        初始化最小最大服务。
-
-        参数:
-        app_config (Config): 应用配置对象，用于获取配置信息。
-
-        返回值:
-        HostingProvider: 返回一个 HostingProvider 实例，配置了最小最大服务的状况。
-        """
-        quota_unit = QuotaUnit.TOKENS  # 定义配额单位为TOKENS
-
-        # 检查是否启用了托管的最小最大服务
+    @staticmethod
+    def init_minimax(app_config: Config) -> HostingProvider:
+        quota_unit = QuotaUnit.TOKENS
         if app_config.get("HOSTED_MINIMAX_ENABLED"):
             # 如果启用，则创建并返回一个配置了免费配额的 HostingProvider 实例
             quotas = [FreeHostingQuota()]
@@ -307,21 +278,9 @@ class HostingConfiguration:
             quota_unit=quota_unit,
         )
 
-    def init_spark(self, app_config: Config) -> HostingProvider:
-        """
-        初始化Spark服务。
-        
-        根据应用配置决定是否启用托管的Spark服务。如果启用了托管服务，则会创建一个包含免费配额的HostingProvider实例；
-        如果未启用，则返回一个禁用状态的HostingProvider实例。
-
-        参数:
-        app_config: Config - 包含应用配置信息的对象，用于检查是否启用了托管Spark服务。
-
-        返回值:
-        HostingProvider - 根据是否启用托管服务，返回相应状态的HostingProvider实例。
-        """
-        quota_unit = QuotaUnit.TOKENS  # 定义配额单位为TOKENS
-
+    @staticmethod
+    def init_spark(app_config: Config) -> HostingProvider:
+        quota_unit = QuotaUnit.TOKENS
         if app_config.get("HOSTED_SPARK_ENABLED"):
             # 如果启用了托管Spark服务，创建并返回一个启用状态的HostingProvider实例，包含免费配额
             quotas = [FreeHostingQuota()]
@@ -339,21 +298,9 @@ class HostingConfiguration:
             quota_unit=quota_unit,
         )
 
-    def init_zhipuai(self, app_config: Config) -> HostingProvider:
-        """
-        初始化智谱服务。
-
-        根据应用配置决定是否启用智谱服务，并配置相应的配额。
-
-        参数:
-        - app_config: Config 类型，应用的配置信息。
-
-        返回值:
-        - HostingProvider 类型，包含智谱服务的配置信息，如是否启用、配额单位和具体配额。
-        """
-        quota_unit = QuotaUnit.TOKENS  # 配额单位为TOKENS
-
-        # 检查是否启用了托管的智谱服务
+    @staticmethod
+    def init_zhipuai(app_config: Config) -> HostingProvider:
+        quota_unit = QuotaUnit.TOKENS
         if app_config.get("HOSTED_ZHIPUAI_ENABLED"):
             quotas = [FreeHostingQuota()]  # 使用免费托管配额
 
@@ -371,19 +318,8 @@ class HostingConfiguration:
             quota_unit=quota_unit,
         )
 
-    def init_moderation_config(self, app_config: Config) -> HostedModerationConfig:
-        """
-        初始化托管审核配置。
-        
-        根据应用配置决定是否启用托管审核，并配置相应的提供者。
-        
-        参数:
-        app_config: Config - 应用的配置对象，包含是否启用托管审核以及审核提供者的信息。
-        
-        返回值:
-        HostedModerationConfig - 托管审核的配置对象，包含是否启用以及提供者列表。
-        """
-        # 检查是否启用了托管审核并且提供了审核提供者列表
+    @staticmethod
+    def init_moderation_config(app_config: Config) -> HostedModerationConfig:
         if app_config.get("HOSTED_MODERATION_ENABLED") \
                 and app_config.get("HOSTED_MODERATION_PROVIDERS"):
             # 如果启用，返回配置为启用状态和提供的审核提供者列表

@@ -34,9 +34,9 @@ from services.message_service import MessageService
 class ChatMessageListApi(Resource):
     # 定义聊天消息列表API，提供获取无限滚动消息列表的功能
     message_infinite_scroll_pagination_fields = {
-        'limit': fields.Integer,  # 请求返回的最大消息数量
-        'has_more': fields.Boolean,  # 是否还有更多消息
-        'data': fields.List(fields.Nested(message_detail_fields))  # 消息数据列表
+        "limit": fields.Integer,
+        "has_more": fields.Boolean,
+        "data": fields.List(fields.Nested(message_detail_fields)),
     }
 
     @setup_required
@@ -46,51 +46,65 @@ class ChatMessageListApi(Resource):
     @marshal_with(message_infinite_scroll_pagination_fields)
     def get(self, app_model):
         parser = reqparse.RequestParser()
-        parser.add_argument('conversation_id', required=True, type=uuid_value, location='args')
-        parser.add_argument('first_id', type=uuid_value, location='args')
-        parser.add_argument('limit', type=int_range(1, 100), required=False, default=20, location='args')
+        parser.add_argument("conversation_id", required=True, type=uuid_value, location="args")
+        parser.add_argument("first_id", type=uuid_value, location="args")
+        parser.add_argument("limit", type=int_range(1, 100), required=False, default=20, location="args")
         args = parser.parse_args()
 
-        # 根据conversation_id查询对话信息
-        conversation = db.session.query(Conversation).filter(
-            Conversation.id == args['conversation_id'],
-            Conversation.app_id == app_model.id
-        ).first()
+        conversation = (
+            db.session.query(Conversation)
+            .filter(Conversation.id == args["conversation_id"], Conversation.app_id == app_model.id)
+            .first()
+        )
 
         # 对话不存在时抛出异常
         if not conversation:
             raise NotFound("Conversation Not Exists.")
 
-        # 根据first_id查询起始消息，用于获取之前的对话历史
-        if args['first_id']:
-            first_message = db.session.query(Message) \
-                .filter(Message.conversation_id == conversation.id, Message.id == args['first_id']).first()
+        if args["first_id"]:
+            first_message = (
+                db.session.query(Message)
+                .filter(Message.conversation_id == conversation.id, Message.id == args["first_id"])
+                .first()
+            )
 
             # 若起始消息不存在则抛出异常
             if not first_message:
                 raise NotFound("First message not found")
 
-            # 查询从起始消息之前的消息，按时间倒序，限制条数
-            history_messages = db.session.query(Message).filter(
-                Message.conversation_id == conversation.id,
-                Message.created_at < first_message.created_at,
-                Message.id != first_message.id
-            ) \
-                .order_by(Message.created_at.desc()).limit(args['limit']).all()
+            history_messages = (
+                db.session.query(Message)
+                .filter(
+                    Message.conversation_id == conversation.id,
+                    Message.created_at < first_message.created_at,
+                    Message.id != first_message.id,
+                )
+                .order_by(Message.created_at.desc())
+                .limit(args["limit"])
+                .all()
+            )
         else:
-            # 若没有提供first_id，则直接查询最新的对话历史
-            history_messages = db.session.query(Message).filter(Message.conversation_id == conversation.id) \
-                .order_by(Message.created_at.desc()).limit(args['limit']).all()
+            history_messages = (
+                db.session.query(Message)
+                .filter(Message.conversation_id == conversation.id)
+                .order_by(Message.created_at.desc())
+                .limit(args["limit"])
+                .all()
+            )
 
         # 判断是否还有更多的消息可供查询
         has_more = False
-        if len(history_messages) == args['limit']:
+        if len(history_messages) == args["limit"]:
             current_page_first_message = history_messages[-1]
-            rest_count = db.session.query(Message).filter(
-                Message.conversation_id == conversation.id,
-                Message.created_at < current_page_first_message.created_at,
-                Message.id != current_page_first_message.id
-            ).count()
+            rest_count = (
+                db.session.query(Message)
+                .filter(
+                    Message.conversation_id == conversation.id,
+                    Message.created_at < current_page_first_message.created_at,
+                    Message.id != current_page_first_message.id,
+                )
+                .count()
+            )
 
             if rest_count > 0:
                 has_more = True
@@ -98,12 +112,7 @@ class ChatMessageListApi(Resource):
         # 将查询结果反转，以便按时间正序展示
         history_messages = list(reversed(history_messages))
 
-        # 返回无限滚动分页数据
-        return InfiniteScrollPagination(
-            data=history_messages,
-            limit=args['limit'],
-            has_more=has_more
-        )
+        return InfiniteScrollPagination(data=history_messages, limit=args["limit"], has_more=has_more)
 
 class MessageFeedbackApi(Resource):
     """
@@ -119,44 +128,39 @@ class MessageFeedbackApi(Resource):
     @get_app_model
     def post(self, app_model):
         parser = reqparse.RequestParser()
-        parser.add_argument('message_id', required=True, type=uuid_value, location='json')
-        parser.add_argument('rating', type=str, choices=['like', 'dislike', None], location='json')
+        parser.add_argument("message_id", required=True, type=uuid_value, location="json")
+        parser.add_argument("rating", type=str, choices=["like", "dislike", None], location="json")
         args = parser.parse_args()
 
-        message_id = str(args['message_id'])
+        message_id = str(args["message_id"])
 
-        # 根据消息ID和应用ID查询消息
-        message = db.session.query(Message).filter(
-            Message.id == message_id,
-            Message.app_id == app_model.id
-        ).first()
+        message = db.session.query(Message).filter(Message.id == message_id, Message.app_id == app_model.id).first()
 
         if not message:
             raise NotFound("Message Not Exists.")
 
         feedback = message.admin_feedback
 
-        # 根据提供的评级更新或删除反馈，或创建新的反馈
-        if not args['rating'] and feedback:
+        if not args["rating"] and feedback:
             db.session.delete(feedback)
-        elif args['rating'] and feedback:
-            feedback.rating = args['rating']
-        elif not args['rating'] and not feedback:
-            raise ValueError('rating cannot be None when feedback not exists')
+        elif args["rating"] and feedback:
+            feedback.rating = args["rating"]
+        elif not args["rating"] and not feedback:
+            raise ValueError("rating cannot be None when feedback not exists")
         else:
             feedback = MessageFeedback(
                 app_id=app_model.id,
                 conversation_id=message.conversation_id,
                 message_id=message.id,
-                rating=args['rating'],
-                from_source='admin',
-                from_account_id=current_user.id
+                rating=args["rating"],
+                from_source="admin",
+                from_account_id=current_user.id,
             )
             db.session.add(feedback)
 
         db.session.commit()
 
-        return {'result': 'success'}
+        return {"result": "success"}
 
 
 class MessageAnnotationApi(Resource):
@@ -170,7 +174,7 @@ class MessageAnnotationApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('annotation')
+    @cloud_edition_billing_resource_check("annotation")
     @get_app_model
     @marshal_with(annotation_fields)
     def post(self, app_model):
@@ -178,10 +182,10 @@ class MessageAnnotationApi(Resource):
             raise Forbidden()
 
         parser = reqparse.RequestParser()
-        parser.add_argument('message_id', required=False, type=uuid_value, location='json')
-        parser.add_argument('question', required=True, type=str, location='json')
-        parser.add_argument('answer', required=True, type=str, location='json')
-        parser.add_argument('annotation_reply', required=False, type=dict, location='json')
+        parser.add_argument("message_id", required=False, type=uuid_value, location="json")
+        parser.add_argument("question", required=True, type=str, location="json")
+        parser.add_argument("answer", required=True, type=str, location="json")
+        parser.add_argument("annotation_reply", required=False, type=dict, location="json")
         args = parser.parse_args()
         annotation = AppAnnotationService.up_insert_app_annotation_from_message(args, app_model.id)
 
@@ -207,11 +211,9 @@ class MessageAnnotationCountApi(Resource):
     @account_initialization_required
     @get_app_model
     def get(self, app_model):
-        count = db.session.query(MessageAnnotation).filter(
-            MessageAnnotation.app_id == app_model.id
-        ).count()
+        count = db.session.query(MessageAnnotation).filter(MessageAnnotation.app_id == app_model.id).count()
 
-        return {'count': count}
+        return {"count": count}
 
 
 class MessageSuggestedQuestionApi(Resource):
@@ -238,10 +240,7 @@ class MessageSuggestedQuestionApi(Resource):
         try:
             # 尝试获取回答后的建议问题
             questions = MessageService.get_suggested_questions_after_answer(
-                app_model=app_model,
-                message_id=message_id,
-                user=current_user,
-                invoke_from=InvokeFrom.DEBUGGER
+                app_model=app_model, message_id=message_id, user=current_user, invoke_from=InvokeFrom.DEBUGGER
             )
         except MessageNotExistsError:
             # 消息不存在时抛出异常
@@ -268,7 +267,7 @@ class MessageSuggestedQuestionApi(Resource):
             logging.exception("internal server error.")
             raise InternalServerError()
 
-        return {'data': questions}  # 返回问题数据
+        return {"data": questions}
 
 
 class MessageApi(Resource):
@@ -287,11 +286,7 @@ class MessageApi(Resource):
     def get(self, app_model, message_id):
         message_id = str(message_id)
 
-        # 查询数据库，获取指定消息
-        message = db.session.query(Message).filter(
-            Message.id == message_id,
-            Message.app_id == app_model.id
-        ).first()
+        message = db.session.query(Message).filter(Message.id == message_id, Message.app_id == app_model.id).first()
 
         if not message:
             raise NotFound("Message Not Exists.")  # 如果消息不存在，抛出异常
@@ -299,9 +294,9 @@ class MessageApi(Resource):
         return message  # 返回查询到的消息
 
 
-api.add_resource(MessageSuggestedQuestionApi, '/apps/<uuid:app_id>/chat-messages/<uuid:message_id>/suggested-questions')
-api.add_resource(ChatMessageListApi, '/apps/<uuid:app_id>/chat-messages', endpoint='console_chat_messages')
-api.add_resource(MessageFeedbackApi, '/apps/<uuid:app_id>/feedbacks')
-api.add_resource(MessageAnnotationApi, '/apps/<uuid:app_id>/annotations')
-api.add_resource(MessageAnnotationCountApi, '/apps/<uuid:app_id>/annotations/count')
-api.add_resource(MessageApi, '/apps/<uuid:app_id>/messages/<uuid:message_id>', endpoint='console_message')
+api.add_resource(MessageSuggestedQuestionApi, "/apps/<uuid:app_id>/chat-messages/<uuid:message_id>/suggested-questions")
+api.add_resource(ChatMessageListApi, "/apps/<uuid:app_id>/chat-messages", endpoint="console_chat_messages")
+api.add_resource(MessageFeedbackApi, "/apps/<uuid:app_id>/feedbacks")
+api.add_resource(MessageAnnotationApi, "/apps/<uuid:app_id>/annotations")
+api.add_resource(MessageAnnotationCountApi, "/apps/<uuid:app_id>/annotations/count")
+api.add_resource(MessageApi, "/apps/<uuid:app_id>/messages/<uuid:message_id>", endpoint="console_message")

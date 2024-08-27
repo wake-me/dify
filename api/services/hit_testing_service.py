@@ -10,14 +10,11 @@ from models.dataset import Dataset, DatasetQuery, DocumentSegment
 
 # 默认的检索模型配置
 default_retrieval_model = {
-    'search_method': RetrievalMethod.SEMANTIC_SEARCH.value,
-    'reranking_enable': False,
-    'reranking_model': {
-        'reranking_provider_name': '',
-        'reranking_model_name': ''
-    },
-    'top_k': 2,  # 返回结果的数量，默认为2
-    'score_threshold_enabled': False  # 是否启用得分阈值，默认不启用
+    "search_method": RetrievalMethod.SEMANTIC_SEARCH.value,
+    "reranking_enable": False,
+    "reranking_model": {"reranking_provider_name": "", "reranking_model_name": ""},
+    "top_k": 2,
+    "score_threshold_enabled": False,
 }
 
 class HitTestingService:
@@ -43,9 +40,9 @@ class HitTestingService:
             return {
                 "query": {
                     "content": query,
-                    "tsne_position": {'x': 0, 'y': 0},
+                    "tsne_position": {"x": 0, "y": 0},
                 },
-                "records": []
+                "records": [],
             }
 
         start = time.perf_counter()
@@ -54,18 +51,22 @@ class HitTestingService:
         if not retrieval_model:
             retrieval_model = dataset.retrieval_model if dataset.retrieval_model else default_retrieval_model
 
-        all_documents = RetrievalService.retrieve(retrival_method=retrieval_model.get('search_method', 'semantic_search'),
-                                                  dataset_id=dataset.id,
-                                                  query=cls.escape_query_for_search(query),
-                                                  top_k=retrieval_model.get('top_k', 2),
-                                                  score_threshold=retrieval_model.get('score_threshold', .0)
-                                                  if retrieval_model['score_threshold_enabled'] else None,
-                                                  reranking_model=retrieval_model.get('reranking_model', None)
-                                                  if retrieval_model['reranking_enable'] else None,
-                                                  reranking_mode=retrieval_model.get('reranking_mode')
-                                                  if retrieval_model.get('reranking_mode') else 'reranking_model',
-                                                  weights=retrieval_model.get('weights', None),
-                                                  )
+        all_documents = RetrievalService.retrieve(
+            retrival_method=retrieval_model.get("search_method", "semantic_search"),
+            dataset_id=dataset.id,
+            query=cls.escape_query_for_search(query),
+            top_k=retrieval_model.get("top_k", 2),
+            score_threshold=retrieval_model.get("score_threshold", 0.0)
+            if retrieval_model["score_threshold_enabled"]
+            else None,
+            reranking_model=retrieval_model.get("reranking_model", None)
+            if retrieval_model["reranking_enable"]
+            else None,
+            reranking_mode=retrieval_model.get("reranking_mode")
+            if retrieval_model.get("reranking_mode")
+            else "reranking_model",
+            weights=retrieval_model.get("weights", None),
+        )
 
         end = time.perf_counter()
         # 记录检索执行时间
@@ -73,11 +74,7 @@ class HitTestingService:
 
         # 将查询信息保存到数据库
         dataset_query = DatasetQuery(
-            dataset_id=dataset.id,
-            content=query,
-            source='hit_testing',
-            created_by_role='account',
-            created_by=account.id
+            dataset_id=dataset.id, content=query, source="hit_testing", created_by_role="account", created_by=account.id
         )
 
         db.session.add(dataset_query)
@@ -90,16 +87,18 @@ class HitTestingService:
         i = 0
         records = []
         for document in documents:
-            # 获取文档的元数据ID
-            index_node_id = document.metadata['doc_id']
+            index_node_id = document.metadata["doc_id"]
 
-            # 查询文档段
-            segment = db.session.query(DocumentSegment).filter(
-                DocumentSegment.dataset_id == dataset.id,
-                DocumentSegment.enabled == True,
-                DocumentSegment.status == 'completed',
-                DocumentSegment.index_node_id == index_node_id
-            ).first()
+            segment = (
+                db.session.query(DocumentSegment)
+                .filter(
+                    DocumentSegment.dataset_id == dataset.id,
+                    DocumentSegment.enabled == True,
+                    DocumentSegment.status == "completed",
+                    DocumentSegment.index_node_id == index_node_id,
+                )
+                .first()
+            )
 
             # 如果文档段不存在，则跳过当前文档
             if not segment:
@@ -109,7 +108,7 @@ class HitTestingService:
             # 构建文档记录
             record = {
                 "segment": segment,
-                "score": document.metadata.get('score', None),
+                "score": document.metadata.get("score", None),
             }
 
             # 将文档记录添加到结果列表
@@ -122,27 +121,15 @@ class HitTestingService:
             "query": {
                 "content": query,
             },
-            "records": records
+            "records": records,
         }
 
     @classmethod
     def hit_testing_args_check(cls, args):
-        """
-        检查传入的参数是否符合hit testing的要求。
-        
-        参数:
-        - cls: 通常表示类的引用，但在该函数中未使用，可以忽略。
-        - args: 一个字典，必须包含'query'键，其值为待检测的查询字符串。
-        
-        返回值:
-        - 无返回值，但会抛出ValueError异常，如果查询字符串为空或超过250个字符。
-        """
-        
-        query = args['query']  # 提取查询字符串
+        query = args["query"]
 
-        # 检查查询字符串是否为空或超过最大长度限制
         if not query or len(query) > 250:
-            raise ValueError('Query is required and cannot exceed 250 characters')
+            raise ValueError("Query is required and cannot exceed 250 characters")
 
     @staticmethod
     def escape_query_for_search(query: str) -> str:

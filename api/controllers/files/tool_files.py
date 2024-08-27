@@ -25,22 +25,21 @@ class ToolFilePreviewApi(Resource):
         # 初始化请求解析器
         parser = reqparse.RequestParser()
 
-        # 添加请求参数解析规则
-        parser.add_argument('timestamp', type=str, required=True, location='args')
-        parser.add_argument('nonce', type=str, required=True, location='args')
-        parser.add_argument('sign', type=str, required=True, location='args')
+        parser.add_argument("timestamp", type=str, required=True, location="args")
+        parser.add_argument("nonce", type=str, required=True, location="args")
+        parser.add_argument("sign", type=str, required=True, location="args")
 
         # 解析请求参数
         args = parser.parse_args()
 
-        # 验证请求的合法性
-        if not ToolFileManager.verify_file(file_id=file_id,
-                                            timestamp=args['timestamp'],
-                                            nonce=args['nonce'],
-                                            sign=args['sign'],
+        if not ToolFileManager.verify_file(
+            file_id=file_id,
+            timestamp=args["timestamp"],
+            nonce=args["nonce"],
+            sign=args["sign"],
         ):
-            raise Forbidden('Invalid request.')
-        
+            raise Forbidden("Invalid request.")
+
         try:
             result = ToolFileManager.get_file_generator_by_tool_file_id(
                 file_id,
@@ -48,9 +47,9 @@ class ToolFilePreviewApi(Resource):
 
             # 如果文件不存在，抛出未找到错误
             if not result:
-                raise NotFound('file is not found')
-            
-            generator, mimetype = result  # 解析获取的结果
+                raise NotFound("file is not found")
+
+            generator, mimetype = result
         except Exception:
             # 如果遇到不支持的文件类型，抛出错误
             raise UnsupportedFileTypeError()
@@ -58,9 +57,11 @@ class ToolFilePreviewApi(Resource):
         # 返回文件生成器和MIME类型
         return Response(generator, mimetype=mimetype)
 
-api.add_resource(ToolFilePreviewApi, '/files/tools/<uuid:file_id>.<string:extension>')
+
+api.add_resource(ToolFilePreviewApi, "/files/tools/<uuid:file_id>.<string:extension>")
+
 
 class UnsupportedFileTypeError(BaseHTTPException):
-    error_code = 'unsupported_file_type'
+    error_code = "unsupported_file_type"
     description = "File type not allowed."
     code = 415

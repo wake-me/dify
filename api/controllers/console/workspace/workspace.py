@@ -27,42 +27,36 @@ from services.workspace_service import WorkspaceService
 
 # 定义provider的字段信息
 provider_fields = {
-    'provider_name': fields.String,  # 提供者名称
-    'provider_type': fields.String,  # 提供者类型
-    'is_valid': fields.Boolean,  # 是否有效
-    'token_is_set': fields.Boolean,  # 是否设置了token
+    "provider_name": fields.String,
+    "provider_type": fields.String,
+    "is_valid": fields.Boolean,
+    "token_is_set": fields.Boolean,
 }
 
 # 定义tenant的字段信息
 tenant_fields = {
-    'id': fields.String,  # 租户ID
-    'name': fields.String,  # 租户名称
-    'plan': fields.String,  # 计划类型
-    'status': fields.String,  # 状态
-    'created_at': TimestampField,  # 创建时间
-    'role': fields.String,  # 角色
-    'in_trial': fields.Boolean,  # 是否在试用期
-    'trial_end_reason': fields.String,  # 试用结束原因
-    'custom_config': fields.Raw(attribute='custom_config'),  # 自定义配置
+    "id": fields.String,
+    "name": fields.String,
+    "plan": fields.String,
+    "status": fields.String,
+    "created_at": TimestampField,
+    "role": fields.String,
+    "in_trial": fields.Boolean,
+    "trial_end_reason": fields.String,
+    "custom_config": fields.Raw(attribute="custom_config"),
 }
 
 # 定义租户信息的字段结构
 tenants_fields = {
-    'id': fields.String,  # 租户唯一标识符
-    'name': fields.String,  # 租户名称
-    'plan': fields.String,  # 租户订阅的计划
-    'status': fields.String,  # 租户状态
-    'created_at': TimestampField,  # 租户创建时间
-    'current': fields.Boolean  # 标记是否为当前租户
+    "id": fields.String,
+    "name": fields.String,
+    "plan": fields.String,
+    "status": fields.String,
+    "created_at": TimestampField,
+    "current": fields.Boolean,
 }
 
-# 定义工作空间信息的字段结构
-workspace_fields = {
-    'id': fields.String,  # 工作空间唯一标识符
-    'name': fields.String,  # 工作空间名称
-    'status': fields.String,  # 工作空间状态
-    'created_at': TimestampField  # 工作空间创建时间
-}
+workspace_fields = {"id": fields.String, "name": fields.String, "status": fields.String, "created_at": TimestampField}
 
 
 class TenantListApi(Resource):
@@ -75,7 +69,7 @@ class TenantListApi(Resource):
         for tenant in tenants:
             if tenant.id == current_user.current_tenant_id:
                 tenant.current = True  # Set current=True for current tenant
-        return {'workspaces': marshal(tenants, tenants_fields)}, 200
+        return {"workspaces": marshal(tenants, tenants_fields)}, 200
 
 
 class WorkspaceListApi(Resource):
@@ -102,22 +96,27 @@ class WorkspaceListApi(Resource):
         """
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('page', type=inputs.int_range(1, 99999), required=False, default=1, location='args')
-        parser.add_argument('limit', type=inputs.int_range(1, 100), required=False, default=20, location='args')
+        parser.add_argument("page", type=inputs.int_range(1, 99999), required=False, default=1, location="args")
+        parser.add_argument("limit", type=inputs.int_range(1, 100), required=False, default=20, location="args")
         args = parser.parse_args()
 
-        # 从数据库中获取工作空间信息，并进行分页
-        tenants = db.session.query(Tenant).order_by(Tenant.created_at.desc())\
-            .paginate(page=args['page'], per_page=args['limit'])
+        tenants = (
+            db.session.query(Tenant)
+            .order_by(Tenant.created_at.desc())
+            .paginate(page=args["page"], per_page=args["limit"])
+        )
 
         # 判断是否还有更多的工作空间页
         has_more = False
-        if len(tenants.items) == args['limit']:
+        if len(tenants.items) == args["limit"]:
             current_page_first_tenant = tenants[-1]
-            rest_count = db.session.query(Tenant).filter(
-                Tenant.created_at < current_page_first_tenant.created_at,
-                Tenant.id != current_page_first_tenant.id
-            ).count()
+            rest_count = (
+                db.session.query(Tenant)
+                .filter(
+                    Tenant.created_at < current_page_first_tenant.created_at, Tenant.id != current_page_first_tenant.id
+                )
+                .count()
+            )
 
             if rest_count > 0:
                 has_more = True
@@ -126,12 +125,12 @@ class WorkspaceListApi(Resource):
         total = db.session.query(Tenant).count()
         # 返回工作空间列表信息
         return {
-            'data': marshal(tenants.items, workspace_fields),
-            'has_more': has_more,
-            'limit': args['limit'],
-            'page': args['page'],
-            'total': total
-                }, 200
+            "data": marshal(tenants.items, workspace_fields),
+            "has_more": has_more,
+            "limit": args["limit"],
+            "page": args["page"],
+            "total": total,
+        }, 200
 
 
 class TenantApi(Resource):
@@ -140,8 +139,8 @@ class TenantApi(Resource):
     @account_initialization_required
     @marshal_with(tenant_fields)
     def get(self):
-        if request.path == '/info':
-            logging.warning('Deprecated URL /info was used.')
+        if request.path == "/info":
+            logging.warning("Deprecated URL /info was used.")
 
         tenant = current_user.current_tenant
 
@@ -153,7 +152,7 @@ class TenantApi(Resource):
                 tenant = tenants[0]
             # else, raise Unauthorized
             else:
-                raise Unauthorized('workspace is archived')
+                raise Unauthorized("workspace is archived")
 
         return WorkspaceService.get_tenant_info(tenant), 200
 
@@ -189,19 +188,18 @@ class SwitchWorkspaceApi(Resource):
         - 包含切换结果及新工作空间信息的字典。
         """
         parser = reqparse.RequestParser()
-        parser.add_argument('tenant_id', type=str, required=True, location='json')
+        parser.add_argument("tenant_id", type=str, required=True, location="json")
         args = parser.parse_args()
 
         # 尝试根据提供的tenant_id切换租户，若失败则抛出特定错误
         try:
-            TenantService.switch_tenant(current_user, args['tenant_id'])
+            TenantService.switch_tenant(current_user, args["tenant_id"])
         except Exception:
             raise AccountNotLinkTenantError("Account not link tenant")
 
-        new_tenant = db.session.query(Tenant).get(args['tenant_id'])  # 获取新切换的租户信息
+        new_tenant = db.session.query(Tenant).get(args["tenant_id"])  # Get new tenant
 
-        # 返回切换成功的消息及新工作空间的详细信息
-        return {'result': 'success', 'new_tenant': marshal(WorkspaceService.get_tenant_info(new_tenant), tenant_fields)}
+        return {"result": "success", "new_tenant": marshal(WorkspaceService.get_tenant_info(new_tenant), tenant_fields)}
 
 
 class CustomConfigWorkspaceApi(Resource):
@@ -215,7 +213,7 @@ class CustomConfigWorkspaceApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('workspace_custom')
+    @cloud_edition_billing_resource_check("workspace_custom")
     def post(self):
         """
         更新工作空间的自定义配置信息。
@@ -228,24 +226,25 @@ class CustomConfigWorkspaceApi(Resource):
         
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('remove_webapp_brand', type=bool, location='json')
-        parser.add_argument('replace_webapp_logo', type=str,  location='json')
+        parser.add_argument("remove_webapp_brand", type=bool, location="json")
+        parser.add_argument("replace_webapp_logo", type=str, location="json")
         args = parser.parse_args()
 
         tenant = db.session.query(Tenant).filter(Tenant.id == current_user.current_tenant_id).one_or_404()
 
         custom_config_dict = {
-            'remove_webapp_brand': args['remove_webapp_brand'],
-            'replace_webapp_logo': args['replace_webapp_logo'] if args['replace_webapp_logo'] is not None else tenant.custom_config_dict.get('replace_webapp_logo') ,
+            "remove_webapp_brand": args["remove_webapp_brand"],
+            "replace_webapp_logo": args["replace_webapp_logo"]
+            if args["replace_webapp_logo"] is not None
+            else tenant.custom_config_dict.get("replace_webapp_logo"),
         }
 
         # 更新租户的自定义配置信息
         tenant.custom_config_dict = custom_config_dict
         db.session.commit()
 
-        # 返回更新成功的信息及租户详细信息
-        return {'result': 'success', 'tenant': marshal(WorkspaceService.get_tenant_info(tenant), tenant_fields)}
-    
+        return {"result": "success", "tenant": marshal(WorkspaceService.get_tenant_info(tenant), tenant_fields)}
+
 
 class WebappLogoWorkspaceApi(Resource):
     """
@@ -261,37 +260,20 @@ class WebappLogoWorkspaceApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('workspace_custom')
+    @cloud_edition_billing_resource_check("workspace_custom")
     def post(self):
-        """
-        上传文件到工作空间。
-        
-        接收一个文件，并检查其类型和大小，然后将其上传到服务器。
-        
-        返回：
-        - 上传文件的ID
-        - HTTP状态码201（创建成功）
-        
-        抛出：
-        - NoFileUploadedError：如果没有文件被上传
-        - TooManyFilesError：如果上传了多个文件
-        - UnsupportedFileTypeError：如果文件类型不是SVG或PNG
-        - FileTooLargeError：如果文件大小超过限制
-        """
-        
-        # 从请求中获取文件
-        file = request.files['file']
+        # get file from request
+        file = request.files["file"]
 
-        # 检查文件是否上传以及上传的文件数量
-        if 'file' not in request.files:
+        # check file
+        if "file" not in request.files:
             raise NoFileUploadedError()
 
         if len(request.files) > 1:
             raise TooManyFilesError()
 
-        # 检查文件扩展名是否支持
-        extension = file.filename.split('.')[-1]
-        if extension.lower() not in ['svg', 'png']:
+        extension = file.filename.split(".")[-1]
+        if extension.lower() not in ["svg", "png"]:
             raise UnsupportedFileTypeError()
 
         try:
@@ -304,15 +286,14 @@ class WebappLogoWorkspaceApi(Resource):
         except services.errors.file.UnsupportedFileTypeError:
             # 如果文件类型不支持，抛出异常
             raise UnsupportedFileTypeError()
-        
-        # 返回上传文件的ID
-        return { 'id': upload_file.id }, 201
+
+        return {"id": upload_file.id}, 201
 
 
-api.add_resource(TenantListApi, '/workspaces')  # GET for getting all tenants
-api.add_resource(WorkspaceListApi, '/all-workspaces')  # GET for getting all tenants
-api.add_resource(TenantApi, '/workspaces/current', endpoint='workspaces_current')  # GET for getting current tenant info
-api.add_resource(TenantApi, '/info', endpoint='info')  # Deprecated
-api.add_resource(SwitchWorkspaceApi, '/workspaces/switch')  # POST for switching tenant
-api.add_resource(CustomConfigWorkspaceApi, '/workspaces/custom-config')
-api.add_resource(WebappLogoWorkspaceApi, '/workspaces/custom-config/webapp-logo/upload')
+api.add_resource(TenantListApi, "/workspaces")  # GET for getting all tenants
+api.add_resource(WorkspaceListApi, "/all-workspaces")  # GET for getting all tenants
+api.add_resource(TenantApi, "/workspaces/current", endpoint="workspaces_current")  # GET for getting current tenant info
+api.add_resource(TenantApi, "/info", endpoint="info")  # Deprecated
+api.add_resource(SwitchWorkspaceApi, "/workspaces/switch")  # POST for switching tenant
+api.add_resource(CustomConfigWorkspaceApi, "/workspaces/custom-config")
+api.add_resource(WebappLogoWorkspaceApi, "/workspaces/custom-config/webapp-logo/upload")

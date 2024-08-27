@@ -19,7 +19,7 @@ class WorkflowRunService:
         :param args: 请求参数，可用于过滤和分页等操作
         :return: 返回一个 InfiniteScrollPagination 对象，包含分页后的工作流运行记录列表
         """
-        # 定义一个内部类，用于封装工作流运行记录和相关消息信息
+
         class WorkflowWithMessage:
             message_id: str  # 消息ID
             conversation_id: str  # 聊天会话ID
@@ -37,10 +37,8 @@ class WorkflowRunService:
         # 初始化一个列表，用于存储带有消息信息的工作流运行记录
         with_message_workflow_runs = []
         for workflow_run in pagination.data:
-            message = workflow_run.message  # 尝试获取与工作流运行记录相关联的消息
-            with_message_workflow_run = WorkflowWithMessage(
-                workflow_run=workflow_run
-            )
+            message = workflow_run.message
+            with_message_workflow_run = WorkflowWithMessage(workflow_run=workflow_run)
             if message:
                 # 如果存在相关消息，则设置工作流运行记录的消息ID和会话ID
                 with_message_workflow_run.message_id = message.id
@@ -61,31 +59,32 @@ class WorkflowRunService:
         :param args: 请求参数，包含分页和筛选条件
         :return: 返回一个包含工作流运行数据的 InfiniteScrollPagination 对象
         """
-        # 解析请求中的限制条数，默认为20
-        limit = int(args.get('limit', 20))
+        limit = int(args.get("limit", 20))
 
         # 构建基础查询，筛选出特定应用和租户ID，以及触发方式为调试的工作流运行记录
         base_query = db.session.query(WorkflowRun).filter(
             WorkflowRun.tenant_id == app_model.tenant_id,
             WorkflowRun.app_id == app_model.id,
-            WorkflowRun.triggered_from == WorkflowRunTriggeredFrom.DEBUGGING.value
+            WorkflowRun.triggered_from == WorkflowRunTriggeredFrom.DEBUGGING.value,
         )
 
-        # 如果请求中包含 last_id 参数，则进一步筛选出之后的工作流运行记录
-        if args.get('last_id'):
+        if args.get("last_id"):
             last_workflow_run = base_query.filter(
-                WorkflowRun.id == args.get('last_id'),
+                WorkflowRun.id == args.get("last_id"),
             ).first()
 
             # 如果找不到指定的 last_workflow_run，则抛出异常
             if not last_workflow_run:
-                raise ValueError('Last workflow run not exists')
+                raise ValueError("Last workflow run not exists")
 
-            # 筛选创建时间早于 last_workflow_run 且 ID 不同的工作流运行记录，按创建时间降序排列，并限制条数
-            workflow_runs = base_query.filter(
-                WorkflowRun.created_at < last_workflow_run.created_at,
-                WorkflowRun.id != last_workflow_run.id
-            ).order_by(WorkflowRun.created_at.desc()).limit(limit).all()
+            workflow_runs = (
+                base_query.filter(
+                    WorkflowRun.created_at < last_workflow_run.created_at, WorkflowRun.id != last_workflow_run.id
+                )
+                .order_by(WorkflowRun.created_at.desc())
+                .limit(limit)
+                .all()
+            )
         else:
             # 若无 last_id 参数，则直接按创建时间降序排列并限制条数
             workflow_runs = base_query.order_by(WorkflowRun.created_at.desc()).limit(limit).all()
@@ -97,19 +96,14 @@ class WorkflowRunService:
             # 计算创建时间早于当前页第一条记录且 ID 不同的工作流运行记录总数
             rest_count = base_query.filter(
                 WorkflowRun.created_at < current_page_first_workflow_run.created_at,
-                WorkflowRun.id != current_page_first_workflow_run.id
+                WorkflowRun.id != current_page_first_workflow_run.id,
             ).count()
 
             # 如果还有更多记录，则 has_more 设为 True
             if rest_count > 0:
                 has_more = True
 
-        # 返回分页结果
-        return InfiniteScrollPagination(
-            data=workflow_runs,
-            limit=limit,
-            has_more=has_more
-        )
+        return InfiniteScrollPagination(data=workflow_runs, limit=limit, has_more=has_more)
 
     def get_workflow_run(self, app_model: App, run_id: str) -> WorkflowRun:
         """
@@ -119,12 +113,15 @@ class WorkflowRunService:
         :param run_id: 工作流运行的唯一标识符
         :return: 返回指定工作流运行的详细信息对象
         """
-        # 根据提供的应用模型、运行ID查询工作流运行信息
-        workflow_run = db.session.query(WorkflowRun).filter(
-            WorkflowRun.tenant_id == app_model.tenant_id,
-            WorkflowRun.app_id == app_model.id,
-            WorkflowRun.id == run_id,
-        ).first()
+        workflow_run = (
+            db.session.query(WorkflowRun)
+            .filter(
+                WorkflowRun.tenant_id == app_model.tenant_id,
+                WorkflowRun.app_id == app_model.id,
+                WorkflowRun.id == run_id,
+            )
+            .first()
+        )
 
         return workflow_run
 
@@ -143,13 +140,17 @@ class WorkflowRunService:
         if not workflow_run:
             return []
 
-        # 查询并返回该工作流运行下的所有节点执行信息，按节点索引降序排列
-        node_executions = db.session.query(WorkflowNodeExecution).filter(
-            WorkflowNodeExecution.tenant_id == app_model.tenant_id,
-            WorkflowNodeExecution.app_id == app_model.id,
-            WorkflowNodeExecution.workflow_id == workflow_run.workflow_id,
-            WorkflowNodeExecution.triggered_from == WorkflowNodeExecutionTriggeredFrom.WORKFLOW_RUN.value,
-            WorkflowNodeExecution.workflow_run_id == run_id,
-        ).order_by(WorkflowNodeExecution.index.desc()).all()
+        node_executions = (
+            db.session.query(WorkflowNodeExecution)
+            .filter(
+                WorkflowNodeExecution.tenant_id == app_model.tenant_id,
+                WorkflowNodeExecution.app_id == app_model.id,
+                WorkflowNodeExecution.workflow_id == workflow_run.workflow_id,
+                WorkflowNodeExecution.triggered_from == WorkflowNodeExecutionTriggeredFrom.WORKFLOW_RUN.value,
+                WorkflowNodeExecution.workflow_run_id == run_id,
+            )
+            .order_by(WorkflowNodeExecution.index.desc())
+            .all()
+        )
 
         return node_executions

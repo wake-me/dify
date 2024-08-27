@@ -4,7 +4,6 @@ from models.model import App, AppModelConfig
 
 
 class ModerationService:
-
     def moderation_for_outputs(self, app_id: str, app_model: App, text: str) -> ModerationOutputsResult:
         """
         对给定文本进行审核，根据应用模型的配置来执行敏感词过滤或其他审核逻辑。
@@ -19,16 +18,16 @@ class ModerationService:
         """
         app_model_config: AppModelConfig = None
 
-        # 从数据库中查询应用模型的配置信息
-        app_model_config = db.session.query(AppModelConfig).filter(AppModelConfig.id == app_model.app_model_config_id).first()
+        app_model_config = (
+            db.session.query(AppModelConfig).filter(AppModelConfig.id == app_model.app_model_config_id).first()
+        )
 
         if not app_model_config:
             # 如果找不到应用模型配置，抛出异常
             raise ValueError("app model config not found")
 
-        # 从配置中获取审核类型和配置信息
-        name = app_model_config.sensitive_word_avoidance_dict['type']
-        config = app_model_config.sensitive_word_avoidance_dict['config']
+        name = app_model_config.sensitive_word_avoidance_dict["type"]
+        config = app_model_config.sensitive_word_avoidance_dict["config"]
 
         # 根据审核类型和配置创建审核器实例
         moderation = ModerationFactory(name, app_id, app_model.tenant_id, config)

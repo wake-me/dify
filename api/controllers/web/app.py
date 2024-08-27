@@ -9,38 +9,34 @@ from services.app_service import AppService
 
 
 class AppParameterApi(WebApiResource):
-    """应用变量资源类。"""
+    """Resource for app variables."""
 
-    # 定义应用变量的字段及其类型
     variable_fields = {
-        'key': fields.String,
-        'name': fields.String,
-        'description': fields.String,
-        'type': fields.String,
-        'default': fields.String,
-        'max_length': fields.Integer,
-        'options': fields.List(fields.String)
+        "key": fields.String,
+        "name": fields.String,
+        "description": fields.String,
+        "type": fields.String,
+        "default": fields.String,
+        "max_length": fields.Integer,
+        "options": fields.List(fields.String),
     }
 
-    # 定义系统参数的字段及其类型
-    system_parameters_fields = {
-        'image_file_size_limit': fields.String
-    }
+    system_parameters_fields = {"image_file_size_limit": fields.String}
 
     # 定义全部参数的字段及其类型
     parameters_fields = {
-        'opening_statement': fields.String,  # 开场白
-        'suggested_questions': fields.Raw,  # 建议问题
-        'suggested_questions_after_answer': fields.Raw,  # 答后建议问题
-        'speech_to_text': fields.Raw,  # 语音转文本
-        'text_to_speech': fields.Raw,  # 文本转语音
-        'retriever_resource': fields.Raw,  # 数据检索资源
-        'annotation_reply': fields.Raw,  # 注解回复
-        'more_like_this': fields.Raw,  # 类似的回答
-        'user_input_form': fields.Raw,  # 用户输入表单
-        'sensitive_word_avoidance': fields.Raw,  # 敏感词规避
-        'file_upload': fields.Raw,  # 文件上传
-        'system_parameters': fields.Nested(system_parameters_fields)  # 系统参数
+        "opening_statement": fields.String,
+        "suggested_questions": fields.Raw,
+        "suggested_questions_after_answer": fields.Raw,
+        "speech_to_text": fields.Raw,
+        "text_to_speech": fields.Raw,
+        "retriever_resource": fields.Raw,
+        "annotation_reply": fields.Raw,
+        "more_like_this": fields.Raw,
+        "user_input_form": fields.Raw,
+        "sensitive_word_avoidance": fields.Raw,
+        "file_upload": fields.Raw,
+        "system_parameters": fields.Nested(system_parameters_fields),
     }
 
     @marshal_with(parameters_fields)
@@ -57,31 +53,36 @@ class AppParameterApi(WebApiResource):
             app_model_config = app_model.app_model_config
             features_dict = app_model_config.to_dict()
 
-            user_input_form = features_dict.get('user_input_form', [])
+            user_input_form = features_dict.get("user_input_form", [])
 
         # 构建并返回包含应用所有配置参数的字典
         return {
-            'opening_statement': features_dict.get('opening_statement'),
-            'suggested_questions': features_dict.get('suggested_questions', []),
-            'suggested_questions_after_answer': features_dict.get('suggested_questions_after_answer',
-                                                                  {"enabled": False}),
-            'speech_to_text': features_dict.get('speech_to_text', {"enabled": False}),
-            'text_to_speech': features_dict.get('text_to_speech', {"enabled": False}),
-            'retriever_resource': features_dict.get('retriever_resource', {"enabled": False}),
-            'annotation_reply': features_dict.get('annotation_reply', {"enabled": False}),
-            'more_like_this': features_dict.get('more_like_this', {"enabled": False}),
-            'user_input_form': user_input_form,
-            'sensitive_word_avoidance': features_dict.get('sensitive_word_avoidance',
-                                                          {"enabled": False, "type": "", "configs": []}),
-            'file_upload': features_dict.get('file_upload', {"image": {
-                "enabled": False,
-                "number_limits": 3,
-                "detail": "high",
-                "transfer_methods": ["remote_url", "local_file"]
-            }}),
-            'system_parameters': {
-                'image_file_size_limit': dify_config.UPLOAD_IMAGE_FILE_SIZE_LIMIT
-            }
+            "opening_statement": features_dict.get("opening_statement"),
+            "suggested_questions": features_dict.get("suggested_questions", []),
+            "suggested_questions_after_answer": features_dict.get(
+                "suggested_questions_after_answer", {"enabled": False}
+            ),
+            "speech_to_text": features_dict.get("speech_to_text", {"enabled": False}),
+            "text_to_speech": features_dict.get("text_to_speech", {"enabled": False}),
+            "retriever_resource": features_dict.get("retriever_resource", {"enabled": False}),
+            "annotation_reply": features_dict.get("annotation_reply", {"enabled": False}),
+            "more_like_this": features_dict.get("more_like_this", {"enabled": False}),
+            "user_input_form": user_input_form,
+            "sensitive_word_avoidance": features_dict.get(
+                "sensitive_word_avoidance", {"enabled": False, "type": "", "configs": []}
+            ),
+            "file_upload": features_dict.get(
+                "file_upload",
+                {
+                    "image": {
+                        "enabled": False,
+                        "number_limits": 3,
+                        "detail": "high",
+                        "transfer_methods": ["remote_url", "local_file"],
+                    }
+                },
+            ),
+            "system_parameters": {"image_file_size_limit": dify_config.UPLOAD_IMAGE_FILE_SIZE_LIMIT},
         }
 
 
@@ -91,5 +92,5 @@ class AppMeta(WebApiResource):
         return AppService().get_app_meta(app_model)
 
 
-api.add_resource(AppParameterApi, '/parameters')
-api.add_resource(AppMeta, '/meta')
+api.add_resource(AppParameterApi, "/parameters")
+api.add_resource(AppMeta, "/meta")

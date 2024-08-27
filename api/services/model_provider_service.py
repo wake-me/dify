@@ -76,8 +76,8 @@ class ModelProviderService:
                 system_configuration=SystemConfigurationResponse(
                     enabled=provider_configuration.system_configuration.enabled,
                     current_quota_type=provider_configuration.system_configuration.current_quota_type,
-                    quota_configurations=provider_configuration.system_configuration.quota_configurations
-                )
+                    quota_configurations=provider_configuration.system_configuration.quota_configurations,
+                ),
             )
 
             provider_responses.append(provider_response)
@@ -97,10 +97,10 @@ class ModelProviderService:
         # 获取当前工作空间的所有提供商配置
         provider_configurations = self.provider_manager.get_configurations(tenant_id)
 
-        # 根据指定提供商获取可用模型，并转换为ModelWithProviderEntityResponse类型列表
-        return [ModelWithProviderEntityResponse(model) for model in provider_configurations.get_models(
-            provider=provider
-        )]
+        # Get provider available models
+        return [
+            ModelWithProviderEntityResponse(model) for model in provider_configurations.get_models(provider=provider)
+        ]
 
     def get_provider_credentials(self, tenant_id: str, provider: str) -> dict:
         """
@@ -201,13 +201,12 @@ class ModelProviderService:
 
         # 如果存在，从ProviderModel中获取模型的自定义认证信息
         return provider_configuration.get_custom_model_credentials(
-            model_type=ModelType.value_of(model_type),
-            model=model,
-            obfuscated=True
+            model_type=ModelType.value_of(model_type), model=model, obfuscated=True
         )
 
-    def model_credentials_validate(self, tenant_id: str, provider: str, model_type: str, model: str,
-                                credentials: dict) -> None:
+    def model_credentials_validate(
+        self, tenant_id: str, provider: str, model_type: str, model: str, credentials: dict
+    ) -> None:
         """
         验证模型的凭证信息。
 
@@ -228,13 +227,12 @@ class ModelProviderService:
 
         # 验证模型凭证信息的有效性
         provider_configuration.custom_model_credentials_validate(
-            model_type=ModelType.value_of(model_type),
-            model=model,
-            credentials=credentials
+            model_type=ModelType.value_of(model_type), model=model, credentials=credentials
         )
 
-    def save_model_credentials(self, tenant_id: str, provider: str, model_type: str, model: str,
-                            credentials: dict) -> None:
+    def save_model_credentials(
+        self, tenant_id: str, provider: str, model_type: str, model: str, credentials: dict
+    ) -> None:
         """
         保存模型凭证信息。
 
@@ -255,9 +253,7 @@ class ModelProviderService:
 
         # 添加或更新自定义模型凭证信息
         provider_configuration.add_or_update_custom_model_credentials(
-            model_type=ModelType.value_of(model_type),
-            model=model,
-            credentials=credentials
+            model_type=ModelType.value_of(model_type), model=model, credentials=credentials
         )
 
     def remove_model_credentials(self, tenant_id: str, provider: str, model_type: str, model: str) -> None:
@@ -278,11 +274,8 @@ class ModelProviderService:
         if not provider_configuration:
             raise ValueError(f"提供者 {provider} 不存在。")
 
-        # 移除自定义模型凭证
-        provider_configuration.delete_custom_model_credentials(
-            model_type=ModelType.value_of(model_type),
-            model=model
-        )
+        # Remove custom model credentials
+        provider_configuration.delete_custom_model_credentials(model_type=ModelType.value_of(model_type), model=model)
 
     def get_models_by_model_type(self, tenant_id: str, model_type: str) -> list[ProviderWithModelsResponse]:
         """
@@ -295,10 +288,8 @@ class ModelProviderService:
         # 获取当前工作空间的所有提供商配置
         provider_configurations = self.provider_manager.get_configurations(tenant_id)
 
-        # 获取提供商可用模型
-        models = provider_configurations.get_models(
-            model_type=ModelType.value_of(model_type)
-        )
+        # Get provider available models
+        models = provider_configurations.get_models(model_type=ModelType.value_of(model_type))
 
         # 按提供商对模型进行分组
         provider_models = {}
@@ -329,16 +320,19 @@ class ModelProviderService:
                     icon_small=first_model.provider.icon_small,
                     icon_large=first_model.provider.icon_large,
                     status=CustomConfigurationStatus.ACTIVE,
-                    models=[ProviderModelWithStatusEntity(
-                        model=model.model,
-                        label=model.label,
-                        model_type=model.model_type,
-                        features=model.features,
-                        fetch_from=model.fetch_from,
-                        model_properties=model.model_properties,
-                        status=model.status,
-                        load_balancing_enabled=model.load_balancing_enabled
-                    ) for model in models]
+                    models=[
+                        ProviderModelWithStatusEntity(
+                            model=model.model,
+                            label=model.label,
+                            model_type=model.model_type,
+                            features=model.features,
+                            fetch_from=model.fetch_from,
+                            model_properties=model.model_properties,
+                            status=model.status,
+                            load_balancing_enabled=model.load_balancing_enabled,
+                        )
+                        for model in models
+                    ],
                 )
             )
 
@@ -366,20 +360,14 @@ class ModelProviderService:
         model_type_instance = provider_configuration.get_model_type_instance(ModelType.LLM)
         model_type_instance = cast(LargeLanguageModel, model_type_instance)
 
-        # 获取认证信息
-        credentials = provider_configuration.get_current_credentials(
-            model_type=ModelType.LLM,
-            model=model
-        )
+        # fetch credentials
+        credentials = provider_configuration.get_current_credentials(model_type=ModelType.LLM, model=model)
 
         if not credentials:
             return []
 
-        # 调用模型实例的get_parameter_rules方法获取模型参数规则
-        return model_type_instance.get_parameter_rules(
-            model=model,
-            credentials=credentials
-        )
+        # Call get_parameter_rules method of model instance to get model parameter rules
+        return model_type_instance.get_parameter_rules(model=model, credentials=credentials)
 
     def get_default_model_of_model_type(self, tenant_id: str, model_type: str) -> Optional[DefaultModelResponse]:
         """
@@ -391,23 +379,23 @@ class ModelProviderService:
         """
         # 将字符串类型的模型类型转换为枚举类型
         model_type_enum = ModelType.value_of(model_type)
-        # 通过管理器获取指定工作空间ID和模型类型的默认模型
-        result = self.provider_manager.get_default_model(
-            tenant_id=tenant_id,
-            model_type=model_type_enum
-        )
+        result = self.provider_manager.get_default_model(tenant_id=tenant_id, model_type=model_type_enum)
         try:
-            return DefaultModelResponse(
-                model=result.model,
-                model_type=result.model_type,
-                provider=SimpleProviderEntityResponse(
-                    provider=result.provider.provider,
-                    label=result.provider.label,
-                    icon_small=result.provider.icon_small,
-                    icon_large=result.provider.icon_large,
-                    supported_model_types=result.provider.supported_model_types
+            return (
+                DefaultModelResponse(
+                    model=result.model,
+                    model_type=result.model_type,
+                    provider=SimpleProviderEntityResponse(
+                        provider=result.provider.provider,
+                        label=result.provider.label,
+                        icon_small=result.provider.icon_small,
+                        icon_large=result.provider.icon_large,
+                        supported_model_types=result.provider.supported_model_types,
+                    ),
                 )
-            ) if result else None
+                if result
+                else None
+            )
         except Exception as e:
             logger.info(f"get_default_model_of_model_type error: {e}")
             return None
@@ -426,13 +414,12 @@ class ModelProviderService:
         model_type_enum = ModelType.value_of(model_type)
         # 调用provider_manager更新默认模型记录
         self.provider_manager.update_default_model_record(
-            tenant_id=tenant_id,
-            model_type=model_type_enum,
-            provider=provider,
-            model=model
+            tenant_id=tenant_id, model_type=model_type_enum, provider=provider, model=model
         )
 
-    def get_model_provider_icon(self, provider: str, icon_type: str, lang: str) -> tuple[Optional[bytes], Optional[str]]:
+    def get_model_provider_icon(
+        self, provider: str, icon_type: str, lang: str
+    ) -> tuple[Optional[bytes], Optional[str]]:
         """
         获取模型提供者的图标。
 
@@ -448,14 +435,11 @@ class ModelProviderService:
         provider_instance = model_provider_factory.get_provider_instance(provider)
         provider_schema = provider_instance.get_provider_schema()
 
-        # 根据图标类型确定具体的图标文件名
-        if icon_type.lower() == 'icon_small':
-            # 如果提供者没有小图标，则抛出异常
+        if icon_type.lower() == "icon_small":
             if not provider_schema.icon_small:
                 raise ValueError(f"Provider {provider} does not have small icon.")
 
-            # 根据语言选择对应的图标文件名
-            if lang.lower() == 'zh_hans':
+            if lang.lower() == "zh_hans":
                 file_name = provider_schema.icon_small.zh_Hans
             else:
                 file_name = provider_schema.icon_small.en_US
@@ -464,15 +448,16 @@ class ModelProviderService:
             if not provider_schema.icon_large:
                 raise ValueError(f"Provider {provider} does not have large icon.")
 
-            # 根据语言选择对应的图标文件名
-            if lang.lower() == 'zh_hans':
+            if lang.lower() == "zh_hans":
                 file_name = provider_schema.icon_large.zh_Hans
             else:
                 file_name = provider_schema.icon_large.en_US
 
         # 计算图标文件的完整路径
         root_path = current_app.root_path
-        provider_instance_path = os.path.dirname(os.path.join(root_path, provider_instance.__class__.__module__.replace('.', '/')))
+        provider_instance_path = os.path.dirname(
+            os.path.join(root_path, provider_instance.__class__.__module__.replace(".", "/"))
+        )
         file_path = os.path.join(provider_instance_path, "_assets")
         file_path = os.path.join(file_path, file_name)
 
@@ -482,10 +467,10 @@ class ModelProviderService:
 
         # 获取文件的MIME类型
         mimetype, _ = mimetypes.guess_type(file_path)
-        mimetype = mimetype or 'application/octet-stream'
+        mimetype = mimetype or "application/octet-stream"
 
-        # 从文件中读取二进制数据
-        with open(file_path, 'rb') as f:
+        # read binary from file
+        with open(file_path, "rb") as f:
             byte_data = f.read()
             return byte_data, mimetype
 
@@ -531,10 +516,7 @@ class ModelProviderService:
             raise ValueError(f"Provider {provider} does not exist.")
 
         # Enable model
-        provider_configuration.enable_model(
-            model=model,
-            model_type=ModelType.value_of(model_type)
-        )
+        provider_configuration.enable_model(model=model, model_type=ModelType.value_of(model_type))
 
     def disable_model(self, tenant_id: str, provider: str, model: str, model_type: str) -> None:
         """
@@ -555,10 +537,7 @@ class ModelProviderService:
             raise ValueError(f"Provider {provider} does not exist.")
 
         # Enable model
-        provider_configuration.disable_model(
-            model=model,
-            model_type=ModelType.value_of(model_type)
-        )
+        provider_configuration.disable_model(model=model, model_type=ModelType.value_of(model_type))
 
     def free_quota_submit(self, tenant_id: str, provider: str):
         """
@@ -578,42 +557,24 @@ class ModelProviderService:
         # 从环境变量获取API密钥和基础URL
         api_key = os.environ.get("FREE_QUOTA_APPLY_API_KEY")
         api_base_url = os.environ.get("FREE_QUOTA_APPLY_BASE_URL")
-        api_url = api_base_url + '/api/v1/providers/apply'
+        api_url = api_base_url + "/api/v1/providers/apply"
 
-        # 构建请求头部，包含认证信息和内容类型
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f"Bearer {api_key}"
-        }
-        # 向免费配额申请API发送POST请求
-        response = requests.post(api_url, headers=headers, json={'workspace_id': tenant_id, 'provider_name': provider})
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+        response = requests.post(api_url, headers=headers, json={"workspace_id": tenant_id, "provider_name": provider})
         if not response.ok:
             # 如果请求失败，记录错误日志并抛出ValueError
             logger.error(f"Request FREE QUOTA APPLY SERVER Error: {response.status_code} ")
             raise ValueError(f"Error: {response.status_code} ")
 
-        # 检查API响应结果
-        if response.json()["code"] != 'success':
-            # 如果API返回非成功代码，抛出ValueError
-            raise ValueError(
-                f"error: {response.json()['message']}"
-            )
+        if response.json()["code"] != "success":
+            raise ValueError(f"error: {response.json()['message']}")
 
         rst = response.json()
 
-        # 根据返回类型处理结果
-        if rst['type'] == 'redirect':
-            # 如果需要重定向，返回重定向URL
-            return {
-                'type': rst['type'],
-                'redirect_url': rst['redirect_url']
-            }
+        if rst["type"] == "redirect":
+            return {"type": rst["type"], "redirect_url": rst["redirect_url"]}
         else:
-            # 如果无需重定向，返回成功结果
-            return {
-                'type': rst['type'],
-                'result': 'success'
-            }
+            return {"type": rst["type"], "result": "success"}
 
     def free_quota_qualification_verify(self, tenant_id: str, provider: str, token: Optional[str]):
         """
@@ -630,46 +591,24 @@ class ModelProviderService:
         # 从环境变量获取API密钥和基础URL
         api_key = os.environ.get("FREE_QUOTA_APPLY_API_KEY")
         api_base_url = os.environ.get("FREE_QUOTA_APPLY_BASE_URL")
-        api_url = api_base_url + '/api/v1/providers/qualification-verify'
+        api_url = api_base_url + "/api/v1/providers/qualification-verify"
 
-        # 准备请求头，包含认证信息
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f"Bearer {api_key}"
-        }
-        # 准备请求体，包含租户ID、提供商名称和可选的令牌
-        json_data = {'workspace_id': tenant_id, 'provider_name': provider}
+        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+        json_data = {"workspace_id": tenant_id, "provider_name": provider}
         if token:
-            json_data['token'] = token
-        
-        # 发起POST请求
-        response = requests.post(api_url, headers=headers,
-                                json=json_data)
-        # 请求失败时，记录日志并抛出异常
+            json_data["token"] = token
+        response = requests.post(api_url, headers=headers, json=json_data)
         if not response.ok:
             logger.error(f"Request FREE QUOTA APPLY SERVER Error: {response.status_code} ")
             raise ValueError(f"Error: {response.status_code} ")
 
         # 解析响应
         rst = response.json()
-        # 响应码非'success'时，抛出异常
-        if rst["code"] != 'success':
-            raise ValueError(
-                f"error: {rst['message']}"
-            )
+        if rst["code"] != "success":
+            raise ValueError(f"error: {rst['message']}")
 
-        # 处理合格或不合格的结果
-        data = rst['data']
-        if data['qualified'] is True:
-            return {
-                'result': 'success',
-                'provider_name': provider,
-                'flag': True
-            }
+        data = rst["data"]
+        if data["qualified"] is True:
+            return {"result": "success", "provider_name": provider, "flag": True}
         else:
-            return {
-                'result': 'success',
-                'provider_name': provider,
-                'flag': False,
-                'reason': data['reason']
-            }
+            return {"result": "success", "provider_name": provider, "flag": False, "reason": data["reason"]}

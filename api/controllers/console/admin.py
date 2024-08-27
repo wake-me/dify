@@ -24,30 +24,25 @@ def admin_required(view):
     """
     @wraps(view)
     def decorated(*args, **kwargs):
-        # 检查环境变量中是否存在有效的管理员API密钥
-        if not os.getenv('ADMIN_API_KEY'):
-            raise Unauthorized('API key is invalid.')
+        if not os.getenv("ADMIN_API_KEY"):
+            raise Unauthorized("API key is invalid.")
 
-        # 检查请求头中是否包含Authorization字段
-        auth_header = request.headers.get('Authorization')
+        auth_header = request.headers.get("Authorization")
         if auth_header is None:
-            raise Unauthorized('Authorization header is missing.')
+            raise Unauthorized("Authorization header is missing.")
 
-        # 检查Authorization头部的格式是否正确
-        if ' ' not in auth_header:
-            raise Unauthorized('Invalid Authorization header format. Expected \'Bearer <api-key>\' format.')
+        if " " not in auth_header:
+            raise Unauthorized("Invalid Authorization header format. Expected 'Bearer <api-key>' format.")
 
         # 分解Authorization头部，获取认证方案和令牌
         auth_scheme, auth_token = auth_header.split(None, 1)
         auth_scheme = auth_scheme.lower()
 
-        # 检查认证方案是否为预期的"Bearer"
-        if auth_scheme != 'bearer':
-            raise Unauthorized('Invalid Authorization header format. Expected \'Bearer <api-key>\' format.')
+        if auth_scheme != "bearer":
+            raise Unauthorized("Invalid Authorization header format. Expected 'Bearer <api-key>' format.")
 
-        # 检查传入的API密钥是否与环境变量中的管理员API密钥匹配
-        if os.getenv('ADMIN_API_KEY') != auth_token:
-            raise Unauthorized('API key is invalid.')
+        if os.getenv("ADMIN_API_KEY") != auth_token:
+            raise Unauthorized("API key is invalid.")
 
         # 如果API密钥验证通过，则执行原视图函数
         return view(*args, **kwargs)
@@ -73,41 +68,43 @@ class InsertExploreAppListApi(Resource):
         - 若应用不存在，则返回404状态码和错误信息
         """
         parser = reqparse.RequestParser()
-        # 解析请求中所需的参数
-        parser.add_argument('app_id', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('desc', type=str, location='json')
-        parser.add_argument('copyright', type=str, location='json')
-        parser.add_argument('privacy_policy', type=str, location='json')
-        parser.add_argument('custom_disclaimer', type=str, location='json')
-        parser.add_argument('language', type=supported_language, required=True, nullable=False, location='json')
-        parser.add_argument('category', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('position', type=int, required=True, nullable=False, location='json')
+        parser.add_argument("app_id", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("desc", type=str, location="json")
+        parser.add_argument("copyright", type=str, location="json")
+        parser.add_argument("privacy_policy", type=str, location="json")
+        parser.add_argument("custom_disclaimer", type=str, location="json")
+        parser.add_argument("language", type=supported_language, required=True, nullable=False, location="json")
+        parser.add_argument("category", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("position", type=int, required=True, nullable=False, location="json")
         args = parser.parse_args()
 
-        # 根据app_id查询应用信息
-        app = App.query.filter(App.id == args['app_id']).first()
+        app = App.query.filter(App.id == args["app_id"]).first()
         if not app:
             raise NotFound(f'App \'{args["app_id"]}\' is not found')
 
         site = app.site
         # 根据应用是否有站点，来确定推荐应用的描述、版权和隐私政策信息
         if not site:
-            desc = args['desc'] if args['desc'] else ''
-            copy_right = args['copyright'] if args['copyright'] else ''
-            privacy_policy = args['privacy_policy'] if args['privacy_policy'] else ''
-            custom_disclaimer = args['custom_disclaimer'] if args['custom_disclaimer'] else ''
+            desc = args["desc"] if args["desc"] else ""
+            copy_right = args["copyright"] if args["copyright"] else ""
+            privacy_policy = args["privacy_policy"] if args["privacy_policy"] else ""
+            custom_disclaimer = args["custom_disclaimer"] if args["custom_disclaimer"] else ""
         else:
-            desc = site.description if site.description else \
-                args['desc'] if args['desc'] else ''
-            copy_right = site.copyright if site.copyright else \
-                args['copyright'] if args['copyright'] else ''
-            privacy_policy = site.privacy_policy if site.privacy_policy else \
-                args['privacy_policy'] if args['privacy_policy']  else ''
-            custom_disclaimer = site.custom_disclaimer if site.custom_disclaimer else \
-                args['custom_disclaimer'] if args['custom_disclaimer'] else ''
+            desc = site.description if site.description else args["desc"] if args["desc"] else ""
+            copy_right = site.copyright if site.copyright else args["copyright"] if args["copyright"] else ""
+            privacy_policy = (
+                site.privacy_policy if site.privacy_policy else args["privacy_policy"] if args["privacy_policy"] else ""
+            )
+            custom_disclaimer = (
+                site.custom_disclaimer
+                if site.custom_disclaimer
+                else args["custom_disclaimer"]
+                if args["custom_disclaimer"]
+                else ""
+            )
 
-        # 查询推荐应用信息，如果不存在则创建新的推荐应用记录
-        recommended_app = RecommendedApp.query.filter(RecommendedApp.app_id == args['app_id']).first()
+        recommended_app = RecommendedApp.query.filter(RecommendedApp.app_id == args["app_id"]).first()
+
         if not recommended_app:
             # 新建推荐应用记录并提交到数据库
             recommended_app = RecommendedApp(
@@ -116,9 +113,9 @@ class InsertExploreAppListApi(Resource):
                 copyright=copy_right,
                 privacy_policy=privacy_policy,
                 custom_disclaimer=custom_disclaimer,
-                language=args['language'],
-                category=args['category'],
-                position=args['position']
+                language=args["language"],
+                category=args["category"],
+                position=args["position"],
             )
 
             db.session.add(recommended_app)
@@ -126,22 +123,22 @@ class InsertExploreAppListApi(Resource):
             app.is_public = True
             db.session.commit()
 
-            return {'result': 'success'}, 201
+            return {"result": "success"}, 201
         else:
             # 如果推荐应用已存在，则更新相关信息并提交到数据库
             recommended_app.description = desc
             recommended_app.copyright = copy_right
             recommended_app.privacy_policy = privacy_policy
             recommended_app.custom_disclaimer = custom_disclaimer
-            recommended_app.language = args['language']
-            recommended_app.category = args['category']
-            recommended_app.position = args['position']
+            recommended_app.language = args["language"]
+            recommended_app.category = args["category"]
+            recommended_app.position = args["position"]
 
             app.is_public = True
 
             db.session.commit()
 
-            return {'result': 'success'}, 200
+            return {"result": "success"}, 200
 
 
 class InsertExploreAppApi(Resource):
@@ -164,8 +161,7 @@ class InsertExploreAppApi(Resource):
         # 尝试根据app_id查询推荐应用
         recommended_app = RecommendedApp.query.filter(RecommendedApp.app_id == str(app_id)).first()
         if not recommended_app:
-            # 如果推荐应用不存在，直接返回成功
-            return {'result': 'success'}, 204
+            return {"result": "success"}, 204
 
         # 查询关联的App信息
         app = App.query.filter(App.id == recommended_app.app_id).first()
@@ -175,8 +171,7 @@ class InsertExploreAppApi(Resource):
 
         # 查询所有非应用所有者租户安装的该应用实例
         installed_apps = InstalledApp.query.filter(
-            InstalledApp.app_id == recommended_app.app_id,
-            InstalledApp.tenant_id != InstalledApp.app_owner_tenant_id
+            InstalledApp.app_id == recommended_app.app_id, InstalledApp.tenant_id != InstalledApp.app_owner_tenant_id
         ).all()
 
         # 删除所有非应用所有者租户安装的该应用实例
@@ -188,9 +183,8 @@ class InsertExploreAppApi(Resource):
         # 提交数据库事务
         db.session.commit()
 
-        # 返回成功信息和状态码204
-        return {'result': 'success'}, 204
+        return {"result": "success"}, 204
 
 
-api.add_resource(InsertExploreAppListApi, '/admin/insert-explore-apps')
-api.add_resource(InsertExploreAppApi, '/admin/insert-explore-apps/<uuid:app_id>')
+api.add_resource(InsertExploreAppListApi, "/admin/insert-explore-apps")
+api.add_resource(InsertExploreAppApi, "/admin/insert-explore-apps/<uuid:app_id>")

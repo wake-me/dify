@@ -478,7 +478,8 @@ class IndexingRunner:
 
         return text_docs
 
-    def filter_string(self, text):
+    @staticmethod
+    def filter_string(text):
         text = re.sub(r'<\|', '<', text)
         text = re.sub(r'\|>', '>', text)
         text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\xEF\xBF\xBE]', '', text)
@@ -486,8 +487,9 @@ class IndexingRunner:
         text = re.sub('\uFFFE', '', text)
         return text
 
-    def _get_splitter(self, processing_rule: DatasetProcessRule,
-                    embedding_model_instance: Optional[ModelInstance]) -> TextSplitter:
+    @staticmethod
+    def _get_splitter(processing_rule: DatasetProcessRule,
+                      embedding_model_instance: Optional[ModelInstance]) -> TextSplitter:
         """
         根据处理规则获取文本分割器对象。
 
@@ -746,7 +748,8 @@ class IndexingRunner:
 
         return all_documents
 
-    def _document_clean(self, text: str, processing_rule: DatasetProcessRule) -> str:
+    @staticmethod
+    def _document_clean(text: str, processing_rule: DatasetProcessRule) -> str:
         """
         根据处理规则清理文档文本。
         
@@ -781,17 +784,8 @@ class IndexingRunner:
 
         return text
 
-    def format_split_text(self, text):
-        """
-        根据给定的文本，使用正则表达式分割出问题和答案，并返回格式化的列表。
-        
-        参数:
-        text: str - 待处理的文本，期望包含以“Q”开头的问题和以“A”开头的答案。
-        
-        返回值:
-        list - 包含问题和答案的字典列表，每个字典包含两个键："question" 和 "answer"。
-        """
-        # 使用正则表达式匹配问题和答案
+    @staticmethod
+    def format_split_text(text):
         regex = r"Q\d+:\s*(.*?)\s*A\d+:\s*([\s\S]*?)(?=Q\d+:|$)"
         matches = re.findall(regex, text, re.UNICODE)
 
@@ -865,19 +859,8 @@ class IndexingRunner:
             }
         )
 
-    def _process_keyword_index(self, flask_app, dataset_id, document_id, documents):
-        """
-        处理关键字索引过程。
-        
-        参数:
-        - flask_app: Flask应用实例，用于提供应用上下文。
-        - dataset_id: 数据集ID，用于查询特定数据集。
-        - document_id: 文档ID，标识需要进行索引的文档。
-        - documents: 文档集合，包含需要索引的文档内容。
-        
-        返回值:
-        无
-        """
+    @staticmethod
+    def _process_keyword_index(flask_app, dataset_id, document_id, documents):
         with flask_app.app_context():
             # 根据数据集ID查询数据集信息
             dataset = Dataset.query.filter_by(id=dataset_id).first()
@@ -939,21 +922,8 @@ class IndexingRunner:
 
             return tokens
 
-    def _check_document_paused_status(self, document_id: str):
-        """
-        检查指定文档的暂停状态。
-        
-        通过在Redis中查找特定键值来判断文档是否处于暂停索引的状态。如果找到相应的键值，
-        则抛出`DocumentIsPausedException`异常。
-        
-        参数:
-        - document_id (str): 要检查的文档ID。
-        
-        返回值:
-        - 无返回值，但如果文档被暂停，则抛出`DocumentIsPausedException`异常。
-        """
-        
-        # 构造缓存键名
+    @staticmethod
+    def _check_document_paused_status(document_id: str):
         indexing_cache_key = 'document_{}_is_paused'.format(document_id)
         # 从Redis获取键值
         result = redis_client.get(indexing_cache_key)
@@ -961,8 +931,9 @@ class IndexingRunner:
             # 如果找到键值，表示文档被暂停，抛出异常
             raise DocumentIsPausedException()
 
-    def _update_document_index_status(self, document_id: str, after_indexing_status: str,
-                                    extra_update_params: Optional[dict] = None) -> None:
+    @staticmethod
+    def _update_document_index_status(document_id: str, after_indexing_status: str,
+                                      extra_update_params: Optional[dict] = None) -> None:
         """
         更新文档的索引状态。
 
@@ -999,7 +970,8 @@ class IndexingRunner:
         DatasetDocument.query.filter_by(id=document_id).update(update_params)
         db.session.commit()
 
-    def _update_segments_by_document(self, dataset_document_id: str, update_params: dict) -> None:
+    @staticmethod
+    def _update_segments_by_document(dataset_document_id: str, update_params: dict) -> None:
         """
         根据文档ID更新文档段落。
         
@@ -1018,7 +990,8 @@ class IndexingRunner:
         # 提交更改到数据库
         db.session.commit()
 
-    def batch_add_segments(self, segments: list[DocumentSegment], dataset: Dataset):
+    @staticmethod
+    def batch_add_segments(segments: list[DocumentSegment], dataset: Dataset):
         """
         批量添加段落索引处理
 

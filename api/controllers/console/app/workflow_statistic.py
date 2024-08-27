@@ -39,46 +39,47 @@ class WorkflowDailyRunsStatistic(Resource):
 
         # 解析请求参数：开始和结束日期
         parser = reqparse.RequestParser()
-        parser.add_argument('start', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
-        parser.add_argument('end', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
+        parser.add_argument("start", type=datetime_string("%Y-%m-%d %H:%M"), location="args")
+        parser.add_argument("end", type=datetime_string("%Y-%m-%d %H:%M"), location="args")
         args = parser.parse_args()
 
-        # 构建SQL查询语句
-        sql_query = '''
+        sql_query = """
         SELECT date(DATE_TRUNC('day', created_at AT TIME ZONE 'UTC' AT TIME ZONE :tz )) AS date, count(id) AS runs
             FROM workflow_runs 
             WHERE app_id = :app_id 
                 AND triggered_from = :triggered_from
-        '''
-        arg_dict = {'tz': account.timezone, 'app_id': app_model.id, 'triggered_from': WorkflowRunTriggeredFrom.APP_RUN.value}
+        """
+        arg_dict = {
+            "tz": account.timezone,
+            "app_id": app_model.id,
+            "triggered_from": WorkflowRunTriggeredFrom.APP_RUN.value,
+        }
 
         # 处理时区转换
         timezone = pytz.timezone(account.timezone)
         utc_timezone = pytz.utc
 
-        # 如果提供了开始日期，添加到SQL查询中
-        if args['start']:
-            start_datetime = datetime.strptime(args['start'], '%Y-%m-%d %H:%M')
+        if args["start"]:
+            start_datetime = datetime.strptime(args["start"], "%Y-%m-%d %H:%M")
             start_datetime = start_datetime.replace(second=0)
 
             start_datetime_timezone = timezone.localize(start_datetime)
             start_datetime_utc = start_datetime_timezone.astimezone(utc_timezone)
 
-            sql_query += ' and created_at >= :start'
-            arg_dict['start'] = start_datetime_utc
+            sql_query += " and created_at >= :start"
+            arg_dict["start"] = start_datetime_utc
 
-        # 如果提供了结束日期，添加到SQL查询中
-        if args['end']:
-            end_datetime = datetime.strptime(args['end'], '%Y-%m-%d %H:%M')
+        if args["end"]:
+            end_datetime = datetime.strptime(args["end"], "%Y-%m-%d %H:%M")
             end_datetime = end_datetime.replace(second=0)
 
             end_datetime_timezone = timezone.localize(end_datetime)
             end_datetime_utc = end_datetime_timezone.astimezone(utc_timezone)
 
-            sql_query += ' and created_at < :end'
-            arg_dict['end'] = end_datetime_utc
+            sql_query += " and created_at < :end"
+            arg_dict["end"] = end_datetime_utc
 
-        sql_query += ' GROUP BY date order by date'
+        sql_query += " GROUP BY date order by date"
 
         # 执行查询并将结果格式化为响应数据
         response_data = []
@@ -86,15 +87,10 @@ class WorkflowDailyRunsStatistic(Resource):
         with db.engine.begin() as conn:
             rs = conn.execute(db.text(sql_query), arg_dict)
             for i in rs:
-                response_data.append({
-                    'date': str(i.date),
-                    'runs': i.runs
-                })
+                response_data.append({"date": str(i.date), "runs": i.runs})
 
-        # 返回JSON格式的统计信息
-        return jsonify({
-            'data': response_data
-        })
+        return jsonify({"data": response_data})
+
 
 class WorkflowDailyTerminalsStatistic(Resource):
     """
@@ -124,62 +120,57 @@ class WorkflowDailyTerminalsStatistic(Resource):
 
         # 解析请求参数：开始和结束时间
         parser = reqparse.RequestParser()
-        parser.add_argument('start', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
-        parser.add_argument('end', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
+        parser.add_argument("start", type=datetime_string("%Y-%m-%d %H:%M"), location="args")
+        parser.add_argument("end", type=datetime_string("%Y-%m-%d %H:%M"), location="args")
         args = parser.parse_args()
 
-        # 构建SQL查询语句
-        sql_query = '''
+        sql_query = """
                 SELECT date(DATE_TRUNC('day', created_at AT TIME ZONE 'UTC' AT TIME ZONE :tz )) AS date, count(distinct workflow_runs.created_by) AS terminal_count
                     FROM workflow_runs 
                     WHERE app_id = :app_id 
                         AND triggered_from = :triggered_from
-                '''
-        arg_dict = {'tz': account.timezone, 'app_id': app_model.id, 'triggered_from': WorkflowRunTriggeredFrom.APP_RUN.value}
+                """
+        arg_dict = {
+            "tz": account.timezone,
+            "app_id": app_model.id,
+            "triggered_from": WorkflowRunTriggeredFrom.APP_RUN.value,
+        }
 
         # 处理时区转换
         timezone = pytz.timezone(account.timezone)
         utc_timezone = pytz.utc
 
-        # 如果提供了开始时间，则添加到SQL查询中
-        if args['start']:
-            start_datetime = datetime.strptime(args['start'], '%Y-%m-%d %H:%M')
+        if args["start"]:
+            start_datetime = datetime.strptime(args["start"], "%Y-%m-%d %H:%M")
             start_datetime = start_datetime.replace(second=0)
 
             start_datetime_timezone = timezone.localize(start_datetime)
             start_datetime_utc = start_datetime_timezone.astimezone(utc_timezone)
 
-            sql_query += ' and created_at >= :start'
-            arg_dict['start'] = start_datetime_utc
+            sql_query += " and created_at >= :start"
+            arg_dict["start"] = start_datetime_utc
 
-        # 如果提供了结束时间，则添加到SQL查询中
-        if args['end']:
-            end_datetime = datetime.strptime(args['end'], '%Y-%m-%d %H:%M')
+        if args["end"]:
+            end_datetime = datetime.strptime(args["end"], "%Y-%m-%d %H:%M")
             end_datetime = end_datetime.replace(second=0)
 
             end_datetime_timezone = timezone.localize(end_datetime)
             end_datetime_utc = end_datetime_timezone.astimezone(utc_timezone)
 
-            sql_query += ' and created_at < :end'
-            arg_dict['end'] = end_datetime_utc
+            sql_query += " and created_at < :end"
+            arg_dict["end"] = end_datetime_utc
 
-        # 完善查询语句并执行查询
-        sql_query += ' GROUP BY date order by date'
+        sql_query += " GROUP BY date order by date"
 
         response_data = []
 
         with db.engine.begin() as conn:
-            rs = conn.execute(db.text(sql_query), arg_dict)            
+            rs = conn.execute(db.text(sql_query), arg_dict)
             for i in rs:
-                response_data.append({
-                    'date': str(i.date),
-                    'terminal_count': i.terminal_count
-                })
+                response_data.append({"date": str(i.date), "terminal_count": i.terminal_count})
 
-        # 构建并返回响应
-        return jsonify({
-            'data': response_data
-        })
+        return jsonify({"data": response_data})
+
 
 class WorkflowDailyTokenCostStatistic(Resource):
     """
@@ -207,64 +198,64 @@ class WorkflowDailyTokenCostStatistic(Resource):
 
         # 解析请求参数：开始和结束时间
         parser = reqparse.RequestParser()
-        parser.add_argument('start', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
-        parser.add_argument('end', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
+        parser.add_argument("start", type=datetime_string("%Y-%m-%d %H:%M"), location="args")
+        parser.add_argument("end", type=datetime_string("%Y-%m-%d %H:%M"), location="args")
         args = parser.parse_args()
 
-        # 构建SQL查询语句
-        sql_query = '''
+        sql_query = """
                 SELECT 
                     date(DATE_TRUNC('day', created_at AT TIME ZONE 'UTC' AT TIME ZONE :tz )) AS date, 
                     SUM(workflow_runs.total_tokens) as token_count
                 FROM workflow_runs 
                 WHERE app_id = :app_id 
                     AND triggered_from = :triggered_from
-                '''
-        arg_dict = {'tz': account.timezone, 'app_id': app_model.id, 'triggered_from': WorkflowRunTriggeredFrom.APP_RUN.value}
+                """
+        arg_dict = {
+            "tz": account.timezone,
+            "app_id": app_model.id,
+            "triggered_from": WorkflowRunTriggeredFrom.APP_RUN.value,
+        }
 
         # 处理时区转换
         timezone = pytz.timezone(account.timezone)
         utc_timezone = pytz.utc
 
-        # 如果指定了开始时间，添加到SQL查询条件中
-        if args['start']:
-            start_datetime = datetime.strptime(args['start'], '%Y-%m-%d %H:%M')
+        if args["start"]:
+            start_datetime = datetime.strptime(args["start"], "%Y-%m-%d %H:%M")
             start_datetime = start_datetime.replace(second=0)
 
             start_datetime_timezone = timezone.localize(start_datetime)
             start_datetime_utc = start_datetime_timezone.astimezone(utc_timezone)
 
-            sql_query += ' and created_at >= :start'
-            arg_dict['start'] = start_datetime_utc
+            sql_query += " and created_at >= :start"
+            arg_dict["start"] = start_datetime_utc
 
-        # 如果指定了结束时间，添加到SQL查询条件中
-        if args['end']:
-            end_datetime = datetime.strptime(args['end'], '%Y-%m-%d %H:%M')
+        if args["end"]:
+            end_datetime = datetime.strptime(args["end"], "%Y-%m-%d %H:%M")
             end_datetime = end_datetime.replace(second=0)
 
             end_datetime_timezone = timezone.localize(end_datetime)
             end_datetime_utc = end_datetime_timezone.astimezone(utc_timezone)
 
-            sql_query += ' and created_at < :end'
-            arg_dict['end'] = end_datetime_utc
+            sql_query += " and created_at < :end"
+            arg_dict["end"] = end_datetime_utc
 
-        # 执行SQL查询并构建响应数据
-        sql_query += ' GROUP BY date order by date'
+        sql_query += " GROUP BY date order by date"
 
         response_data = []
 
         with db.engine.begin() as conn:
             rs = conn.execute(db.text(sql_query), arg_dict)
             for i in rs:
-                response_data.append({
-                    'date': str(i.date),
-                    'token_count': i.token_count,
-                })
+                response_data.append(
+                    {
+                        "date": str(i.date),
+                        "token_count": i.token_count,
+                    }
+                )
 
-        # 返回JSON响应
-        return jsonify({
-            'data': response_data
-        })
+        return jsonify({"data": response_data})
+
 
 class WorkflowAverageAppInteractionStatistic(Resource):
     """
@@ -294,8 +285,8 @@ class WorkflowAverageAppInteractionStatistic(Resource):
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('start', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
-        parser.add_argument('end', type=datetime_string('%Y-%m-%d %H:%M'), location='args')
+        parser.add_argument("start", type=datetime_string("%Y-%m-%d %H:%M"), location="args")
+        parser.add_argument("end", type=datetime_string("%Y-%m-%d %H:%M"), location="args")
         args = parser.parse_args()
 
         # 构造SQL查询语句
@@ -316,54 +307,56 @@ class WorkflowAverageAppInteractionStatistic(Resource):
                 GROUP BY date, c.created_by) sub
             GROUP BY sub.date
             """
-        arg_dict = {'tz': account.timezone, 'app_id': app_model.id, 'triggered_from': WorkflowRunTriggeredFrom.APP_RUN.value}
+        arg_dict = {
+            "tz": account.timezone,
+            "app_id": app_model.id,
+            "triggered_from": WorkflowRunTriggeredFrom.APP_RUN.value,
+        }
 
         # 处理时区
         timezone = pytz.timezone(account.timezone)
         utc_timezone = pytz.utc
 
-        # 根据请求参数动态修改SQL查询语句
-        if args['start']:
-            start_datetime = datetime.strptime(args['start'], '%Y-%m-%d %H:%M')
+        if args["start"]:
+            start_datetime = datetime.strptime(args["start"], "%Y-%m-%d %H:%M")
             start_datetime = start_datetime.replace(second=0)
 
             start_datetime_timezone = timezone.localize(start_datetime)
             start_datetime_utc = start_datetime_timezone.astimezone(utc_timezone)
 
-            sql_query = sql_query.replace('{{start}}', ' AND c.created_at >= :start')
-            arg_dict['start'] = start_datetime_utc
+            sql_query = sql_query.replace("{{start}}", " AND c.created_at >= :start")
+            arg_dict["start"] = start_datetime_utc
         else:
-            sql_query = sql_query.replace('{{start}}', '')
+            sql_query = sql_query.replace("{{start}}", "")
 
-        if args['end']:
-            end_datetime = datetime.strptime(args['end'], '%Y-%m-%d %H:%M')
+        if args["end"]:
+            end_datetime = datetime.strptime(args["end"], "%Y-%m-%d %H:%M")
             end_datetime = end_datetime.replace(second=0)
 
             end_datetime_timezone = timezone.localize(end_datetime)
             end_datetime_utc = end_datetime_timezone.astimezone(utc_timezone)
 
-            sql_query = sql_query.replace('{{end}}', ' and c.created_at < :end')
-            arg_dict['end'] = end_datetime_utc
+            sql_query = sql_query.replace("{{end}}", " and c.created_at < :end")
+            arg_dict["end"] = end_datetime_utc
         else:
-            sql_query = sql_query.replace('{{end}}', '')
+            sql_query = sql_query.replace("{{end}}", "")
 
         # 执行查询并构造响应数据
         response_data = []
-        
+
         with db.engine.begin() as conn:
             rs = conn.execute(db.text(sql_query), arg_dict)
             for i in rs:
-                response_data.append({
-                    'date': str(i.date),
-                    'interactions': float(i.interactions.quantize(Decimal('0.01')))
-                })
+                response_data.append(
+                    {"date": str(i.date), "interactions": float(i.interactions.quantize(Decimal("0.01")))}
+                )
 
-        # 返回JSON响应
-        return jsonify({
-            'data': response_data
-        })
+        return jsonify({"data": response_data})
 
-api.add_resource(WorkflowDailyRunsStatistic, '/apps/<uuid:app_id>/workflow/statistics/daily-conversations')
-api.add_resource(WorkflowDailyTerminalsStatistic, '/apps/<uuid:app_id>/workflow/statistics/daily-terminals')
-api.add_resource(WorkflowDailyTokenCostStatistic, '/apps/<uuid:app_id>/workflow/statistics/token-costs')
-api.add_resource(WorkflowAverageAppInteractionStatistic, '/apps/<uuid:app_id>/workflow/statistics/average-app-interactions')
+
+api.add_resource(WorkflowDailyRunsStatistic, "/apps/<uuid:app_id>/workflow/statistics/daily-conversations")
+api.add_resource(WorkflowDailyTerminalsStatistic, "/apps/<uuid:app_id>/workflow/statistics/daily-terminals")
+api.add_resource(WorkflowDailyTokenCostStatistic, "/apps/<uuid:app_id>/workflow/statistics/token-costs")
+api.add_resource(
+    WorkflowAverageAppInteractionStatistic, "/apps/<uuid:app_id>/workflow/statistics/average-app-interactions"
+)

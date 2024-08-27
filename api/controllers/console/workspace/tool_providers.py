@@ -32,10 +32,18 @@ class ToolProviderListApi(Resource):
         tenant_id = current_user.current_tenant_id
 
         req = reqparse.RequestParser()
-        req.add_argument('type', type=str, choices=['builtin', 'model', 'api', 'workflow'], required=False, nullable=True, location='args')
+        req.add_argument(
+            "type",
+            type=str,
+            choices=["builtin", "model", "api", "workflow"],
+            required=False,
+            nullable=True,
+            location="args",
+        )
         args = req.parse_args()
 
-        return ToolCommonService.list_tool_providers(user_id, tenant_id, args.get('type', None))
+        return ToolCommonService.list_tool_providers(user_id, tenant_id, args.get("type", None))
+
 
 class ToolBuiltinProviderListToolsApi(Resource):
     """
@@ -63,11 +71,14 @@ class ToolBuiltinProviderListToolsApi(Resource):
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
-        return jsonable_encoder(BuiltinToolManageService.list_builtin_tool_provider_tools(
-            user_id,
-            tenant_id,
-            provider,
-        ))
+        return jsonable_encoder(
+            BuiltinToolManageService.list_builtin_tool_provider_tools(
+                user_id,
+                tenant_id,
+                provider,
+            )
+        )
+
 
 class ToolBuiltinProviderDeleteApi(Resource):
     """
@@ -91,8 +102,7 @@ class ToolBuiltinProviderDeleteApi(Resource):
         # 检查用户是否有权限删除工具提供商，如果不是管理员或所有者，则抛出权限异常
         if not current_user.is_admin_or_owner:
             raise Forbidden()
-        
-        # 获取当前用户的ID和所属租户的ID
+
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
@@ -101,7 +111,8 @@ class ToolBuiltinProviderDeleteApi(Resource):
             tenant_id,
             provider,
         )
-    
+
+
 class ToolBuiltinProviderUpdateApi(Resource):
     """
     用于更新内置工具提供商的API接口类。
@@ -135,14 +146,13 @@ class ToolBuiltinProviderUpdateApi(Resource):
         # 检查当前用户是否有权限更新提供商信息
         if not current_user.is_admin_or_owner:
             raise Forbidden()
-        
-        # 获取当前用户的ID和租户ID
+
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
         # 解析请求中的凭证信息
         parser = reqparse.RequestParser()
-        parser.add_argument('credentials', type=dict, required=True, nullable=False, location='json')
+        parser.add_argument("credentials", type=dict, required=True, nullable=False, location="json")
 
         args = parser.parse_args()
 
@@ -150,9 +160,10 @@ class ToolBuiltinProviderUpdateApi(Resource):
             user_id,
             tenant_id,
             provider,
-            args['credentials'],
+            args["credentials"],
         )
-    
+
+
 class ToolBuiltinProviderGetCredentialsApi(Resource):
     @setup_required
     @login_required
@@ -166,6 +177,7 @@ class ToolBuiltinProviderGetCredentialsApi(Resource):
             tenant_id,
             provider,
         )
+
 
 class ToolBuiltinProviderIconApi(Resource):
     """
@@ -186,6 +198,7 @@ class ToolBuiltinProviderIconApi(Resource):
         icon_bytes, mimetype = BuiltinToolManageService.get_builtin_tool_provider_icon(provider)
         icon_cache_max_age = dify_config.TOOL_ICON_CACHE_MAX_AGE
         return send_file(io.BytesIO(icon_bytes), mimetype=mimetype, max_age=icon_cache_max_age)
+
 
 class ToolApiProviderAddApi(Resource):
     """
@@ -210,36 +223,36 @@ class ToolApiProviderAddApi(Resource):
         # 检查当前用户是否具有管理员或所有者权限
         if not current_user.is_admin_or_owner:
             raise Forbidden()
-        
-        # 获取当前用户信息
+
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('credentials', type=dict, required=True, nullable=False, location='json')
-        parser.add_argument('schema_type', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('schema', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('provider', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('icon', type=dict, required=True, nullable=False, location='json')
-        parser.add_argument('privacy_policy', type=str, required=False, nullable=True, location='json')
-        parser.add_argument('labels', type=list[str], required=False, nullable=True, location='json', default=[])
-        parser.add_argument('custom_disclaimer', type=str, required=False, nullable=True, location='json')
+        parser.add_argument("credentials", type=dict, required=True, nullable=False, location="json")
+        parser.add_argument("schema_type", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("schema", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("provider", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("icon", type=dict, required=True, nullable=False, location="json")
+        parser.add_argument("privacy_policy", type=str, required=False, nullable=True, location="json")
+        parser.add_argument("labels", type=list[str], required=False, nullable=True, location="json", default=[])
+        parser.add_argument("custom_disclaimer", type=str, required=False, nullable=True, location="json")
 
         args = parser.parse_args()
 
         return ApiToolManageService.create_api_tool_provider(
             user_id,
             tenant_id,
-            args['provider'],
-            args['icon'],
-            args['credentials'],
-            args['schema_type'],
-            args['schema'],
-            args.get('privacy_policy', ''),
-            args.get('custom_disclaimer', ''),
-            args.get('labels', []),
+            args["provider"],
+            args["icon"],
+            args["credentials"],
+            args["schema_type"],
+            args["schema"],
+            args.get("privacy_policy", ""),
+            args.get("custom_disclaimer", ""),
+            args.get("labels", []),
         )
+
 
 class ToolApiProviderGetRemoteSchemaApi(Resource):
     """
@@ -261,8 +274,7 @@ class ToolApiProviderGetRemoteSchemaApi(Resource):
         # 初始化请求解析器
         parser = reqparse.RequestParser()
 
-        # 添加请求参数
-        parser.add_argument('url', type=str, required=True, nullable=False, location='args')
+        parser.add_argument("url", type=str, required=True, nullable=False, location="args")
 
         # 解析请求参数
         args = parser.parse_args()
@@ -270,9 +282,10 @@ class ToolApiProviderGetRemoteSchemaApi(Resource):
         return ApiToolManageService.get_api_tool_provider_remote_schema(
             current_user.id,
             current_user.current_tenant_id,
-            args['url'],
+            args["url"],
         )
-    
+
+
 class ToolApiProviderListToolsApi(Resource):
     """
     提供工具API提供者列表的接口类。
@@ -303,17 +316,19 @@ class ToolApiProviderListToolsApi(Resource):
         # 创建请求解析器用于解析查询参数
         parser = reqparse.RequestParser()
 
-        # 添加查询参数'provider'，用于指定工具提供商
-        parser.add_argument('provider', type=str, required=True, nullable=False, location='args')
+        parser.add_argument("provider", type=str, required=True, nullable=False, location="args")
 
         # 解析查询参数
         args = parser.parse_args()
 
-        return jsonable_encoder(ApiToolManageService.list_api_tool_provider_tools(
-            user_id,
-            tenant_id,
-            args['provider'],
-        ))
+        return jsonable_encoder(
+            ApiToolManageService.list_api_tool_provider_tools(
+                user_id,
+                tenant_id,
+                args["provider"],
+            )
+        )
+
 
 class ToolApiProviderUpdateApi(Resource):
     """
@@ -338,38 +353,38 @@ class ToolApiProviderUpdateApi(Resource):
         # 检查用户是否有权限
         if not current_user.is_admin_or_owner:
             raise Forbidden()
-        
-        # 获取当前用户信息
+
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('credentials', type=dict, required=True, nullable=False, location='json')
-        parser.add_argument('schema_type', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('schema', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('provider', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('original_provider', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('icon', type=dict, required=True, nullable=False, location='json')
-        parser.add_argument('privacy_policy', type=str, required=True, nullable=True, location='json')
-        parser.add_argument('labels', type=list[str], required=False, nullable=True, location='json')
-        parser.add_argument('custom_disclaimer', type=str, required=True, nullable=True, location='json')
+        parser.add_argument("credentials", type=dict, required=True, nullable=False, location="json")
+        parser.add_argument("schema_type", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("schema", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("provider", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("original_provider", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("icon", type=dict, required=True, nullable=False, location="json")
+        parser.add_argument("privacy_policy", type=str, required=True, nullable=True, location="json")
+        parser.add_argument("labels", type=list[str], required=False, nullable=True, location="json")
+        parser.add_argument("custom_disclaimer", type=str, required=True, nullable=True, location="json")
 
         args = parser.parse_args()
 
         return ApiToolManageService.update_api_tool_provider(
             user_id,
             tenant_id,
-            args['provider'],
-            args['original_provider'],
-            args['icon'],
-            args['credentials'],
-            args['schema_type'],
-            args['schema'],
-            args['privacy_policy'],
-            args['custom_disclaimer'],
-            args.get('labels', []),
+            args["provider"],
+            args["original_provider"],
+            args["icon"],
+            args["credentials"],
+            args["schema_type"],
+            args["schema"],
+            args["privacy_policy"],
+            args["custom_disclaimer"],
+            args.get("labels", []),
         )
+
 
 class ToolApiProviderDeleteApi(Resource):
     """
@@ -398,21 +413,23 @@ class ToolApiProviderDeleteApi(Resource):
         # 检查用户权限
         if not current_user.is_admin_or_owner:
             raise Forbidden()
-        
-        # 获取当前用户信息
+
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('provider', type=str, required=True, nullable=False, location='json')
+
+        parser.add_argument("provider", type=str, required=True, nullable=False, location="json")
+
         args = parser.parse_args()
 
         return ApiToolManageService.delete_api_tool_provider(
             user_id,
             tenant_id,
-            args['provider'],
+            args["provider"],
         )
+
 
 class ToolApiProviderGetApi(Resource):
     """
@@ -443,8 +460,7 @@ class ToolApiProviderGetApi(Resource):
         # 创建请求解析器用于解析查询参数
         parser = reqparse.RequestParser()
 
-        # 添加必要的查询参数'provider'，用于指定要查询的API提供者
-        parser.add_argument('provider', type=str, required=True, nullable=False, location='args')
+        parser.add_argument("provider", type=str, required=True, nullable=False, location="args")
 
         # 解析并获取查询参数
         args = parser.parse_args()
@@ -452,8 +468,9 @@ class ToolApiProviderGetApi(Resource):
         return ApiToolManageService.get_api_tool_provider(
             user_id,
             tenant_id,
-            args['provider'],
+            args["provider"],
         )
+
 
 class ToolBuiltinProviderCredentialsSchemaApi(Resource):
     """
@@ -474,6 +491,7 @@ class ToolBuiltinProviderCredentialsSchemaApi(Resource):
     @account_initialization_required
     def get(self, provider):
         return BuiltinToolManageService.list_builtin_provider_credentials_schema(provider)
+
 
 class ToolApiProviderSchemaApi(Resource):
     """
@@ -502,16 +520,15 @@ class ToolApiProviderSchemaApi(Resource):
         parser = reqparse.RequestParser()
         # 创建请求解析器，用于解析JSON请求体中的'schema'参数
 
-        parser.add_argument('schema', type=str, required=True, nullable=False, location='json')
-        # 添加'schema'参数解析规则，要求为非空字符串
+        parser.add_argument("schema", type=str, required=True, nullable=False, location="json")
 
         args = parser.parse_args()
         # 解析请求体中的参数
 
         return ApiToolManageService.parser_api_schema(
-            schema=args['schema'],
+            schema=args["schema"],
         )
-        # 调用服务层方法，处理解析后的API模式
+
 
 class ToolApiProviderPreviousTestApi(Resource):
     """
@@ -541,25 +558,25 @@ class ToolApiProviderPreviousTestApi(Resource):
         """
         parser = reqparse.RequestParser()
 
-        # 解析请求参数
-        parser.add_argument('tool_name', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('provider_name', type=str, required=False, nullable=False, location='json')
-        parser.add_argument('credentials', type=dict, required=True, nullable=False, location='json')
-        parser.add_argument('parameters', type=dict, required=True, nullable=False, location='json')
-        parser.add_argument('schema_type', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('schema', type=str, required=True, nullable=False, location='json')
+        parser.add_argument("tool_name", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("provider_name", type=str, required=False, nullable=False, location="json")
+        parser.add_argument("credentials", type=dict, required=True, nullable=False, location="json")
+        parser.add_argument("parameters", type=dict, required=True, nullable=False, location="json")
+        parser.add_argument("schema_type", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("schema", type=str, required=True, nullable=False, location="json")
 
         args = parser.parse_args()
 
         return ApiToolManageService.test_api_tool_preview(
             current_user.current_tenant_id,
-            args['provider_name'] if args['provider_name'] else '',
-            args['tool_name'],
-            args['credentials'],
-            args['parameters'],
-            args['schema_type'],
-            args['schema'],
+            args["provider_name"] if args["provider_name"] else "",
+            args["tool_name"],
+            args["credentials"],
+            args["parameters"],
+            args["schema_type"],
+            args["schema"],
         )
+
 
 class ToolWorkflowProviderCreateApi(Resource):
     @setup_required
@@ -568,34 +585,35 @@ class ToolWorkflowProviderCreateApi(Resource):
     def post(self):
         if not current_user.is_admin_or_owner:
             raise Forbidden()
-        
+
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
         reqparser = reqparse.RequestParser()
-        reqparser.add_argument('workflow_app_id', type=uuid_value, required=True, nullable=False, location='json')
-        reqparser.add_argument('name', type=alphanumeric, required=True, nullable=False, location='json')
-        reqparser.add_argument('label', type=str, required=True, nullable=False, location='json')
-        reqparser.add_argument('description', type=str, required=True, nullable=False, location='json')
-        reqparser.add_argument('icon', type=dict, required=True, nullable=False, location='json')
-        reqparser.add_argument('parameters', type=list[dict], required=True, nullable=False, location='json')
-        reqparser.add_argument('privacy_policy', type=str, required=False, nullable=True, location='json', default='')
-        reqparser.add_argument('labels', type=list[str], required=False, nullable=True, location='json')
+        reqparser.add_argument("workflow_app_id", type=uuid_value, required=True, nullable=False, location="json")
+        reqparser.add_argument("name", type=alphanumeric, required=True, nullable=False, location="json")
+        reqparser.add_argument("label", type=str, required=True, nullable=False, location="json")
+        reqparser.add_argument("description", type=str, required=True, nullable=False, location="json")
+        reqparser.add_argument("icon", type=dict, required=True, nullable=False, location="json")
+        reqparser.add_argument("parameters", type=list[dict], required=True, nullable=False, location="json")
+        reqparser.add_argument("privacy_policy", type=str, required=False, nullable=True, location="json", default="")
+        reqparser.add_argument("labels", type=list[str], required=False, nullable=True, location="json")
 
         args = reqparser.parse_args()
 
         return WorkflowToolManageService.create_workflow_tool(
             user_id,
             tenant_id,
-            args['workflow_app_id'],
-            args['name'],
-            args['label'],
-            args['icon'],
-            args['description'],
-            args['parameters'],
-            args['privacy_policy'],
-            args.get('labels', []),
+            args["workflow_app_id"],
+            args["name"],
+            args["label"],
+            args["icon"],
+            args["description"],
+            args["parameters"],
+            args["privacy_policy"],
+            args.get("labels", []),
         )
+
 
 class ToolWorkflowProviderUpdateApi(Resource):
     @setup_required
@@ -604,37 +622,38 @@ class ToolWorkflowProviderUpdateApi(Resource):
     def post(self):
         if not current_user.is_admin_or_owner:
             raise Forbidden()
-        
+
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
         reqparser = reqparse.RequestParser()
-        reqparser.add_argument('workflow_tool_id', type=uuid_value, required=True, nullable=False, location='json')
-        reqparser.add_argument('name', type=alphanumeric, required=True, nullable=False, location='json')
-        reqparser.add_argument('label', type=str, required=True, nullable=False, location='json')
-        reqparser.add_argument('description', type=str, required=True, nullable=False, location='json')
-        reqparser.add_argument('icon', type=dict, required=True, nullable=False, location='json')
-        reqparser.add_argument('parameters', type=list[dict], required=True, nullable=False, location='json')
-        reqparser.add_argument('privacy_policy', type=str, required=False, nullable=True, location='json', default='')
-        reqparser.add_argument('labels', type=list[str], required=False, nullable=True, location='json')
-        
+        reqparser.add_argument("workflow_tool_id", type=uuid_value, required=True, nullable=False, location="json")
+        reqparser.add_argument("name", type=alphanumeric, required=True, nullable=False, location="json")
+        reqparser.add_argument("label", type=str, required=True, nullable=False, location="json")
+        reqparser.add_argument("description", type=str, required=True, nullable=False, location="json")
+        reqparser.add_argument("icon", type=dict, required=True, nullable=False, location="json")
+        reqparser.add_argument("parameters", type=list[dict], required=True, nullable=False, location="json")
+        reqparser.add_argument("privacy_policy", type=str, required=False, nullable=True, location="json", default="")
+        reqparser.add_argument("labels", type=list[str], required=False, nullable=True, location="json")
+
         args = reqparser.parse_args()
 
-        if not args['workflow_tool_id']:
-            raise ValueError('incorrect workflow_tool_id')
-        
+        if not args["workflow_tool_id"]:
+            raise ValueError("incorrect workflow_tool_id")
+
         return WorkflowToolManageService.update_workflow_tool(
             user_id,
             tenant_id,
-            args['workflow_tool_id'],
-            args['name'],
-            args['label'],
-            args['icon'],
-            args['description'],
-            args['parameters'],
-            args['privacy_policy'],
-            args.get('labels', []),
+            args["workflow_tool_id"],
+            args["name"],
+            args["label"],
+            args["icon"],
+            args["description"],
+            args["parameters"],
+            args["privacy_policy"],
+            args.get("labels", []),
         )
+
 
 class ToolWorkflowProviderDeleteApi(Resource):
     @setup_required
@@ -643,21 +662,22 @@ class ToolWorkflowProviderDeleteApi(Resource):
     def post(self):
         if not current_user.is_admin_or_owner:
             raise Forbidden()
-        
+
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
         reqparser = reqparse.RequestParser()
-        reqparser.add_argument('workflow_tool_id', type=uuid_value, required=True, nullable=False, location='json')
+        reqparser.add_argument("workflow_tool_id", type=uuid_value, required=True, nullable=False, location="json")
 
         args = reqparser.parse_args()
 
         return WorkflowToolManageService.delete_workflow_tool(
             user_id,
             tenant_id,
-            args['workflow_tool_id'],
+            args["workflow_tool_id"],
         )
-        
+
+
 class ToolWorkflowProviderGetApi(Resource):
     @setup_required
     @login_required
@@ -667,28 +687,29 @@ class ToolWorkflowProviderGetApi(Resource):
         tenant_id = current_user.current_tenant_id
 
         parser = reqparse.RequestParser()
-        parser.add_argument('workflow_tool_id', type=uuid_value, required=False, nullable=True, location='args')
-        parser.add_argument('workflow_app_id', type=uuid_value, required=False, nullable=True, location='args')
+        parser.add_argument("workflow_tool_id", type=uuid_value, required=False, nullable=True, location="args")
+        parser.add_argument("workflow_app_id", type=uuid_value, required=False, nullable=True, location="args")
 
         args = parser.parse_args()
 
-        if args.get('workflow_tool_id'):
+        if args.get("workflow_tool_id"):
             tool = WorkflowToolManageService.get_workflow_tool_by_tool_id(
                 user_id,
                 tenant_id,
-                args['workflow_tool_id'],
+                args["workflow_tool_id"],
             )
-        elif args.get('workflow_app_id'):
+        elif args.get("workflow_app_id"):
             tool = WorkflowToolManageService.get_workflow_tool_by_app_id(
                 user_id,
                 tenant_id,
-                args['workflow_app_id'],
+                args["workflow_app_id"],
             )
         else:
-            raise ValueError('incorrect workflow_tool_id or workflow_app_id')
+            raise ValueError("incorrect workflow_tool_id or workflow_app_id")
 
         return jsonable_encoder(tool)
-    
+
+
 class ToolWorkflowProviderListToolApi(Resource):
     @setup_required
     @login_required
@@ -698,15 +719,18 @@ class ToolWorkflowProviderListToolApi(Resource):
         tenant_id = current_user.current_tenant_id
 
         parser = reqparse.RequestParser()
-        parser.add_argument('workflow_tool_id', type=uuid_value, required=True, nullable=False, location='args')
+        parser.add_argument("workflow_tool_id", type=uuid_value, required=True, nullable=False, location="args")
 
         args = parser.parse_args()
 
-        return jsonable_encoder(WorkflowToolManageService.list_single_workflow_tools(
-            user_id,
-            tenant_id,
-            args['workflow_tool_id'],
-        ))
+        return jsonable_encoder(
+            WorkflowToolManageService.list_single_workflow_tools(
+                user_id,
+                tenant_id,
+                args["workflow_tool_id"],
+            )
+        )
+
 
 class ToolBuiltinListApi(Resource):
     @setup_required
@@ -716,11 +740,17 @@ class ToolBuiltinListApi(Resource):
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
-        return jsonable_encoder([provider.to_dict() for provider in BuiltinToolManageService.list_builtin_tools(
-            user_id,
-            tenant_id,
-        )])
-    
+        return jsonable_encoder(
+            [
+                provider.to_dict()
+                for provider in BuiltinToolManageService.list_builtin_tools(
+                    user_id,
+                    tenant_id,
+                )
+            ]
+        )
+
+
 class ToolApiListApi(Resource):
     @setup_required
     @login_required
@@ -729,11 +759,17 @@ class ToolApiListApi(Resource):
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
-        return jsonable_encoder([provider.to_dict() for provider in ApiToolManageService.list_api_tools(
-            user_id,
-            tenant_id,
-        )])
-    
+        return jsonable_encoder(
+            [
+                provider.to_dict()
+                for provider in ApiToolManageService.list_api_tools(
+                    user_id,
+                    tenant_id,
+                )
+            ]
+        )
+
+
 class ToolWorkflowListApi(Resource):
     @setup_required
     @login_required
@@ -742,11 +778,17 @@ class ToolWorkflowListApi(Resource):
         user_id = current_user.id
         tenant_id = current_user.current_tenant_id
 
-        return jsonable_encoder([provider.to_dict() for provider in WorkflowToolManageService.list_tenant_workflow_tools(
-            user_id,
-            tenant_id,
-        )])
-    
+        return jsonable_encoder(
+            [
+                provider.to_dict()
+                for provider in WorkflowToolManageService.list_tenant_workflow_tools(
+                    user_id,
+                    tenant_id,
+                )
+            ]
+        )
+
+
 class ToolLabelsApi(Resource):
     @setup_required
     @login_required
@@ -754,36 +796,41 @@ class ToolLabelsApi(Resource):
     def get(self):
         return jsonable_encoder(ToolLabelsService.list_tool_labels())
 
+
 # tool provider
-api.add_resource(ToolProviderListApi, '/workspaces/current/tool-providers')
+api.add_resource(ToolProviderListApi, "/workspaces/current/tool-providers")
 
 # builtin tool provider
-api.add_resource(ToolBuiltinProviderListToolsApi, '/workspaces/current/tool-provider/builtin/<provider>/tools')
-api.add_resource(ToolBuiltinProviderDeleteApi, '/workspaces/current/tool-provider/builtin/<provider>/delete')
-api.add_resource(ToolBuiltinProviderUpdateApi, '/workspaces/current/tool-provider/builtin/<provider>/update')
-api.add_resource(ToolBuiltinProviderGetCredentialsApi, '/workspaces/current/tool-provider/builtin/<provider>/credentials')
-api.add_resource(ToolBuiltinProviderCredentialsSchemaApi, '/workspaces/current/tool-provider/builtin/<provider>/credentials_schema')
-api.add_resource(ToolBuiltinProviderIconApi, '/workspaces/current/tool-provider/builtin/<provider>/icon')
+api.add_resource(ToolBuiltinProviderListToolsApi, "/workspaces/current/tool-provider/builtin/<provider>/tools")
+api.add_resource(ToolBuiltinProviderDeleteApi, "/workspaces/current/tool-provider/builtin/<provider>/delete")
+api.add_resource(ToolBuiltinProviderUpdateApi, "/workspaces/current/tool-provider/builtin/<provider>/update")
+api.add_resource(
+    ToolBuiltinProviderGetCredentialsApi, "/workspaces/current/tool-provider/builtin/<provider>/credentials"
+)
+api.add_resource(
+    ToolBuiltinProviderCredentialsSchemaApi, "/workspaces/current/tool-provider/builtin/<provider>/credentials_schema"
+)
+api.add_resource(ToolBuiltinProviderIconApi, "/workspaces/current/tool-provider/builtin/<provider>/icon")
 
 # api tool provider
-api.add_resource(ToolApiProviderAddApi, '/workspaces/current/tool-provider/api/add')
-api.add_resource(ToolApiProviderGetRemoteSchemaApi, '/workspaces/current/tool-provider/api/remote')
-api.add_resource(ToolApiProviderListToolsApi, '/workspaces/current/tool-provider/api/tools')
-api.add_resource(ToolApiProviderUpdateApi, '/workspaces/current/tool-provider/api/update')
-api.add_resource(ToolApiProviderDeleteApi, '/workspaces/current/tool-provider/api/delete')
-api.add_resource(ToolApiProviderGetApi, '/workspaces/current/tool-provider/api/get')
-api.add_resource(ToolApiProviderSchemaApi, '/workspaces/current/tool-provider/api/schema')
-api.add_resource(ToolApiProviderPreviousTestApi, '/workspaces/current/tool-provider/api/test/pre')
+api.add_resource(ToolApiProviderAddApi, "/workspaces/current/tool-provider/api/add")
+api.add_resource(ToolApiProviderGetRemoteSchemaApi, "/workspaces/current/tool-provider/api/remote")
+api.add_resource(ToolApiProviderListToolsApi, "/workspaces/current/tool-provider/api/tools")
+api.add_resource(ToolApiProviderUpdateApi, "/workspaces/current/tool-provider/api/update")
+api.add_resource(ToolApiProviderDeleteApi, "/workspaces/current/tool-provider/api/delete")
+api.add_resource(ToolApiProviderGetApi, "/workspaces/current/tool-provider/api/get")
+api.add_resource(ToolApiProviderSchemaApi, "/workspaces/current/tool-provider/api/schema")
+api.add_resource(ToolApiProviderPreviousTestApi, "/workspaces/current/tool-provider/api/test/pre")
 
 # workflow tool provider
-api.add_resource(ToolWorkflowProviderCreateApi, '/workspaces/current/tool-provider/workflow/create')
-api.add_resource(ToolWorkflowProviderUpdateApi, '/workspaces/current/tool-provider/workflow/update')
-api.add_resource(ToolWorkflowProviderDeleteApi, '/workspaces/current/tool-provider/workflow/delete')
-api.add_resource(ToolWorkflowProviderGetApi, '/workspaces/current/tool-provider/workflow/get')
-api.add_resource(ToolWorkflowProviderListToolApi, '/workspaces/current/tool-provider/workflow/tools')
+api.add_resource(ToolWorkflowProviderCreateApi, "/workspaces/current/tool-provider/workflow/create")
+api.add_resource(ToolWorkflowProviderUpdateApi, "/workspaces/current/tool-provider/workflow/update")
+api.add_resource(ToolWorkflowProviderDeleteApi, "/workspaces/current/tool-provider/workflow/delete")
+api.add_resource(ToolWorkflowProviderGetApi, "/workspaces/current/tool-provider/workflow/get")
+api.add_resource(ToolWorkflowProviderListToolApi, "/workspaces/current/tool-provider/workflow/tools")
 
-api.add_resource(ToolBuiltinListApi, '/workspaces/current/tools/builtin')
-api.add_resource(ToolApiListApi, '/workspaces/current/tools/api')
-api.add_resource(ToolWorkflowListApi, '/workspaces/current/tools/workflow')
+api.add_resource(ToolBuiltinListApi, "/workspaces/current/tools/builtin")
+api.add_resource(ToolApiListApi, "/workspaces/current/tools/api")
+api.add_resource(ToolWorkflowListApi, "/workspaces/current/tools/workflow")
 
-api.add_resource(ToolLabelsApi, '/workspaces/current/tool-labels')
+api.add_resource(ToolLabelsApi, "/workspaces/current/tool-labels")

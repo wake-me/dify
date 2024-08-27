@@ -30,20 +30,19 @@ class WorkflowAppLogApi(Resource):
         - 分页工作流应用日志信息
         """
         parser = reqparse.RequestParser()
-        parser.add_argument('keyword', type=str, location='args')  # 关键字参数，用于日志筛选
-        parser.add_argument('status', type=str, choices=['succeeded', 'failed', 'stopped'], location='args')  # 状态参数，用于筛选成功、失败或停止的日志
-        parser.add_argument('page', type=int_range(1, 99999), default=1, location='args')  # 页码参数，用于分页
-        parser.add_argument('limit', type=int_range(1, 100), default=20, location='args')  # 每页数量参数，用于控制每页显示的日志数量
+        parser.add_argument("keyword", type=str, location="args")
+        parser.add_argument("status", type=str, choices=["succeeded", "failed", "stopped"], location="args")
+        parser.add_argument("page", type=int_range(1, 99999), default=1, location="args")
+        parser.add_argument("limit", type=int_range(1, 100), default=20, location="args")
         args = parser.parse_args()
 
         # 获取分页后的工作流应用日志
         workflow_app_service = WorkflowAppService()
         workflow_app_log_pagination = workflow_app_service.get_paginate_workflow_app_logs(
-            app_model=app_model,
-            args=args
+            app_model=app_model, args=args
         )
 
         return workflow_app_log_pagination
 
 
-api.add_resource(WorkflowAppLogApi, '/apps/<uuid:app_id>/workflow-app-logs')
+api.add_resource(WorkflowAppLogApi, "/apps/<uuid:app_id>/workflow-app-logs")

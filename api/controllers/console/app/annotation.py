@@ -39,26 +39,23 @@ class AnnotationReplyActionApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('annotation')
+    @cloud_edition_billing_resource_check("annotation")
     def post(self, app_id, action):
         if not current_user.is_editor:
             raise Forbidden()
 
         app_id = str(app_id)
         parser = reqparse.RequestParser()
-        # 解析请求体中的参数
-        parser.add_argument('score_threshold', required=True, type=float, location='json')
-        parser.add_argument('embedding_provider_name', required=True, type=str, location='json')
-        parser.add_argument('embedding_model_name', required=True, type=str, location='json')
+        parser.add_argument("score_threshold", required=True, type=float, location="json")
+        parser.add_argument("embedding_provider_name", required=True, type=str, location="json")
+        parser.add_argument("embedding_model_name", required=True, type=str, location="json")
         args = parser.parse_args()
-
-        # 根据action类型执行相应的操作
-        if action == 'enable':
+        if action == "enable":
             result = AppAnnotationService.enable_app_annotation(args, app_id)
-        elif action == 'disable':
+        elif action == "disable":
             result = AppAnnotationService.disable_app_annotation(app_id)
         else:
-            raise ValueError('Unsupported annotation reply action')
+            raise ValueError("Unsupported annotation reply action")
         return result, 200
 
 
@@ -110,7 +107,7 @@ class AppAnnotationSettingUpdateApi(Resource):
 
         # 解析请求体中的参数
         parser = reqparse.RequestParser()
-        parser.add_argument('score_threshold', required=True, type=float, location='json')
+        parser.add_argument("score_threshold", required=True, type=float, location="json")
         args = parser.parse_args()
 
         # 调用服务层方法，更新应用的注解设置
@@ -126,30 +123,25 @@ class AnnotationReplyActionStatusApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('annotation')
+    @cloud_edition_billing_resource_check("annotation")
     def get(self, app_id, job_id, action):
         if not current_user.is_editor:
             raise Forbidden()
 
         job_id = str(job_id)
-        app_annotation_job_key = '{}_app_annotation_job_{}'.format(action, str(job_id))
+        app_annotation_job_key = "{}_app_annotation_job_{}".format(action, str(job_id))
         cache_result = redis_client.get(app_annotation_job_key)
         if cache_result is None:
             # 如果缓存中没有任务状态，表示任务不存在
             raise ValueError("The job is not exist.")
 
         job_status = cache_result.decode()
-        error_msg = ''
-        if job_status == 'error':
-            # 如果任务状态为错误，尝试从Redis获取错误信息
-            app_annotation_error_key = '{}_app_annotation_error_{}'.format(action, str(job_id))
+        error_msg = ""
+        if job_status == "error":
+            app_annotation_error_key = "{}_app_annotation_error_{}".format(action, str(job_id))
             error_msg = redis_client.get(app_annotation_error_key).decode()
 
-        return {
-            'job_id': job_id,
-            'job_status': job_status,
-            'error_msg': error_msg
-        }, 200
+        return {"job_id": job_id, "job_status": job_status, "error_msg": error_msg}, 200
 
 
 class AnnotationListApi(Resource):
@@ -167,10 +159,9 @@ class AnnotationListApi(Resource):
         if not current_user.is_editor:
             raise Forbidden()
 
-        # 从请求参数中获取页码和限制数，并提供默认值；获取搜索关键字
-        page = request.args.get('page', default=1, type=int)
-        limit = request.args.get('limit', default=20, type=int)
-        keyword = request.args.get('keyword', default=None, type=str)
+        page = request.args.get("page", default=1, type=int)
+        limit = request.args.get("limit", default=20, type=int)
+        keyword = request.args.get("keyword", default=None, type=str)
 
         app_id = str(app_id)
         # 调用服务层方法，根据应用ID、页码、限制数和关键字获取注解列表及总数量
@@ -178,11 +169,11 @@ class AnnotationListApi(Resource):
         
         # 构建并返回响应数据
         response = {
-            'data': marshal(annotation_list, annotation_fields),  # 使用字段映射注解列表
-            'has_more': len(annotation_list) == limit,  # 判断是否还有更多数据
-            'limit': limit,
-            'total': total,
-            'page': page
+            "data": marshal(annotation_list, annotation_fields),
+            "has_more": len(annotation_list) == limit,
+            "limit": limit,
+            "total": total,
+            "page": page,
         }
         return response, 200
 
@@ -205,10 +196,7 @@ class AnnotationExportApi(Resource):
         app_id = str(app_id)  # 将app_id转换为字符串格式
         # 根据应用ID导出注解列表
         annotation_list = AppAnnotationService.export_annotation_list_by_app_id(app_id)
-        # 构建响应字典，包含经过格式化的注解列表
-        response = {
-            'data': marshal(annotation_list, annotation_fields)
-        }
+        response = {"data": marshal(annotation_list, annotation_fields)}
         return response, 200
 
 
@@ -229,18 +217,17 @@ class AnnotationCreateApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('annotation')
+    @cloud_edition_billing_resource_check("annotation")
     @marshal_with(annotation_fields)
     def post(self, app_id):
         if not current_user.is_editor:
             raise Forbidden()
 
-        app_id = str(app_id)  # 确保app_id是字符串格式
-        parser = reqparse.RequestParser()  # 创建请求解析器
-        parser.add_argument('question', required=True, type=str, location='json')  # 添加问题参数
-        parser.add_argument('answer', required=True, type=str, location='json')  # 添加答案参数
-        args = parser.parse_args()  # 解析请求参数
-        # 直接插入应用注解到数据库
+        app_id = str(app_id)
+        parser = reqparse.RequestParser()
+        parser.add_argument("question", required=True, type=str, location="json")
+        parser.add_argument("answer", required=True, type=str, location="json")
+        args = parser.parse_args()
         annotation = AppAnnotationService.insert_app_annotation_directly(args, app_id)
         return annotation
 
@@ -257,7 +244,7 @@ class AnnotationUpdateDeleteApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('annotation')
+    @cloud_edition_billing_resource_check("annotation")
     @marshal_with(annotation_fields)
     def post(self, app_id, annotation_id):
         if not current_user.is_editor:
@@ -266,8 +253,8 @@ class AnnotationUpdateDeleteApi(Resource):
         app_id = str(app_id)
         annotation_id = str(annotation_id)
         parser = reqparse.RequestParser()
-        parser.add_argument('question', required=True, type=str, location='json')
-        parser.add_argument('answer', required=True, type=str, location='json')
+        parser.add_argument("question", required=True, type=str, location="json")
+        parser.add_argument("answer", required=True, type=str, location="json")
         args = parser.parse_args()
         # 直接更新应用的注解
         annotation = AppAnnotationService.update_app_annotation_directly(args, app_id, annotation_id)
@@ -284,7 +271,7 @@ class AnnotationUpdateDeleteApi(Resource):
         annotation_id = str(annotation_id)
         # 删除指定的应用注解
         AppAnnotationService.delete_app_annotation(app_id, annotation_id)
-        return {'result': 'success'}, 200
+        return {"result": "success"}, 200
 
 
 class AnnotationBatchImportApi(Resource):
@@ -309,23 +296,23 @@ class AnnotationBatchImportApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('annotation')
+    @cloud_edition_billing_resource_check("annotation")
     def post(self, app_id):
         if not current_user.is_editor:
             raise Forbidden()
 
         app_id = str(app_id)
-        # 从请求中获取文件
-        file = request.files['file']
-        # 检查是否上传了文件
-        if 'file' not in request.files:
+        # get file from request
+        file = request.files["file"]
+        # check file
+        if "file" not in request.files:
             raise NoFileUploadedError()
 
         # 检查是否上传了多个文件
         if len(request.files) > 1:
             raise TooManyFilesError()
-        # 检查文件类型是否为CSV
-        if not file.filename.endswith('.csv'):
+        # check file type
+        if not file.filename.endswith(".csv"):
             raise ValueError("Invalid file type. Only CSV files are allowed")
         # 批量导入应用注解
         return AppAnnotationService.batch_import_app_annotations(app_id, file)
@@ -340,31 +327,24 @@ class AnnotationBatchImportStatusApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('annotation')
+    @cloud_edition_billing_resource_check("annotation")
     def get(self, app_id, job_id):
         if not current_user.is_editor:
             raise Forbidden()
 
         job_id = str(job_id)
-        # 构造缓存键并从Redis获取批处理导入状态
-        indexing_cache_key = 'app_annotation_batch_import_{}'.format(str(job_id))
+        indexing_cache_key = "app_annotation_batch_import_{}".format(str(job_id))
         cache_result = redis_client.get(indexing_cache_key)
         if cache_result is None:
             # 如果缓存中无数据，表示任务不存在
             raise ValueError("The job is not exist.")
         job_status = cache_result.decode()
-        error_msg = ''
-        # 如果任务状态为错误，获取错误信息
-        if job_status == 'error':
-            indexing_error_msg_key = 'app_annotation_batch_import_error_msg_{}'.format(str(job_id))
+        error_msg = ""
+        if job_status == "error":
+            indexing_error_msg_key = "app_annotation_batch_import_error_msg_{}".format(str(job_id))
             error_msg = redis_client.get(indexing_error_msg_key).decode()
 
-        # 返回任务状态和错误信息（如果有）
-        return {
-            'job_id': job_id,
-            'job_status': job_status,
-            'error_msg': error_msg
-        }, 200
+        return {"job_id": job_id, "job_status": job_status, "error_msg": error_msg}, 200
 
 
 class AnnotationHitHistoryListApi(Resource):
@@ -382,34 +362,32 @@ class AnnotationHitHistoryListApi(Resource):
         if not current_user.is_editor:
             raise Forbidden()
 
-        # 从请求参数中获取页码和限制数量，默认值分别为1和20
-        page = request.args.get('page', default=1, type=int)
-        limit = request.args.get('limit', default=20, type=int)
+        page = request.args.get("page", default=1, type=int)
+        limit = request.args.get("limit", default=20, type=int)
         app_id = str(app_id)
         annotation_id = str(annotation_id)
-        
-        # 调用服务层获取注解命中历史列表和总数
-        annotation_hit_history_list, total = AppAnnotationService.get_annotation_hit_histories(app_id, annotation_id,
-                                                                                               page, limit)
-        
-        # 构建并返回响应数据
+        annotation_hit_history_list, total = AppAnnotationService.get_annotation_hit_histories(
+            app_id, annotation_id, page, limit
+        )
         response = {
-            'data': marshal(annotation_hit_history_list, annotation_hit_history_fields),
-            'has_more': len(annotation_hit_history_list) == limit,
-            'limit': limit,
-            'total': total,
-            'page': page
+            "data": marshal(annotation_hit_history_list, annotation_hit_history_fields),
+            "has_more": len(annotation_hit_history_list) == limit,
+            "limit": limit,
+            "total": total,
+            "page": page,
         }
         return response
 
-api.add_resource(AnnotationReplyActionApi, '/apps/<uuid:app_id>/annotation-reply/<string:action>')
-api.add_resource(AnnotationReplyActionStatusApi,
-                 '/apps/<uuid:app_id>/annotation-reply/<string:action>/status/<uuid:job_id>')
-api.add_resource(AnnotationListApi, '/apps/<uuid:app_id>/annotations')
-api.add_resource(AnnotationExportApi, '/apps/<uuid:app_id>/annotations/export')
-api.add_resource(AnnotationUpdateDeleteApi, '/apps/<uuid:app_id>/annotations/<uuid:annotation_id>')
-api.add_resource(AnnotationBatchImportApi, '/apps/<uuid:app_id>/annotations/batch-import')
-api.add_resource(AnnotationBatchImportStatusApi, '/apps/<uuid:app_id>/annotations/batch-import-status/<uuid:job_id>')
-api.add_resource(AnnotationHitHistoryListApi, '/apps/<uuid:app_id>/annotations/<uuid:annotation_id>/hit-histories')
-api.add_resource(AppAnnotationSettingDetailApi, '/apps/<uuid:app_id>/annotation-setting')
-api.add_resource(AppAnnotationSettingUpdateApi, '/apps/<uuid:app_id>/annotation-settings/<uuid:annotation_setting_id>')
+
+api.add_resource(AnnotationReplyActionApi, "/apps/<uuid:app_id>/annotation-reply/<string:action>")
+api.add_resource(
+    AnnotationReplyActionStatusApi, "/apps/<uuid:app_id>/annotation-reply/<string:action>/status/<uuid:job_id>"
+)
+api.add_resource(AnnotationListApi, "/apps/<uuid:app_id>/annotations")
+api.add_resource(AnnotationExportApi, "/apps/<uuid:app_id>/annotations/export")
+api.add_resource(AnnotationUpdateDeleteApi, "/apps/<uuid:app_id>/annotations/<uuid:annotation_id>")
+api.add_resource(AnnotationBatchImportApi, "/apps/<uuid:app_id>/annotations/batch-import")
+api.add_resource(AnnotationBatchImportStatusApi, "/apps/<uuid:app_id>/annotations/batch-import-status/<uuid:job_id>")
+api.add_resource(AnnotationHitHistoryListApi, "/apps/<uuid:app_id>/annotations/<uuid:annotation_id>/hit-histories")
+api.add_resource(AppAnnotationSettingDetailApi, "/apps/<uuid:app_id>/annotation-setting")
+api.add_resource(AppAnnotationSettingUpdateApi, "/apps/<uuid:app_id>/annotation-settings/<uuid:annotation_setting_id>")

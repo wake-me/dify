@@ -14,10 +14,6 @@ from .wraps import only_edition_self_hosted
 
 
 class InitValidateAPI(Resource):
-    """
-    初始化验证API类，用于处理系统的初始化验证请求。
-    """
-
     def get(self):
         """
         处理获取初始化验证状态的请求。
@@ -28,8 +24,8 @@ class InitValidateAPI(Resource):
         """
         init_status = get_init_validate_status()  # 获取初始化验证的状态
         if init_status:
-            return { 'status': 'finished' }  # 如果初始化已完成，返回完成状态
-        return {'status': 'not_started'}  # 如果初始化未开始，返回未开始状态
+            return {"status": "finished"}
+        return {"status": "not_started"}
 
     @only_edition_self_hosted
     def post(self):
@@ -47,24 +43,24 @@ class InitValidateAPI(Resource):
         if tenant_count > 0:
             raise AlreadySetupError()  # 如果租户已存在，抛出已设置错误
 
-        parser = reqparse.RequestParser()  # 创建请求解析器
-        parser.add_argument('password', type=str_len(30),
-                            required=True, location='json')  # 添加密码参数
-        input_password = parser.parse_args()['password']  # 解析提交的密码
+        parser = reqparse.RequestParser()
+        parser.add_argument("password", type=str_len(30), required=True, location="json")
+        input_password = parser.parse_args()["password"]
 
-        # 验证密码是否正确
-        if input_password != os.environ.get('INIT_PASSWORD'):
-            session['is_init_validated'] = False  # 验证失败，设置会话状态
-            raise InitValidateFailedError()  # 抛出初始化验证失败错误
-            
-        session['is_init_validated'] = True  # 验证成功，设置会话状态
-        return {'result': 'success'}, 201  # 返回成功状态和HTTP 201创建响应码
+        if input_password != os.environ.get("INIT_PASSWORD"):
+            session["is_init_validated"] = False
+            raise InitValidateFailedError()
+
+        session["is_init_validated"] = True
+        return {"result": "success"}, 201
+
 
 def get_init_validate_status():
-    if dify_config.EDITION == 'SELF_HOSTED':
-        if os.environ.get('INIT_PASSWORD'):
-            return session.get('is_init_validated') or DifySetup.query.first()
-    
-    return True  # 如果不是自托管版本，返回True表示初始化已完成或未开始
+    if dify_config.EDITION == "SELF_HOSTED":
+        if os.environ.get("INIT_PASSWORD"):
+            return session.get("is_init_validated") or DifySetup.query.first()
 
-api.add_resource(InitValidateAPI, '/init')
+    return True
+
+
+api.add_resource(InitValidateAPI, "/init")

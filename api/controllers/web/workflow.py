@@ -38,18 +38,14 @@ class WorkflowRunApi(WebApiResource):
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('inputs', type=dict, required=True, nullable=False, location='json')
-        parser.add_argument('files', type=list, required=False, location='json')
+        parser.add_argument("inputs", type=dict, required=True, nullable=False, location="json")
+        parser.add_argument("files", type=list, required=False, location="json")
         args = parser.parse_args()
 
         try:
             # 生成工作流执行响应
             response = AppGenerateService.generate(
-                app_model=app_model,
-                user=end_user,
-                args=args,
-                invoke_from=InvokeFrom.WEB_APP,
-                streaming=True
+                app_model=app_model, user=end_user, args=args, invoke_from=InvokeFrom.WEB_APP, streaming=True
             )
 
             return helper.compact_generate_response(response)
@@ -85,10 +81,8 @@ class WorkflowTaskStopApi(WebApiResource):
         # 设置任务停止标志
         AppQueueManager.set_stop_flag(task_id, InvokeFrom.WEB_APP, end_user.id)
 
-        return {
-            "result": "success"
-        }
+        return {"result": "success"}
 
 
-api.add_resource(WorkflowRunApi, '/workflows/run')
-api.add_resource(WorkflowTaskStopApi, '/workflows/tasks/<string:task_id>/stop')
+api.add_resource(WorkflowRunApi, "/workflows/run")
+api.add_resource(WorkflowTaskStopApi, "/workflows/tasks/<string:task_id>/stop")

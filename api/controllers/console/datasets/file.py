@@ -22,10 +22,6 @@ PREVIEW_WORDS_LIMIT = 3000
 
 
 class FileApi(Resource):
-    """
-    文件API类，提供文件上传和获取文件上传配置信息的功能。
-    """
-
     @setup_required
     @login_required
     @account_initialization_required
@@ -35,36 +31,24 @@ class FileApi(Resource):
         batch_count_limit = dify_config.UPLOAD_FILE_BATCH_LIMIT
         image_file_size_limit = dify_config.UPLOAD_IMAGE_FILE_SIZE_LIMIT
         return {
-            'file_size_limit': file_size_limit,
-            'batch_count_limit': batch_count_limit,
-            'image_file_size_limit': image_file_size_limit
+            "file_size_limit": file_size_limit,
+            "batch_count_limit": batch_count_limit,
+            "image_file_size_limit": image_file_size_limit,
         }, 200
 
     @setup_required
     @login_required
     @account_initialization_required
     @marshal_with(file_fields)
-    @cloud_edition_billing_resource_check(resource='documents')
+    @cloud_edition_billing_resource_check(resource="documents")
     def post(self):
-        """
-        上传文件。
-        
-        参数:
-            通过HTTP请求上传的文件。
-            
-        返回:
-            上传成功后的文件信息;
-            HTTP状态码201。
-            
-        异常:
-            如果没有文件被上传、上传文件数量超过限制、文件过大或文件类型不受支持，将抛出相应的错误。
-        """
-        # 从请求中获取文件
-        file = request.files['file']
+        # get file from request
+        file = request.files["file"]
 
-        # 检查文件是否正确上传
-        if 'file' not in request.files:
-            raise NoFileUploadedError()  # 如果没有文件被上传，则抛出错误
+        # check file
+        if "file" not in request.files:
+            raise NoFileUploadedError()
+
         if len(request.files) > 1:
             raise TooManyFilesError()  # 如果上传了多个文件，则抛出错误
         
@@ -90,18 +74,9 @@ class FilePreviewApi(Resource):
     @login_required
     @account_initialization_required
     def get(self, file_id):
-        """
-        获取指定文件的预览内容。
-        
-        参数:
-        - file_id: 文件的唯一标识符，整数类型。
-        
-        返回值:
-        - 一个包含预览内容的字典。
-        """
-        file_id = str(file_id)  # 将file_id转换为字符串
-        text = FileService.get_file_preview(file_id)  # 从文件服务中获取预览文本
-        return {'content': text}  # 返回包含预览内容的字典
+        file_id = str(file_id)
+        text = FileService.get_file_preview(file_id)
+        return {"content": text}
 
 
 class FileSupportTypeApi(Resource):
@@ -116,10 +91,10 @@ class FileSupportTypeApi(Resource):
     @account_initialization_required
     def get(self):
         etl_type = dify_config.ETL_TYPE
-        allowed_extensions = UNSTRUCTURED_ALLOWED_EXTENSIONS if etl_type == 'Unstructured' else ALLOWED_EXTENSIONS
-        return {'allowed_extensions': allowed_extensions}
+        allowed_extensions = UNSTRUCTURED_ALLOWED_EXTENSIONS if etl_type == "Unstructured" else ALLOWED_EXTENSIONS
+        return {"allowed_extensions": allowed_extensions}
 
 
-api.add_resource(FileApi, '/files/upload')
-api.add_resource(FilePreviewApi, '/files/<uuid:file_id>/preview')
-api.add_resource(FileSupportTypeApi, '/files/support-type')
+api.add_resource(FileApi, "/files/upload")
+api.add_resource(FilePreviewApi, "/files/<uuid:file_id>/preview")
+api.add_resource(FileSupportTypeApi, "/files/support-type")

@@ -5,37 +5,14 @@ from models.api_based_extension import APIBasedExtension, APIBasedExtensionPoint
 
 
 class APIBasedExtensionService:
-    """
-    基于API的扩展服务类，提供以下方法：
-
-    - `get_all_by_tenant_id`: 根据租户ID获取所有APIBasedExtension实例列表
-    - `save`: 保存或更新一个APIBasedExtension实例，并进行数据验证与加密处理
-    - `delete`: 删除指定的APIBasedExtension实例
-    - `get_with_tenant_id`: 根据租户ID及扩展ID获取单个APIBasedExtension实例
-    - `_validation`: 验证APIBasedExtension实例的数据完整性与唯一性（私有方法）
-    - `_ping_connection`: 检测给定APIBasedExtension实例的连接状态（私有静态方法）
-
-    这些方法涵盖了对APIBasedExtension数据模型的CRUD操作以及相关验证、连接检测等辅助功能。
-
-    """
-
-
     @staticmethod
     def get_all_by_tenant_id(tenant_id: str) -> list[APIBasedExtension]:
-        """
-        根据租户ID获取所有API扩展
-        
-        参数:
-        tenant_id (str): 租户的唯一标识符
-        
-        返回值:
-        list[APIBasedExtension]: 按创建时间降序排列的API扩展列表
-        """
-        # 从数据库中查询与租户ID匹配的所有API扩展，并按创建时间降序排序
-        extension_list = db.session.query(APIBasedExtension) \
-                        .filter_by(tenant_id=tenant_id) \
-                        .order_by(APIBasedExtension.created_at.desc()) \
-                        .all()
+        extension_list = (
+            db.session.query(APIBasedExtension)
+            .filter_by(tenant_id=tenant_id)
+            .order_by(APIBasedExtension.created_at.desc())
+            .all()
+        )
 
         # 对查询结果中的每个扩展的API密钥进行解密
         for extension in extension_list:
@@ -84,24 +61,12 @@ class APIBasedExtensionService:
 
     @staticmethod
     def get_with_tenant_id(tenant_id: str, api_based_extension_id: str) -> APIBasedExtension:
-        """
-        根据租户ID和API扩展ID获取API扩展对象。
-        
-        参数:
-        tenant_id: str - 租户ID，用于查询特定租户的API扩展。
-        api_based_extension_id: str - API扩展的唯一标识符。
-        
-        返回值:
-        APIBasedExtension - 查询到的API扩展对象。
-        
-        抛出:
-        ValueError - 如果未找到对应的API扩展，则抛出异常。
-        """
-        # 从数据库中查询指定租户ID和ID的API扩展
-        extension = db.session.query(APIBasedExtension) \
-            .filter_by(tenant_id=tenant_id) \
-            .filter_by(id=api_based_extension_id) \
+        extension = (
+            db.session.query(APIBasedExtension)
+            .filter_by(tenant_id=tenant_id)
+            .filter_by(id=api_based_extension_id)
             .first()
+        )
 
         # 如果查询结果为空，则抛出未找到异常
         if not extension:
@@ -136,21 +101,25 @@ class APIBasedExtensionService:
             raise ValueError("name must not be empty")
 
         if not extension_data.id:
-            # 检查新数据时，确保 name 是唯一的
-            is_name_existed = db.session.query(APIBasedExtension) \
-                .filter_by(tenant_id=extension_data.tenant_id) \
-                .filter_by(name=extension_data.name) \
+            # case one: check new data, name must be unique
+            is_name_existed = (
+                db.session.query(APIBasedExtension)
+                .filter_by(tenant_id=extension_data.tenant_id)
+                .filter_by(name=extension_data.name)
                 .first()
+            )
 
             if is_name_existed:
                 raise ValueError("name must be unique, it is already existed")
         else:
-            # 检查已有数据时，确保 name 是唯一的
-            is_name_existed = db.session.query(APIBasedExtension) \
-                .filter_by(tenant_id=extension_data.tenant_id) \
-                .filter_by(name=extension_data.name) \
-                .filter(APIBasedExtension.id != extension_data.id) \
+            # case two: check existing data, name must be unique
+            is_name_existed = (
+                db.session.query(APIBasedExtension)
+                .filter_by(tenant_id=extension_data.tenant_id)
+                .filter_by(name=extension_data.name)
+                .filter(APIBasedExtension.id != extension_data.id)
                 .first()
+            )
 
             if is_name_existed:
                 raise ValueError("name must be unique, it is already existed")
@@ -182,8 +151,7 @@ class APIBasedExtensionService:
             client = APIBasedExtensionRequestor(extension_data.api_endpoint, extension_data.api_key)
             # 向API发送PING请求
             resp = client.request(point=APIBasedExtensionPoint.PING, params={})
-            # 如果响应结果不是'pong'，则抛出一个包含响应信息的ValueError异常
-            if resp.get('result') != 'pong':
+            if resp.get("result") != "pong":
                 raise ValueError(resp)
         except Exception as e:
             # 如果在尝试连接过程中遇到任何异常，则抛出一个包含连接错误信息的ValueError异常

@@ -14,7 +14,7 @@ from models.dataset import Dataset, Document, DocumentSegment
 from models.source import DataSourceOauthBinding
 
 
-@shared_task(queue='dataset')
+@shared_task(queue="dataset")
 def document_indexing_sync_task(dataset_id: str, document_id: str):
     """
     异步更新文档索引任务。
@@ -24,46 +24,40 @@ def document_indexing_sync_task(dataset_id: str, document_id: str):
     
     使用方法：document_indexing_sync_task.delay(dataset_id, document_id)
     """
-    # 记录开始同步文档的日志
-    logging.info(click.style('Start sync document: {}'.format(document_id), fg='green'))
+    logging.info(click.style("Start sync document: {}".format(document_id), fg="green"))
     start_at = time.perf_counter()
 
-    # 从数据库查询文档信息
-    document = db.session.query(Document).filter(
-        Document.id == document_id,
-        Document.dataset_id == dataset_id
-    ).first()
+    document = db.session.query(Document).filter(Document.id == document_id, Document.dataset_id == dataset_id).first()
 
     # 如果文档不存在，则抛出异常
     if not document:
-        raise NotFound('Document not found')
+        raise NotFound("Document not found")
 
     # 获取文档的数据源信息
     data_source_info = document.data_source_info_dict
-    # 针对Notion导入的文档类型进行处理
-    if document.data_source_type == 'notion_import':
-        # 检查Notion页面信息是否完整
-        if not data_source_info or 'notion_page_id' not in data_source_info \
-                or 'notion_workspace_id' not in data_source_info:
+    if document.data_source_type == "notion_import":
+        if (
+            not data_source_info
+            or "notion_page_id" not in data_source_info
+            or "notion_workspace_id" not in data_source_info
+        ):
             raise ValueError("no notion page found")
-        
-        # 提取页面和工作区ID等信息
-        workspace_id = data_source_info['notion_workspace_id']
-        page_id = data_source_info['notion_page_id']
-        page_type = data_source_info['type']
-        page_edited_time = data_source_info['last_edited_time']
+        workspace_id = data_source_info["notion_workspace_id"]
+        page_id = data_source_info["notion_page_id"]
+        page_type = data_source_info["type"]
+        page_edited_time = data_source_info["last_edited_time"]
         data_source_binding = DataSourceOauthBinding.query.filter(
             db.and_(
                 DataSourceOauthBinding.tenant_id == document.tenant_id,
-                DataSourceOauthBinding.provider == 'notion',
+                DataSourceOauthBinding.provider == "notion",
                 DataSourceOauthBinding.disabled == False,
-                DataSourceOauthBinding.source_info['workspace_id'] == f'"{workspace_id}"'
+                DataSourceOauthBinding.source_info["workspace_id"] == f'"{workspace_id}"',
             )
         ).first()
         
         # 如果找不到绑定信息，则抛出异常
         if not data_source_binding:
-            raise ValueError('Data source binding not found.')
+            raise ValueError("Data source binding not found.")
 
         # 初始化Notion数据加载器
         loader = NotionExtractor(
@@ -71,7 +65,7 @@ def document_indexing_sync_task(dataset_id: str, document_id: str):
             notion_obj_id=page_id,
             notion_page_type=page_type,
             notion_access_token=data_source_binding.access_token,
-            tenant_id=document.tenant_id
+            tenant_id=document.tenant_id,
         )
 
         # 获取Notion页面的最新编辑时间
@@ -79,8 +73,7 @@ def document_indexing_sync_task(dataset_id: str, document_id: str):
 
         # 检查页面是否被更新
         if last_edited_time != page_edited_time:
-            # 更新文档的索引状态和开始处理的时间
-            document.indexing_status = 'parsing'
+            document.indexing_status = "parsing"
             document.processing_started_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
             db.session.commit()
 
@@ -88,7 +81,7 @@ def document_indexing_sync_task(dataset_id: str, document_id: str):
             try:
                 dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
                 if not dataset:
-                    raise Exception('Dataset not found')
+                    raise Exception("Dataset not found")
                 index_type = document.doc_form
                 index_processor = IndexProcessorFactory(index_type).init_index_processor()
 
@@ -106,7 +99,13 @@ def document_indexing_sync_task(dataset_id: str, document_id: str):
                 # 记录清理文档段落和索引的日志
                 end_at = time.perf_counter()
                 logging.info(
-                    click.style('Cleaned document when document update data source or process rule: {} latency: {}'.format(document_id, end_at - start_at), fg='green'))
+                    click.style(
+                        "Cleaned document when document update data source or process rule: {} latency: {}".format(
+                            document_id, end_at - start_at
+                        ),
+                        fg="green",
+                    )
+                )
             except Exception:
                 logging.exception("Cleaned document when document update data source or process rule failed")
 
@@ -115,11 +114,11 @@ def document_indexing_sync_task(dataset_id: str, document_id: str):
                 indexing_runner = IndexingRunner()
                 indexing_runner.run([document])
                 end_at = time.perf_counter()
-                # 记录更新文档索引的日志
-                logging.info(click.style('update document: {} latency: {}'.format(document.id, end_at - start_at), fg='green'))
+                logging.info(
+                    click.style("update document: {} latency: {}".format(document.id, end_at - start_at), fg="green")
+                )
             except DocumentIsPausedException as ex:
-                # 如果文档被暂停，则记录日志
-                logging.info(click.style(str(ex), fg='yellow'))
+                logging.info(click.style(str(ex), fg="yellow"))
             except Exception:
                 # 其他异常，直接忽略
                 pass

@@ -22,8 +22,9 @@ class CustomConfigurationStatus(Enum):
     """
     自定义配置状态的枚举类。
     """
-    ACTIVE = 'active'  # 激活状态
-    NO_CONFIGURE = 'no-configure'  # 未配置状态
+
+    ACTIVE = "active"
+    NO_CONFIGURE = "no-configure"
 
 
 class CustomConfigurationResponse(BaseModel):
@@ -33,6 +34,7 @@ class CustomConfigurationResponse(BaseModel):
     属性:
         status (CustomConfigurationStatus): 自定义配置的状态，使用CustomConfigurationStatus枚举。
     """
+
     status: CustomConfigurationStatus
 
 
@@ -45,6 +47,7 @@ class SystemConfigurationResponse(BaseModel):
         current_quota_type (Optional[ProviderQuotaType]): 当前配额类型，为可选字段。
         quota_configurations (list[QuotaConfiguration]): 配额配置列表。
     """
+
     enabled: bool
     current_quota_type: Optional[ProviderQuotaType] = None
     quota_configurations: list[QuotaConfiguration] = []
@@ -54,6 +57,7 @@ class ProviderResponse(BaseModel):
     """
     Model class for provider response.
     """
+
     provider: str
     label: I18nObject
     description: Optional[I18nObject] = None
@@ -75,18 +79,15 @@ class ProviderResponse(BaseModel):
     def __init__(self, **data) -> None:
         super().__init__(**data)
 
-        url_prefix = (dify_config.CONSOLE_API_URL
-                      + f"/console/api/workspaces/current/model-providers/{self.provider}")
+        url_prefix = dify_config.CONSOLE_API_URL + f"/console/api/workspaces/current/model-providers/{self.provider}"
         if self.icon_small is not None:
             self.icon_small = I18nObject(
-                en_US=f"{url_prefix}/icon_small/en_US",
-                zh_Hans=f"{url_prefix}/icon_small/zh_Hans"
+                en_US=f"{url_prefix}/icon_small/en_US", zh_Hans=f"{url_prefix}/icon_small/zh_Hans"
             )
 
         if self.icon_large is not None:
             self.icon_large = I18nObject(
-                en_US=f"{url_prefix}/icon_large/en_US",
-                zh_Hans=f"{url_prefix}/icon_large/zh_Hans"
+                en_US=f"{url_prefix}/icon_large/en_US", zh_Hans=f"{url_prefix}/icon_large/zh_Hans"
             )
 
 
@@ -94,6 +95,7 @@ class ProviderWithModelsResponse(BaseModel):
     """
     Model class for provider with models response.
     """
+
     provider: str
     label: I18nObject
     icon_small: Optional[I18nObject] = None
@@ -104,18 +106,15 @@ class ProviderWithModelsResponse(BaseModel):
     def __init__(self, **data) -> None:
         super().__init__(**data)
 
-        url_prefix = (dify_config.CONSOLE_API_URL
-                      + f"/console/api/workspaces/current/model-providers/{self.provider}")
+        url_prefix = dify_config.CONSOLE_API_URL + f"/console/api/workspaces/current/model-providers/{self.provider}"
         if self.icon_small is not None:
             self.icon_small = I18nObject(
-                en_US=f"{url_prefix}/icon_small/en_US",
-                zh_Hans=f"{url_prefix}/icon_small/zh_Hans"
+                en_US=f"{url_prefix}/icon_small/en_US", zh_Hans=f"{url_prefix}/icon_small/zh_Hans"
             )
 
         if self.icon_large is not None:
             self.icon_large = I18nObject(
-                en_US=f"{url_prefix}/icon_large/en_US",
-                zh_Hans=f"{url_prefix}/icon_large/zh_Hans"
+                en_US=f"{url_prefix}/icon_large/en_US", zh_Hans=f"{url_prefix}/icon_large/zh_Hans"
             )
 
 
@@ -128,21 +127,16 @@ class SimpleProviderEntityResponse(SimpleProviderEntity):
     def __init__(self, **data) -> None:
         super().__init__(**data)  # 调用父类构造函数，初始化父类属性
 
-        url_prefix = (dify_config.CONSOLE_API_URL
-                      + f"/console/api/workspaces/current/model-providers/{self.provider}")
-        
-        # 如果存在小图标地址，则将其设置为带有国际化路径的I18nObject
+        url_prefix = dify_config.CONSOLE_API_URL + f"/console/api/workspaces/current/model-providers/{self.provider}"
         if self.icon_small is not None:
             self.icon_small = I18nObject(
-                en_US=f"{url_prefix}/icon_small/en_US",
-                zh_Hans=f"{url_prefix}/icon_small/zh_Hans"
+                en_US=f"{url_prefix}/icon_small/en_US", zh_Hans=f"{url_prefix}/icon_small/zh_Hans"
             )
             
         # 如果存在大图标地址，则将其设置为带有国际化路径的I18nObject
         if self.icon_large is not None:
             self.icon_large = I18nObject(
-                en_US=f"{url_prefix}/icon_large/en_US",
-                zh_Hans=f"{url_prefix}/icon_large/zh_Hans"
+                en_US=f"{url_prefix}/icon_large/en_US", zh_Hans=f"{url_prefix}/icon_large/zh_Hans"
             )
 
 class DefaultModelResponse(BaseModel):
@@ -154,6 +148,7 @@ class DefaultModelResponse(BaseModel):
         model_type (ModelType): 模型类型。
         provider (SimpleProviderEntityResponse): 提供者实体信息。
     """
+
     model: str
     model_type: ModelType
     provider: SimpleProviderEntityResponse
@@ -172,6 +167,7 @@ class ModelWithProviderEntityResponse(ModelWithProviderEntity):
     方法:
         __init__(self, model: ModelWithProviderEntity) -> None: 构造函数，初始化模型实例。
     """
+
     provider: SimpleProviderEntityResponse
 
     def __init__(self, model: ModelWithProviderEntity) -> None:

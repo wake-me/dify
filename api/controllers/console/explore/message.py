@@ -70,20 +70,20 @@ class MessageListApi(InstalledAppResource):
             raise NotChatAppError()
 
         parser = reqparse.RequestParser()
-        # 添加请求参数解析
-        parser.add_argument('conversation_id', required=True, type=uuid_value, location='args')
-        parser.add_argument('first_id', type=uuid_value, location='args')
-        parser.add_argument('limit', type=int_range(1, 100), required=False, default=20, location='args')
+        parser.add_argument("conversation_id", required=True, type=uuid_value, location="args")
+        parser.add_argument("first_id", type=uuid_value, location="args")
+        parser.add_argument("limit", type=int_range(1, 100), required=False, default=20, location="args")
         args = parser.parse_args()
 
         try:
-            # 调用服务层进行分页查询
-            return MessageService.pagination_by_first_id(app_model, current_user,
-                                                     args['conversation_id'], args['first_id'], args['limit'])
+            return MessageService.pagination_by_first_id(
+                app_model, current_user, args["conversation_id"], args["first_id"], args["limit"]
+            )
         except services.errors.conversation.ConversationNotExistsError:
             raise NotFound("Conversation Not Exists.")
         except services.errors.message.FirstMessageNotExistsError:
             raise NotFound("First Message Not Exists.")
+
 
 class MessageFeedbackApi(InstalledAppResource):
     """
@@ -106,18 +106,16 @@ class MessageFeedbackApi(InstalledAppResource):
 
         # 初始化请求解析器，用于解析客户端提交的点赞或点踩类型
         parser = reqparse.RequestParser()
-        parser.add_argument('rating', type=str, choices=['like', 'dislike', None], location='json')
+        parser.add_argument("rating", type=str, choices=["like", "dislike", None], location="json")
         args = parser.parse_args()
 
         try:
-            # 尝试创建消息反馈，包括应用模型、消息ID、当前用户和点赞/点踩类型
-            MessageService.create_feedback(app_model, message_id, current_user, args['rating'])
+            MessageService.create_feedback(app_model, message_id, current_user, args["rating"])
         except services.errors.message.MessageNotExistsError:
             # 如果消息不存在，则抛出404错误
             raise NotFound("Message Not Exists.")
 
-        # 返回成功结果
-        return {'result': 'success'}
+        return {"result": "success"}
 
 
 class MessageMoreLikeThisApi(InstalledAppResource):
@@ -146,18 +144,19 @@ class MessageMoreLikeThisApi(InstalledAppResource):
     def get(self, installed_app, message_id):
         # 校验调用的应用模式是否为'completion'
         app_model = installed_app.app
-        if app_model.mode != 'completion':
+        if app_model.mode != "completion":
             raise NotCompletionAppError()
 
         message_id = str(message_id)
 
         # 解析请求参数，包括响应模式（blocking或streaming）
         parser = reqparse.RequestParser()
-        parser.add_argument('response_mode', type=str, required=True, choices=['blocking', 'streaming'], location='args')
+        parser.add_argument(
+            "response_mode", type=str, required=True, choices=["blocking", "streaming"], location="args"
+        )
         args = parser.parse_args()
 
-        # 根据响应模式确定是否为流式响应
-        streaming = args['response_mode'] == 'streaming'
+        streaming = args["response_mode"] == "streaming"
 
         try:
             response = AppGenerateService.generate_more_like_this(
@@ -165,7 +164,7 @@ class MessageMoreLikeThisApi(InstalledAppResource):
                 user=current_user,
                 message_id=message_id,
                 invoke_from=InvokeFrom.EXPLORE,
-                streaming=streaming
+                streaming=streaming,
             )
             return helper.compact_generate_response(response)
         except MessageNotExistsError:
@@ -211,10 +210,7 @@ class MessageSuggestedQuestionApi(InstalledAppResource):
         try:
             # 尝试获取回答后的建议问题
             questions = MessageService.get_suggested_questions_after_answer(
-                app_model=app_model,
-                user=current_user,
-                message_id=message_id,
-                invoke_from=InvokeFrom.EXPLORE
+                app_model=app_model, user=current_user, message_id=message_id, invoke_from=InvokeFrom.EXPLORE
             )
         except MessageNotExistsError:
             raise NotFound("Message not found")  # 消息不存在异常处理
@@ -234,10 +230,22 @@ class MessageSuggestedQuestionApi(InstalledAppResource):
             logging.exception("internal server error.")  # 服务器内部错误异常处理
             raise InternalServerError()
 
-        return {'data': questions}  # 返回建议问题数据
+        return {"data": questions}
 
 
-api.add_resource(MessageListApi, '/installed-apps/<uuid:installed_app_id>/messages', endpoint='installed_app_messages')
-api.add_resource(MessageFeedbackApi, '/installed-apps/<uuid:installed_app_id>/messages/<uuid:message_id>/feedbacks', endpoint='installed_app_message_feedback')
-api.add_resource(MessageMoreLikeThisApi, '/installed-apps/<uuid:installed_app_id>/messages/<uuid:message_id>/more-like-this', endpoint='installed_app_more_like_this')
-api.add_resource(MessageSuggestedQuestionApi, '/installed-apps/<uuid:installed_app_id>/messages/<uuid:message_id>/suggested-questions', endpoint='installed_app_suggested_question')
+api.add_resource(MessageListApi, "/installed-apps/<uuid:installed_app_id>/messages", endpoint="installed_app_messages")
+api.add_resource(
+    MessageFeedbackApi,
+    "/installed-apps/<uuid:installed_app_id>/messages/<uuid:message_id>/feedbacks",
+    endpoint="installed_app_message_feedback",
+)
+api.add_resource(
+    MessageMoreLikeThisApi,
+    "/installed-apps/<uuid:installed_app_id>/messages/<uuid:message_id>/more-like-this",
+    endpoint="installed_app_more_like_this",
+)
+api.add_resource(
+    MessageSuggestedQuestionApi,
+    "/installed-apps/<uuid:installed_app_id>/messages/<uuid:message_id>/suggested-questions",
+    endpoint="installed_app_suggested_question",
+)

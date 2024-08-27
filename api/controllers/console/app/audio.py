@@ -46,7 +46,7 @@ class ChatMessageAudioApi(Resource):
     @account_initialization_required
     @get_app_model(mode=[AppMode.CHAT, AppMode.AGENT_CHAT, AppMode.ADVANCED_CHAT])
     def post(self, app_model):
-        file = request.files['file']
+        file = request.files["file"]
 
         try:
             # 尝试使用音频转写服务进行转写
@@ -98,31 +98,31 @@ class ChatMessageTextApi(Resource):
 
         try:
             parser = reqparse.RequestParser()
-            parser.add_argument('message_id', type=str, location='json')
-            parser.add_argument('text', type=str, location='json')
-            parser.add_argument('voice', type=str, location='json')
-            parser.add_argument('streaming', type=bool, location='json')
+            parser.add_argument("message_id", type=str, location="json")
+            parser.add_argument("text", type=str, location="json")
+            parser.add_argument("voice", type=str, location="json")
+            parser.add_argument("streaming", type=bool, location="json")
             args = parser.parse_args()
 
-            message_id = args.get('message_id', None)
-            text = args.get('text', None)
-            if (app_model.mode in [AppMode.ADVANCED_CHAT.value, AppMode.WORKFLOW.value]
-                    and app_model.workflow
-                    and app_model.workflow.features_dict):
-                text_to_speech = app_model.workflow.features_dict.get('text_to_speech')
-                voice = args.get('voice') if args.get('voice') else text_to_speech.get('voice')
+            message_id = args.get("message_id", None)
+            text = args.get("text", None)
+            if (
+                app_model.mode in [AppMode.ADVANCED_CHAT.value, AppMode.WORKFLOW.value]
+                and app_model.workflow
+                and app_model.workflow.features_dict
+            ):
+                text_to_speech = app_model.workflow.features_dict.get("text_to_speech")
+                voice = args.get("voice") if args.get("voice") else text_to_speech.get("voice")
             else:
                 try:
-                    voice = args.get('voice') if args.get('voice') else app_model.app_model_config.text_to_speech_dict.get(
-                        'voice')
+                    voice = (
+                        args.get("voice")
+                        if args.get("voice")
+                        else app_model.app_model_config.text_to_speech_dict.get("voice")
+                    )
                 except Exception:
                     voice = None
-            response = AudioService.transcript_tts(
-                app_model=app_model,
-                text=text,
-                message_id=message_id,
-                voice=voice
-            )
+            response = AudioService.transcript_tts(app_model=app_model, text=text, message_id=message_id, voice=voice)
             return response
         except services.errors.app_model_config.AppModelConfigBrokenError:
             # 记录应用模型配置错误日志，并抛出应用不可用错误
@@ -170,13 +170,13 @@ class TextModesApi(Resource):
         try:
             # 解析请求参数
             parser = reqparse.RequestParser()
-            parser.add_argument('language', type=str, required=True, location='args')
+            parser.add_argument("language", type=str, required=True, location="args")
             args = parser.parse_args()
 
             # 调用音频服务，获取支持的文本到语音转换语言
             response = AudioService.transcript_tts_voices(
                 tenant_id=app_model.tenant_id,
-                language=args['language'],
+                language=args["language"],
             )
 
             return response
@@ -216,6 +216,6 @@ class TextModesApi(Resource):
             raise InternalServerError()
 
 
-api.add_resource(ChatMessageAudioApi, '/apps/<uuid:app_id>/audio-to-text')
-api.add_resource(ChatMessageTextApi, '/apps/<uuid:app_id>/text-to-audio')
-api.add_resource(TextModesApi, '/apps/<uuid:app_id>/text-to-audio/voices')
+api.add_resource(ChatMessageAudioApi, "/apps/<uuid:app_id>/audio-to-text")
+api.add_resource(ChatMessageTextApi, "/apps/<uuid:app_id>/text-to-audio")
+api.add_resource(TextModesApi, "/apps/<uuid:app_id>/text-to-audio/voices")

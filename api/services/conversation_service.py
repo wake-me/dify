@@ -25,12 +25,17 @@ class ConversationService:
     """
     
     @classmethod
-    def pagination_by_last_id(cls, app_model: App, user: Optional[Union[Account, EndUser]],
-                              last_id: Optional[str], limit: int,
-                              invoke_from: InvokeFrom,
-                              include_ids: Optional[list] = None,
-                              exclude_ids: Optional[list] = None,
-                              sort_by: str = '-updated_at') -> InfiniteScrollPagination:
+    def pagination_by_last_id(
+        cls,
+        app_model: App,
+        user: Optional[Union[Account, EndUser]],
+        last_id: Optional[str],
+        limit: int,
+        invoke_from: InvokeFrom,
+        include_ids: Optional[list] = None,
+        exclude_ids: Optional[list] = None,
+        sort_by: str = "-updated_at",
+    ) -> InfiniteScrollPagination:
         if not user:
             return InfiniteScrollPagination(data=[], limit=limit, has_more=False)
 
@@ -38,10 +43,10 @@ class ConversationService:
         base_query = db.session.query(Conversation).filter(
             Conversation.is_deleted == False,
             Conversation.app_id == app_model.id,
-            Conversation.from_source == ('api' if isinstance(user, EndUser) else 'console'),
+            Conversation.from_source == ("api" if isinstance(user, EndUser) else "console"),
             Conversation.from_end_user_id == (user.id if isinstance(user, EndUser) else None),
             Conversation.from_account_id == (user.id if isinstance(user, Account) else None),
-            or_(Conversation.invoke_from.is_(None), Conversation.invoke_from == invoke_from.value)
+            or_(Conversation.invoke_from.is_(None), Conversation.invoke_from == invoke_from.value),
         )
 
         # 如果有指定包含的对话ID，则添加到查询条件中
@@ -72,29 +77,26 @@ class ConversationService:
         has_more = False
         if len(conversations) == limit:
             current_page_last_conversation = conversations[-1]
-            rest_filter_condition = cls._build_filter_condition(sort_field, sort_direction,
-                                                                current_page_last_conversation, is_next_page=True)
+            rest_filter_condition = cls._build_filter_condition(
+                sort_field, sort_direction, current_page_last_conversation, is_next_page=True
+            )
             rest_count = base_query.filter(rest_filter_condition).count()
 
             if rest_count > 0:
                 has_more = True
 
-        # 返回包含对话数据、限制数量和是否有更多数据的分页对象
-        return InfiniteScrollPagination(
-            data=conversations,
-            limit=limit,
-            has_more=has_more
-        )
+        return InfiniteScrollPagination(data=conversations, limit=limit, has_more=has_more)
 
     @classmethod
     def _get_sort_params(cls, sort_by: str) -> tuple[str, callable]:
-        if sort_by.startswith('-'):
+        if sort_by.startswith("-"):
             return sort_by[1:], desc
         return sort_by, asc
 
     @classmethod
-    def _build_filter_condition(cls, sort_field: str, sort_direction: callable, reference_conversation: Conversation,
-                                is_next_page: bool = False):
+    def _build_filter_condition(
+        cls, sort_field: str, sort_direction: callable, reference_conversation: Conversation, is_next_page: bool = False
+    ):
         field_value = getattr(reference_conversation, sort_field)
         if (sort_direction == desc and not is_next_page) or (sort_direction == asc and is_next_page):
             return getattr(Conversation, sort_field) < field_value
@@ -102,23 +104,15 @@ class ConversationService:
             return getattr(Conversation, sort_field) > field_value
 
     @classmethod
-    def rename(cls, app_model: App, conversation_id: str,
-            user: Optional[Union[Account, EndUser]], name: str, auto_generate: bool):
-        """
-        重命名会话。
-
-        参数:
-        - cls: 类的引用。
-        - app_model: 应用模型，表示特定的应用。
-        - conversation_id: 会话的唯一标识符。
-        - user: 可选，进行操作的用户，可以是账户或终端用户。
-        - name: 新的会话名称。
-        - auto_generate: 布尔值，指示是否自动生成会话名称。
-
-        返回值:
-        - 重命名后的会话对象。
-        """
-        conversation = cls.get_conversation(app_model, conversation_id, user)  # 获取指定的会话
+    def rename(
+        cls,
+        app_model: App,
+        conversation_id: str,
+        user: Optional[Union[Account, EndUser]],
+        name: str,
+        auto_generate: bool,
+    ):
+        conversation = cls.get_conversation(app_model, conversation_id, user)
 
         if auto_generate:
             # 如果设置为自动生成名称，则调用函数生成并返回新的会话对象
@@ -133,26 +127,13 @@ class ConversationService:
 
     @classmethod
     def auto_generate_name(cls, app_model: App, conversation: Conversation):
-        """
-        自动为对话生成名称。
-        
-        参数:
-        - cls: 类的引用，此处未使用。
-        - app_model: App模型的实例，代表一个特定的应用。
-        - conversation: Conversation模型的实例，代表一个特定的对话。
-        
-        返回值:
-        - 返回更新后的conversation实例。
-        
-        抛出:
-        - MessageNotExistsError: 如果对话中的第一条消息不存在，则抛出此错误。
-        """
-        # 尝试获取对话的第一条消息
-        message = db.session.query(Message) \
-            .filter(
-            Message.app_id == app_model.id,
-            Message.conversation_id == conversation.id
-        ).order_by(Message.created_at.asc()).first()
+        # get conversation first message
+        message = (
+            db.session.query(Message)
+            .filter(Message.app_id == app_model.id, Message.conversation_id == conversation.id)
+            .order_by(Message.created_at.asc())
+            .first()
+        )
 
         # 如果第一条消息不存在，则抛出异常
         if not message:
@@ -175,28 +156,19 @@ class ConversationService:
 
     @classmethod
     def get_conversation(cls, app_model: App, conversation_id: str, user: Optional[Union[Account, EndUser]]):
-        """
-        根据对话ID和用户信息，从数据库中获取对话记录。
-        
-        :param cls: 类的引用，用于调用数据库会话。
-        :param app_model: 应用模型实例，代表一个特定的应用。
-        :param conversation_id: 对话的唯一标识符。
-        :param user: 参与对话的用户，可以是终端用户或账户。此参数为可选。
-        :return: 查询到的对话记录。
-        :raises ConversationNotExistsError: 如果对话不存在，则抛出异常。
-        """
-        # 查询数据库，尝试获取符合条件的对话记录
-        conversation = db.session.query(Conversation) \
+        conversation = (
+            db.session.query(Conversation)
             .filter(
-            Conversation.id == conversation_id,
-            Conversation.app_id == app_model.id,
-            Conversation.from_source == ('api' if isinstance(user, EndUser) else 'console'),
-            Conversation.from_end_user_id == (user.id if isinstance(user, EndUser) else None),
-            Conversation.from_account_id == (user.id if isinstance(user, Account) else None),
-            Conversation.is_deleted == False
-        ).first()
+                Conversation.id == conversation_id,
+                Conversation.app_id == app_model.id,
+                Conversation.from_source == ("api" if isinstance(user, EndUser) else "console"),
+                Conversation.from_end_user_id == (user.id if isinstance(user, EndUser) else None),
+                Conversation.from_account_id == (user.id if isinstance(user, Account) else None),
+                Conversation.is_deleted == False,
+            )
+            .first()
+        )
 
-        # 如果查询结果为空，则抛出对话不存在异常
         if not conversation:
             raise ConversationNotExistsError()
 

@@ -34,18 +34,13 @@ class AdvancedChatAppWorkflowRunListApi(Resource):
         """
         # 初始化请求解析器，用于解析GET请求中的参数
         parser = reqparse.RequestParser()
-        parser.add_argument('last_id', type=uuid_value, location='args')  # 解析最后一个工作流运行的ID
-        parser.add_argument('limit', type=int_range(1, 100), required=False, default=20, location='args')  # 解析请求的限制条数，默认为20
-        
-        # 解析请求参数
+        parser.add_argument("last_id", type=uuid_value, location="args")
+        parser.add_argument("limit", type=int_range(1, 100), required=False, default=20, location="args")
         args = parser.parse_args()
 
         # 使用工作流运行服务来获取分页后的高级聊天工作流运行列表
         workflow_run_service = WorkflowRunService()
-        result = workflow_run_service.get_paginate_advanced_chat_workflow_runs(
-            app_model=app_model,
-            args=args
-        )
+        result = workflow_run_service.get_paginate_advanced_chat_workflow_runs(app_model=app_model, args=args)
 
         return result  # 返回获取到的结果
 
@@ -70,16 +65,13 @@ class WorkflowRunListApi(Resource):
         """
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('last_id', type=uuid_value, location='args')  # 最后一个ID，用于分页
-        parser.add_argument('limit', type=int_range(1, 100), required=False, default=20, location='args')  # 请求限制的数量，默认20
+        parser.add_argument("last_id", type=uuid_value, location="args")
+        parser.add_argument("limit", type=int_range(1, 100), required=False, default=20, location="args")
         args = parser.parse_args()
 
         # 使用工作流运行服务获取分页后的运行列表
         workflow_run_service = WorkflowRunService()
-        result = workflow_run_service.get_paginate_workflow_runs(
-            app_model=app_model,
-            args=args
-        )
+        result = workflow_run_service.get_paginate_workflow_runs(app_model=app_model, args=args)
 
         return result  # 返回获取到的工作流运行列表分页结果
 
@@ -137,12 +129,11 @@ class WorkflowRunNodeExecutionListApi(Resource):
         # 使用工作流运行服务获取工作流运行节点执行的信息
         workflow_run_service = WorkflowRunService()
         node_executions = workflow_run_service.get_workflow_run_node_executions(app_model=app_model, run_id=run_id)
-        
-        return {
-            'data': node_executions  # 返回获取到的节点执行数据
-        }
 
-api.add_resource(AdvancedChatAppWorkflowRunListApi, '/apps/<uuid:app_id>/advanced-chat/workflow-runs')
-api.add_resource(WorkflowRunListApi, '/apps/<uuid:app_id>/workflow-runs')
-api.add_resource(WorkflowRunDetailApi, '/apps/<uuid:app_id>/workflow-runs/<uuid:run_id>')
-api.add_resource(WorkflowRunNodeExecutionListApi, '/apps/<uuid:app_id>/workflow-runs/<uuid:run_id>/node-executions')
+        return {"data": node_executions}
+
+
+api.add_resource(AdvancedChatAppWorkflowRunListApi, "/apps/<uuid:app_id>/advanced-chat/workflow-runs")
+api.add_resource(WorkflowRunListApi, "/apps/<uuid:app_id>/workflow-runs")
+api.add_resource(WorkflowRunDetailApi, "/apps/<uuid:app_id>/workflow-runs/<uuid:run_id>")
+api.add_resource(WorkflowRunNodeExecutionListApi, "/apps/<uuid:app_id>/workflow-runs/<uuid:run_id>/node-executions")

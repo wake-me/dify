@@ -23,30 +23,23 @@ def parse_app_site_args():
         dict: 包含所有解析出的参数及其值的字典。
     """
     parser = reqparse.RequestParser()
-    # 添加应用程序标题参数
-    parser.add_argument('title', type=str, required=False, location='json')
-    parser.add_argument('icon_type', type=str, required=False, location='json')
-    parser.add_argument('icon', type=str, required=False, location='json')
-    # 添加应用程序图标背景颜色参数
-    parser.add_argument('icon_background', type=str, required=False, location='json')
-    # 添加应用程序描述参数
-    parser.add_argument('description', type=str, required=False, location='json')
-    # 添加应用程序默认语言参数，需为支持的语言
-    parser.add_argument('default_language', type=supported_language, required=False, location='json')
-    parser.add_argument('chat_color_theme', type=str, required=False, location='json')
-    parser.add_argument('chat_color_theme_inverted', type=bool, required=False, location='json')
-    parser.add_argument('customize_domain', type=str, required=False, location='json')
-    # 添加应用程序版权声明参数
-    parser.add_argument('copyright', type=str, required=False, location='json')
-    # 添加应用程序隐私政策链接参数
-    parser.add_argument('privacy_policy', type=str, required=False, location='json')
-    parser.add_argument('custom_disclaimer', type=str, required=False, location='json')
-    parser.add_argument('customize_token_strategy', type=str, choices=['must', 'allow', 'not_allow'],
-                        required=False,
-                        location='json')
-    # 添加是否提示用户公开应用程序的参数
-    parser.add_argument('prompt_public', type=bool, required=False, location='json')
-    parser.add_argument('show_workflow_steps', type=bool, required=False, location='json')
+    parser.add_argument("title", type=str, required=False, location="json")
+    parser.add_argument("icon_type", type=str, required=False, location="json")
+    parser.add_argument("icon", type=str, required=False, location="json")
+    parser.add_argument("icon_background", type=str, required=False, location="json")
+    parser.add_argument("description", type=str, required=False, location="json")
+    parser.add_argument("default_language", type=supported_language, required=False, location="json")
+    parser.add_argument("chat_color_theme", type=str, required=False, location="json")
+    parser.add_argument("chat_color_theme_inverted", type=bool, required=False, location="json")
+    parser.add_argument("customize_domain", type=str, required=False, location="json")
+    parser.add_argument("copyright", type=str, required=False, location="json")
+    parser.add_argument("privacy_policy", type=str, required=False, location="json")
+    parser.add_argument("custom_disclaimer", type=str, required=False, location="json")
+    parser.add_argument(
+        "customize_token_strategy", type=str, choices=["must", "allow", "not_allow"], required=False, location="json"
+    )
+    parser.add_argument("prompt_public", type=bool, required=False, location="json")
+    parser.add_argument("show_workflow_steps", type=bool, required=False, location="json")
     return parser.parse_args()
 
 
@@ -69,28 +62,25 @@ class AppSite(Resource):
         if not current_user.is_editor:
             raise Forbidden()
 
-        # 从数据库中获取对应的站点信息
-        site = db.session.query(Site). \
-            filter(Site.app_id == app_model.id). \
-            one_or_404()
+        site = db.session.query(Site).filter(Site.app_id == app_model.id).one_or_404()
 
         # 遍历需要更新的属性列表，并根据请求参数更新站点和应用信息
         for attr_name in [
-            'title',
-            'icon_type',
-            'icon',
-            'icon_background',
-            'description',
-            'default_language',
-            'chat_color_theme',
-            'chat_color_theme_inverted',
-            'customize_domain',
-            'copyright',
-            'privacy_policy',
-            'custom_disclaimer',
-            'customize_token_strategy',
-            'prompt_public',
-            'show_workflow_steps'
+            "title",
+            "icon_type",
+            "icon",
+            "icon_background",
+            "description",
+            "default_language",
+            "chat_color_theme",
+            "chat_color_theme_inverted",
+            "customize_domain",
+            "copyright",
+            "privacy_policy",
+            "custom_disclaimer",
+            "customize_token_strategy",
+            "prompt_public",
+            "show_workflow_steps",
         ]:
             value = args.get(attr_name)
             if value is not None:
@@ -102,19 +92,6 @@ class AppSite(Resource):
 
 
 class AppSiteAccessTokenReset(Resource):
-    """
-    用于重置应用站点的访问令牌的接口类。
-
-    方法:
-    - post: 重置指定应用的访问令牌。
-
-    参数:
-    - app_id: 应用的唯一标识符。
-
-    返回值:
-    - 返回更新后的站点信息。
-    """
-
     @setup_required
     @login_required
     @account_initialization_required
@@ -138,5 +115,5 @@ class AppSiteAccessTokenReset(Resource):
         return site  # 返回更新后的站点信息
 
 
-api.add_resource(AppSite, '/apps/<uuid:app_id>/site')
-api.add_resource(AppSiteAccessTokenReset, '/apps/<uuid:app_id>/site/access-token-reset')
+api.add_resource(AppSite, "/apps/<uuid:app_id>/site")
+api.add_resource(AppSiteAccessTokenReset, "/apps/<uuid:app_id>/site/access-token-reset")

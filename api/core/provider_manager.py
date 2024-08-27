@@ -357,7 +357,8 @@ class ProviderManager:
 
         return default_model
 
-    def _get_all_providers(self, tenant_id: str) -> dict[str, list[Provider]]:
+    @staticmethod
+    def _get_all_providers(tenant_id: str) -> dict[str, list[Provider]]:
         """
         获取工作空间的所有有效提供者记录。
 
@@ -385,7 +386,8 @@ class ProviderManager:
         # 返回填充后的字典，允许通过名称轻松访问提供者。
         return provider_name_to_provider_records_dict
 
-    def _get_all_provider_models(self, tenant_id: str) -> dict[str, list[ProviderModel]]:
+    @staticmethod
+    def _get_all_provider_models(tenant_id: str) -> dict[str, list[ProviderModel]]:
         """
         获取指定工作区下的所有供应商模型记录。
 
@@ -412,7 +414,8 @@ class ProviderManager:
         # 返回分组后的供应商模型字典
         return provider_name_to_model_records_dict
 
-    def _get_all_preferred_model_providers(self, tenant_id: str) -> dict[str, TenantPreferredModelProvider]:
+    @staticmethod
+    def _get_all_preferred_model_providers(tenant_id: str) -> dict[str, TenantPreferredModelProvider]:
         """
         获取工作空间的所有首选提供者类型。
 
@@ -433,7 +436,8 @@ class ProviderManager:
 
         return provider_name_to_preferred_provider_type_records_dict
 
-    def _get_all_provider_model_settings(self, tenant_id: str) -> dict[str, list[ProviderModelSetting]]:
+    @staticmethod
+    def _get_all_provider_model_settings(tenant_id: str) -> dict[str, list[ProviderModelSetting]]:
         """
         Get All provider model settings of the workspace.
 
@@ -452,7 +456,8 @@ class ProviderManager:
 
         return provider_name_to_provider_model_settings_dict
 
-    def _get_all_provider_load_balancing_configs(self, tenant_id: str) -> dict[str, list[LoadBalancingModelConfig]]:
+    @staticmethod
+    def _get_all_provider_load_balancing_configs(tenant_id: str) -> dict[str, list[LoadBalancingModelConfig]]:
         """
         Get All provider load balancing configs of the workspace.
 
@@ -483,7 +488,8 @@ class ProviderManager:
 
         return provider_name_to_provider_load_balancing_model_configs_dict
 
-    def _init_trial_provider_records(self, tenant_id: str,
+    @staticmethod
+    def _init_trial_provider_records(tenant_id: str,
                                      provider_name_to_provider_records_dict: dict[str, list]) -> dict[str, list]:
         """
         Initialize trial provider records if not exists.
@@ -830,7 +836,8 @@ class ProviderManager:
             credentials=current_using_credentials
         )
 
-    def _choice_current_using_quota_type(self, quota_configurations: list[QuotaConfiguration]) -> ProviderQuotaType:
+    @staticmethod
+    def _choice_current_using_quota_type(quota_configurations: list[QuotaConfiguration]) -> ProviderQuotaType:
         """
         选择当前使用的配额类型，优先级顺序为：付费配额 > 提供商免费配额 > 试用配额。
         如果根据排序仍有对应配额类型可用，
@@ -860,7 +867,8 @@ class ProviderManager:
         # 如果没有可用的配额类型，抛出异常
         raise ValueError('No quota type available')
 
-    def _extract_secret_variables(self, credential_form_schemas: list[CredentialFormSchema]) -> list[str]:
+    @staticmethod
+    def _extract_secret_variables(credential_form_schemas: list[CredentialFormSchema]) -> list[str]:
         """
         提取保密输入表单变量。
 

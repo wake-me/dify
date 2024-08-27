@@ -39,12 +39,7 @@ from tasks.mail_reset_password_task import send_reset_password_mail_task
 
 
 class AccountService:
-
-    reset_password_rate_limiter = RateLimiter(
-        prefix="reset_password_rate_limit",
-        max_attempts=5,
-        time_window=60 * 60
-    )
+    reset_password_rate_limiter = RateLimiter(prefix="reset_password_rate_limit", max_attempts=5, time_window=60 * 60)
 
     @staticmethod
     def load_user(user_id: str) -> None | Account:
@@ -56,13 +51,15 @@ class AccountService:
         if account.status in [AccountStatus.BANNED.value, AccountStatus.CLOSED.value]:
             raise Unauthorized("Account is banned or closed.")
 
-        current_tenant: TenantAccountJoin = TenantAccountJoin.query.filter_by(account_id=account.id, current=True).first()
+        current_tenant: TenantAccountJoin = TenantAccountJoin.query.filter_by(
+            account_id=account.id, current=True
+        ).first()
         if current_tenant:
             account.current_tenant_id = current_tenant.tenant_id
         else:
-            # 如果没有当前有效的租户关联，查找第一个可用的租户关联并设置为当前
-            available_ta = TenantAccountJoin.query.filter_by(account_id=account.id) \
-                .order_by(TenantAccountJoin.id.asc()).first()
+            available_ta = (
+                TenantAccountJoin.query.filter_by(account_id=account.id).order_by(TenantAccountJoin.id.asc()).first()
+            )
             if not available_ta:
                 return None  # 如果账号没有关联任何租户，则返回None
 
@@ -76,14 +73,13 @@ class AccountService:
 
         return account
 
-
     @staticmethod
     def get_account_jwt_token(account, *, exp: timedelta = timedelta(days=30)):
         payload = {
             "user_id": account.id,
             "exp": datetime.now(timezone.utc).replace(tzinfo=None) + exp,
             "iss": dify_config.EDITION,
-            "sub": 'Console API Passport',
+            "sub": "Console API Passport",
         }
 
         # 调用PassportService的issue方法，根据负载生成JWT令牌
@@ -109,11 +105,11 @@ class AccountService:
         # 根据电子邮件查询账户信息
         account = Account.query.filter_by(email=email).first()
         if not account:
-            raise AccountLoginError('Invalid email or password.')
+            raise AccountLoginError("Invalid email or password.")
 
         # 检查账户状态，禁用或关闭的账户不能登录
         if account.status == AccountStatus.BANNED.value or account.status == AccountStatus.CLOSED.value:
-            raise AccountLoginError('Account is banned or closed.')
+            raise AccountLoginError("Account is banned or closed.")
 
         # 如果账户状态为待激活，则将其激活
         if account.status == AccountStatus.PENDING.value:
@@ -123,7 +119,7 @@ class AccountService:
 
         # 验证密码，不匹配则抛出登录错误
         if account.password is None or not compare_password(password, account.password, account.password_salt):
-            raise AccountLoginError('Invalid email or password.')
+            raise AccountLoginError("Invalid email or password.")
         return account
 
     @staticmethod
@@ -162,11 +158,9 @@ class AccountService:
         return account
 
     @staticmethod
-    def create_account(email: str,
-                       name: str,
-                       interface_language: str,
-                       password: Optional[str] = None,
-                       interface_theme: str = 'light') -> Account:
+    def create_account(
+        email: str, name: str, interface_language: str, password: Optional[str] = None, interface_theme: str = "light"
+    ) -> Account:
         """create account"""
         account = Account()
         account.email = email
@@ -187,8 +181,8 @@ class AccountService:
         account.interface_language = interface_language  # 设置界面语言
         account.interface_theme = interface_theme  # 设置界面主题
 
-        # 根据界面语言设置时区，默认为UTC
-        account.timezone = language_timezone_mapping.get(interface_language, 'UTC')
+        # Set timezone based on language
+        account.timezone = language_timezone_mapping.get(interface_language, "UTC")
 
         db.session.add(account)  # 将新账户添加到数据库会话
         db.session.commit()  # 提交数据库会话，保存新账户
@@ -208,9 +202,10 @@ class AccountService:
         None
         """
         try:
-            # 查询是否存在相同提供者的绑定记录
-            account_integrate: Optional[AccountIntegrate] = AccountIntegrate.query.filter_by(account_id=account.id,
-                                                                                            provider=provider).first()
+            # Query whether there is an existing binding record for the same provider
+            account_integrate: Optional[AccountIntegrate] = AccountIntegrate.query.filter_by(
+                account_id=account.id, provider=provider
+            ).first()
 
             if account_integrate:
                 # 如果存在，更新记录
@@ -218,17 +213,17 @@ class AccountService:
                 account_integrate.encrypted_token = ""  # todo
                 account_integrate.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
             else:
-                # 如果不存在，创建新记录
-                account_integrate = AccountIntegrate(account_id=account.id, provider=provider, open_id=open_id,
-                                                    encrypted_token="")
+                # If it does not exist, create a new record
+                account_integrate = AccountIntegrate(
+                    account_id=account.id, provider=provider, open_id=open_id, encrypted_token=""
+                )
                 db.session.add(account_integrate)
 
             db.session.commit()
-            logging.info(f'Account {account.id} linked {provider} account {open_id}.')
+            logging.info(f"Account {account.id} linked {provider} account {open_id}.")
         except Exception as e:
-            logging.exception(f'Failed to link {provider} account {open_id} to Account {account.id}')
-            # 抛出链接账户整合错误的异常
-            raise LinkAccountIntegrateError('Failed to link account.') from e
+            logging.exception(f"Failed to link {provider} account {open_id} to Account {account.id}")
+            raise LinkAccountIntegrateError("Failed to link account.") from e
 
     @staticmethod
     def close_account(account: Account) -> None:
@@ -270,7 +265,7 @@ class AccountService:
             AccountService.update_last_login(account, ip_address=ip_address)
         exp = timedelta(days=30)
         token = AccountService.get_account_jwt_token(account, exp=exp)
-        redis_client.set(_get_login_cache_key(account_id=account.id, token=token), '1', ex=int(exp.total_seconds()))
+        redis_client.set(_get_login_cache_key(account_id=account.id, token=token), "1", ex=int(exp.total_seconds()))
         return token
 
     @staticmethod
@@ -288,22 +283,18 @@ class AccountService:
         if cls.reset_password_rate_limiter.is_rate_limited(account.email):
             raise RateLimitExceededError(f"Rate limit exceeded for email: {account.email}. Please try again later.")
 
-        token = TokenManager.generate_token(account, 'reset_password')
-        send_reset_password_mail_task.delay(
-            language=account.interface_language,
-            to=account.email,
-            token=token
-        )
+        token = TokenManager.generate_token(account, "reset_password")
+        send_reset_password_mail_task.delay(language=account.interface_language, to=account.email, token=token)
         cls.reset_password_rate_limiter.increment_rate_limit(account.email)
         return token
 
     @classmethod
     def revoke_reset_password_token(cls, token: str):
-        TokenManager.revoke_token(token, 'reset_password')
+        TokenManager.revoke_token(token, "reset_password")
 
     @classmethod
     def get_reset_password_data(cls, token: str) -> Optional[dict[str, Any]]:
-        return TokenManager.get_token_data(token, 'reset_password')
+        return TokenManager.get_token_data(token, "reset_password")
 
 
 def _get_login_cache_key(*, account_id: str, token: str):
@@ -311,27 +302,6 @@ def _get_login_cache_key(*, account_id: str, token: str):
 
 
 class TenantService:
-    """
-    租户服务类，提供了一系列静态方法来处理与租户相关的操作，包括创建租户、管理租户成员、切换当前工作空间等。
-    
-    方法：
-    - `create_tenant`: 创建新的租户，并将其与公钥加密关联并保存到数据库。
-    - `create_owner_tenant_if_not_exist`: 若不存在所有者租户，则创建一个新的所有者租户，并将指定账户添加为该租户的所有者。
-    - `create_tenant_member`: 将账户添加为租户成员，并可指定角色（默认为“normal”）。
-    - `get_join_tenants`: 获取指定账户加入的所有租户列表。
-    - `get_current_tenant_by_account`: 获取账户当前关联的租户并为其添加角色信息。
-    - `switch_tenant`: 切换账户当前的工作空间至指定租户。
-    - `get_tenant_members`: 获取租户的所有成员及其对应的角色。
-    - `has_roles`: 检查用户在指定租户下是否具有给定的任意角色。
-    - `get_user_role`: 获取账户在特定租户下的角色。
-    - `get_tenant_count`: 获取数据库中租户的数量。
-    - `check_member_permission`: 检查操作员是否有权限对成员进行增删改操作。
-    - `remove_member_from_tenant`: 从租户中移除指定成员。
-    - `update_member_role`: 更新租户内成员的角色。
-    - `dissolve_tenant`: 解散租户，删除其所有成员关系及租户本身。
-    - `get_custom_config`: 获取指定租户的自定义配置。
-    """
-
     @staticmethod
     def create_tenant(name: str) -> Tenant:
         """
@@ -357,16 +327,10 @@ class TenantService:
 
     @staticmethod
     def create_owner_tenant_if_not_exist(account: Account):
-        """
-        如果还未存在，创建一个属于指定账户的owner租户
-        参数:
-            account: Account - 需要创建租户的账户对象
-        返回值:
-            无
-        """
-        # 查询当前账户是否已经关联了租户
-        available_ta = TenantAccountJoin.query.filter_by(account_id=account.id) \
-            .order_by(TenantAccountJoin.id.asc()).first()
+        """Create owner tenant if not exist"""
+        available_ta = (
+            TenantAccountJoin.query.filter_by(account_id=account.id).order_by(TenantAccountJoin.id.asc()).first()
+        )
 
         # 如果已经存在关联租户，则不进行操作
         if available_ta:
@@ -374,58 +338,33 @@ class TenantService:
 
         # 创建新的租户，并将账户作为owner角色加入到租户中
         tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
-        TenantService.create_tenant_member(tenant, account, role='owner')
+        TenantService.create_tenant_member(tenant, account, role="owner")
         account.current_tenant = tenant
         db.session.commit()  # 提交数据库会话，确保更改被保存
         tenant_was_created.send(tenant)  # 发送租户创建成功的信号
 
     @staticmethod
-    def create_tenant_member(tenant: Tenant, account: Account, role: str = 'normal') -> TenantAccountJoin:
-        """
-        创建租户成员
-        
-        参数:
-        tenant: Tenant - 租户对象，表示需要添加成员的租户。
-        account: Account - 账户对象，表示要添加到租户的成员。
-        role: str - 成员的角色，默认为 'normal'。可接受的值包括但不限于 'normal'、'owner'。
-
-        返回值:
-        TenantAccountJoin - 表示租户成员关系的对象。
-
-        异常:
-        如果尝试将多个‘owner’角色分配给一个租户，将引发异常。
-        """
-
-        # 检查是否尝试添加第二个‘owner’角色，如果是，则抛出异常
+    def create_tenant_member(tenant: Tenant, account: Account, role: str = "normal") -> TenantAccountJoin:
+        """Create tenant member"""
         if role == TenantAccountJoinRole.OWNER.value:
             if TenantService.has_roles(tenant, [TenantAccountJoinRole.OWNER]):
-                logging.error(f'Tenant {tenant.id} has already an owner.')
-                raise Exception('Tenant already has an owner.')
+                logging.error(f"Tenant {tenant.id} has already an owner.")
+                raise Exception("Tenant already has an owner.")
 
-        # 创建租户成员关系对象并将其添加到数据库
-        ta = TenantAccountJoin(
-            tenant_id=tenant.id,
-            account_id=account.id,
-            role=role
-        )
+        ta = TenantAccountJoin(tenant_id=tenant.id, account_id=account.id, role=role)
         db.session.add(ta)
         db.session.commit()
         return ta
 
     @staticmethod
     def get_join_tenants(account: Account) -> list[Tenant]:
-        """
-        获取账户已加入的租户列表
-        
-        参数:
-        account: Account - 需要查询加入租户的账户对象
-        
-        返回值:
-        list[Tenant] - 账户已加入的租户列表
-        """
-        return db.session.query(Tenant).join(
-            TenantAccountJoin, Tenant.id == TenantAccountJoin.tenant_id
-        ).filter(TenantAccountJoin.account_id == account.id, Tenant.status == TenantStatus.NORMAL).all()
+        """Get account join tenants"""
+        return (
+            db.session.query(Tenant)
+            .join(TenantAccountJoin, Tenant.id == TenantAccountJoin.tenant_id)
+            .filter(TenantAccountJoin.account_id == account.id, Tenant.status == TenantStatus.NORMAL)
+            .all()
+        )
 
     @staticmethod
     def get_current_tenant_by_account(account: Account):
@@ -470,18 +409,24 @@ class TenantService:
         if tenant_id is None:
             raise ValueError("Tenant ID must be provided.")
 
-        tenant_account_join = db.session.query(TenantAccountJoin).join(Tenant, TenantAccountJoin.tenant_id == Tenant.id).filter(
-            TenantAccountJoin.account_id == account.id,
-            TenantAccountJoin.tenant_id == tenant_id,
-            Tenant.status == TenantStatus.NORMAL,
-        ).first()
+        tenant_account_join = (
+            db.session.query(TenantAccountJoin)
+            .join(Tenant, TenantAccountJoin.tenant_id == Tenant.id)
+            .filter(
+                TenantAccountJoin.account_id == account.id,
+                TenantAccountJoin.tenant_id == tenant_id,
+                Tenant.status == TenantStatus.NORMAL,
+            )
+            .first()
+        )
 
         if not tenant_account_join:
             # 如果未找到关联或账户不是租户的成员，则抛出异常
             raise AccountNotLinkTenantError("Tenant not found or account is not a member of the tenant.")
         else:
-            # 更新除当前租户外的所有租户关联的当前状态为False
-            TenantAccountJoin.query.filter(TenantAccountJoin.account_id == account.id, TenantAccountJoin.tenant_id != tenant_id).update({'current': False})
+            TenantAccountJoin.query.filter(
+                TenantAccountJoin.account_id == account.id, TenantAccountJoin.tenant_id != tenant_id
+            ).update({"current": False})
             tenant_account_join.current = True
             # 设置账户的当前租户ID
             account.current_tenant_id = tenant_account_join.tenant_id
@@ -503,9 +448,7 @@ class TenantService:
         query = (
             db.session.query(Account, TenantAccountJoin.role)
             .select_from(Account)
-            .join(
-                TenantAccountJoin, Account.id == TenantAccountJoin.account_id
-            )
+            .join(TenantAccountJoin, Account.id == TenantAccountJoin.account_id)
             .filter(TenantAccountJoin.tenant_id == tenant.id)
         )
 
@@ -525,11 +468,9 @@ class TenantService:
         query = (
             db.session.query(Account, TenantAccountJoin.role)
             .select_from(Account)
-            .join(
-                TenantAccountJoin, Account.id == TenantAccountJoin.account_id
-            )
+            .join(TenantAccountJoin, Account.id == TenantAccountJoin.account_id)
             .filter(TenantAccountJoin.tenant_id == tenant.id)
-            .filter(TenantAccountJoin.role == 'dataset_operator')
+            .filter(TenantAccountJoin.role == "dataset_operator")
         )
 
         # Initialize an empty list to store the updated accounts
@@ -555,32 +496,25 @@ class TenantService:
         """
         # 检查roles列表中的所有元素是否都为TenantAccountJoinRole类型
         if not all(isinstance(role, TenantAccountJoinRole) for role in roles):
-            raise ValueError('all roles must be TenantAccountJoinRole')
+            raise ValueError("all roles must be TenantAccountJoinRole")
 
-        # 查询数据库，检查是否存在租户、角色匹配的记录
-        return db.session.query(TenantAccountJoin).filter(
-            TenantAccountJoin.tenant_id == tenant.id,
-            TenantAccountJoin.role.in_([role.value for role in roles])
-        ).first() is not None
+        return (
+            db.session.query(TenantAccountJoin)
+            .filter(
+                TenantAccountJoin.tenant_id == tenant.id, TenantAccountJoin.role.in_([role.value for role in roles])
+            )
+            .first()
+            is not None
+        )
 
     @staticmethod
     def get_user_role(account: Account, tenant: Tenant) -> Optional[TenantAccountJoinRole]:
-        """
-        获取指定租户下当前账户的角色
-
-        参数:
-        account: Account - 需要查询角色的账户对象
-        tenant: Tenant - 指定的租户对象
-
-        返回值:
-        Optional[TenantAccountJoinRole] - 如果账户在租户中，返回其角色对象；否则返回None
-        """
-        # 查询数据库，尝试获取账户和租户关联的角色信息
-        join = db.session.query(TenantAccountJoin).filter(
-            TenantAccountJoin.tenant_id == tenant.id,
-            TenantAccountJoin.account_id == account.id
-        ).first()
-        # 如果找到了关联信息，返回角色对象；否则返回None
+        """Get the role of the current account for a given tenant"""
+        join = (
+            db.session.query(TenantAccountJoin)
+            .filter(TenantAccountJoin.tenant_id == tenant.id, TenantAccountJoin.account_id == account.id)
+            .first()
+        )
         return join.role if join else None
 
     @staticmethod
@@ -618,13 +552,11 @@ class TenantService:
 
         # 定义可执行操作及其所需权限
         perms = {
-            'add': [TenantAccountRole.OWNER, TenantAccountRole.ADMIN],
-            'remove': [TenantAccountRole.OWNER],
-            'update': [TenantAccountRole.OWNER]
+            "add": [TenantAccountRole.OWNER, TenantAccountRole.ADMIN],
+            "remove": [TenantAccountRole.OWNER],
+            "update": [TenantAccountRole.OWNER],
         }
-
-        # 检查操作类型是否有效
-        if action not in ['add', 'remove', 'update']:
+        if action not in ["add", "remove", "update"]:
             raise InvalidActionError("Invalid action.")
 
         # 如果成员账户非空且操作者尝试操作自己，抛出异常
@@ -632,31 +564,16 @@ class TenantService:
             if operator.id == member.id:
                 raise CannotOperateSelfError("Cannot operate self.")
 
-        # 查询操作者是否在租户中具有相应权限
-        ta_operator = TenantAccountJoin.query.filter_by(
-            tenant_id=tenant.id,
-            account_id=operator.id
-        ).first()
+        ta_operator = TenantAccountJoin.query.filter_by(tenant_id=tenant.id, account_id=operator.id).first()
 
         # 如果查询结果为空或角色不在可执行操作的权限列表中，抛出无权限异常
         if not ta_operator or ta_operator.role not in perms[action]:
-            raise NoPermissionError(f'No permission to {action} member.')
+            raise NoPermissionError(f"No permission to {action} member.")
 
     @staticmethod
     def remove_member_from_tenant(tenant: Tenant, account: Account, operator: Account) -> None:
-        """
-        从租户中移除成员
-        
-        参数:
-        tenant: Tenant - 租户对象，表示需要操作的租户。
-        account: Account - 需要被移除的成员账户对象。
-        operator: Account - 执行移除操作的管理员账户对象。
-        
-        返回值:
-        None
-        """
-        # 检查操作者是否尝试移除自己，如果是，则抛出错误
-        if operator.id == account.id and TenantService.check_member_permission(tenant, operator, account, 'remove'):
+        """Remove member from tenant"""
+        if operator.id == account.id and TenantService.check_member_permission(tenant, operator, account, "remove"):
             raise CannotOperateSelfError("Cannot operate self.")
 
         # 查询指定租户和成员是否存在关联，不存在则抛出错误
@@ -670,34 +587,19 @@ class TenantService:
 
     @staticmethod
     def update_member_role(tenant: Tenant, member: Account, new_role: str, operator: Account) -> None:
-        """
-        更新成员的角色
-        :param tenant: 租户对象，表示需要操作的租户
-        :param member: 账户对象，表示需要更新角色的成员
-        :param new_role: 字符串，表示成员新的角色
-        :param operator: 账户对象，表示执行操作的管理员
-        :return: 无返回值
-        """
-        # 检查操作者是否有权限更新成员的角色
-        TenantService.check_member_permission(tenant, operator, member, 'update')
+        """Update member role"""
+        TenantService.check_member_permission(tenant, operator, member, "update")
 
-        # 查询目标成员的加入信息
-        target_member_join = TenantAccountJoin.query.filter_by(
-            tenant_id=tenant.id,
-            account_id=member.id
-        ).first()
+        target_member_join = TenantAccountJoin.query.filter_by(tenant_id=tenant.id, account_id=member.id).first()
 
         # 如果新角色与旧角色相同，则抛出角色已分配错误
         if target_member_join.role == new_role:
             raise RoleAlreadyAssignedError("The provided role is already assigned to the member.")
 
-        # 如果新角色为owner，则查找当前owner并将其角色改为admin
-        if new_role == 'owner':
-            current_owner_join = TenantAccountJoin.query.filter_by(
-                tenant_id=tenant.id,
-                role='owner'
-            ).first()
-            current_owner_join.role = 'admin'
+        if new_role == "owner":
+            # Find the current owner and change their role to 'admin'
+            current_owner_join = TenantAccountJoin.query.filter_by(tenant_id=tenant.id, role="owner").first()
+            current_owner_join.role = "admin"
 
         # 更新目标成员的角色
         target_member_join.role = new_role
@@ -705,24 +607,9 @@ class TenantService:
 
     @staticmethod
     def dissolve_tenant(tenant: Tenant, operator: Account) -> None:
-        """
-        解散租户
-        
-        参数:
-        tenant: Tenant - 需要被解散的租户对象。
-        operator: Account - 执行解散操作的账户对象。
-        
-        返回值:
-        None
-        
-        抛出:
-        NoPermissionError - 如果操作者没有权限解散租户，则抛出无权限错误。
-        """
-        # 检查操作者是否有权限解散租户
-        if not TenantService.check_member_permission(tenant, operator, operator, 'remove'):
-            raise NoPermissionError('No permission to dissolve tenant.')
-        
-        # 从数据库中删除租户与账户之间的关联
+        """Dissolve tenant"""
+        if not TenantService.check_member_permission(tenant, operator, operator, "remove"):
+            raise NoPermissionError("No permission to dissolve tenant.")
         db.session.query(TenantAccountJoin).filter_by(tenant_id=tenant.id).delete()
         # 删除租户对象
         db.session.delete(tenant)
@@ -747,33 +634,9 @@ class TenantService:
 
 
 class RegisterService:
-    """
-    注册服务类，提供账户注册、邀请成员、生成和验证邀请令牌等功能。
-
-    方法：
-    - _get_invitation_token_key(token: str) -> str：根据邀请令牌生成存储在Redis中的键名。
-    - register(email, name, ...) -> Account：处理账户注册逻辑，包括创建账户、关联第三方账号（如有）、初始化workspace等操作，并返回注册成功的账户对象。
-    - invite_new_member(tenant: Tenant, email: str, ...) -> str：邀请新成员加入指定租户，如果成员不存在则先进行注册，然后添加至租户并发送邀请邮件，最后返回邀请令牌。
-    - generate_invite_token(tenant: Tenant, account: Account) -> str：为已注册的账户生成一个邀请令牌，并将其与相关数据一同存储到Redis中，有效期由配置决定。
-    - revoke_token(workspace_id: str, email: str, token: str)：撤销特定工作区、邮箱及令牌对应的邀请信息。
-    - get_invitation_if_token_valid(workspace_id: str, email: str, token: str) -> Optional[dict[str, Any]]：检查邀请令牌是否有效，并获取对应的有效邀请数据，若有效则返回包含账户、租户等信息的字典，否则返回None。
-    - _get_invitation_by_token(token: str, workspace_id: str, email: str) -> Optional[dict[str, str]]：从Redis中根据给定条件获取邀请数据，如果没有找到则返回None。
-
-    """
-
     @classmethod
     def _get_invitation_token_key(cls, token: str) -> str:
-        """
-        获取邀请令牌的键名。
-        
-        参数:
-        cls - 类的引用，用于表示这是一个类方法。
-        token - 字符串类型，表示邀请令牌。
-        
-        返回值:
-        返回一个字符串，表示邀请令牌在存储系统中的键名。
-        """
-        return f'member_invite:token:{token}'
+        return f"member_invite:token:{token}"
 
     @classmethod
     def setup(cls, email: str, name: str, password: str, ip_address: str) -> None:
@@ -799,9 +662,7 @@ class RegisterService:
 
             TenantService.create_owner_tenant_if_not_exist(account)
 
-            dify_setup = DifySetup(
-                version=dify_config.CURRENT_VERSION
-            )
+            dify_setup = DifySetup(version=dify_config.CURRENT_VERSION)
             db.session.add(dify_setup)
             db.session.commit()
         except Exception as e:
@@ -811,16 +672,20 @@ class RegisterService:
             db.session.query(Tenant).delete()
             db.session.commit()
 
-            logging.exception(f'Setup failed: {e}')
-            raise ValueError(f'Setup failed: {e}')
+            logging.exception(f"Setup failed: {e}")
+            raise ValueError(f"Setup failed: {e}")
 
     @classmethod
-    def register(cls, email, name,
-                 password: Optional[str] = None,
-                 open_id: Optional[str] = None,
-                 provider: Optional[str] = None,
-                 language: Optional[str] = None,
-                 status: Optional[AccountStatus] = None) -> Account:
+    def register(
+        cls,
+        email,
+        name,
+        password: Optional[str] = None,
+        open_id: Optional[str] = None,
+        provider: Optional[str] = None,
+        language: Optional[str] = None,
+        status: Optional[AccountStatus] = None,
+    ) -> Account:
         db.session.begin_nested()
         """
         注册账户
@@ -841,10 +706,7 @@ class RegisterService:
         try:
             # 创建账户，如果未指定语言则使用默认语言；如果指定了密码，则进行加密处理
             account = AccountService.create_account(
-                email=email,
-                name=name,
-                interface_language=language if language else languages[0],
-                password=password
+                email=email, name=name, interface_language=language if language else languages[0], password=password
             )
             # 设置账户状态，优先使用传入的状态，若无则设置为激活状态
             account.status = AccountStatus.ACTIVE.value if not status else status.value
@@ -853,9 +715,10 @@ class RegisterService:
             # 如果有提供open_id和provider，则绑定账户的第三方身份认证
             if open_id is not None or provider is not None:
                 AccountService.link_account_integrate(provider, open_id, account)
-            if dify_config.EDITION != 'SELF_HOSTED':
+            if dify_config.EDITION != "SELF_HOSTED":
                 tenant = TenantService.create_tenant(f"{account.name}'s Workspace")
-                TenantService.create_tenant_member(tenant, account, role='owner')
+
+                TenantService.create_tenant_member(tenant, account, role="owner")
                 account.current_tenant = tenant
                 # 发送租户创建事件
                 tenant_was_created.send(tenant)
@@ -863,36 +726,21 @@ class RegisterService:
             db.session.commit()  # 提交数据库事务
         except Exception as e:
             db.session.rollback()
-            logging.error(f'Register failed: {e}')
-            raise AccountRegisterError(f'Registration failed: {e}') from e
+            logging.error(f"Register failed: {e}")
+            raise AccountRegisterError(f"Registration failed: {e}") from e
 
         return account  # 返回创建的账户对象
 
     @classmethod
-    def invite_new_member(cls, tenant: Tenant, email: str, language: str, role: str = 'normal', inviter: Account = None) -> str:
-        """
-        邀请新的成员加入租户。
-        
-        参数:
-        - cls: 类的引用。
-        - tenant: 租户对象，表示邀请加入的租户。
-        - email: 被邀请人的邮箱地址，同时也是账户的登录标识。
-        - language: 被邀请人的语言偏好。
-        - role: 被邀请人在租户中的角色，默认为 'normal'。
-        - inviter: 发起邀请的账户对象，默认为 None，表示系统邀请。
-        
-        返回值:
-        - token: 生成的邀请令牌，用于邮件中确认邀请。
-        """
-        
-        # 查询是否已存在该邮箱对应的账户
+    def invite_new_member(
+        cls, tenant: Tenant, email: str, language: str, role: str = "normal", inviter: Account = None
+    ) -> str:
+        """Invite new member"""
         account = Account.query.filter_by(email=email).first()
 
         if not account:
-            # 检查邀请者是否有权限添加成员
-            TenantService.check_member_permission(tenant, inviter, None, 'add')
-            # 从邮箱中提取用户名
-            name = email.split('@')[0]
+            TenantService.check_member_permission(tenant, inviter, None, "add")
+            name = email.split("@")[0]
 
             # 为新邀请的成员注册账户
             account = cls.register(email=email, name=name, language=language, status=AccountStatus.PENDING)
@@ -901,14 +749,8 @@ class RegisterService:
             # 切换当前账户所属租户为被邀请人
             TenantService.switch_tenant(account, tenant.id)
         else:
-            # 检查邀请者是否有权限添加已有账户成员
-            TenantService.check_member_permission(tenant, inviter, account, 'add')
-            
-            # 查询该账户是否已经是当前租户的成员
-            ta = TenantAccountJoin.query.filter_by(
-                tenant_id=tenant.id,
-                account_id=account.id
-            ).first()
+            TenantService.check_member_permission(tenant, inviter, account, "add")
+            ta = TenantAccountJoin.query.filter_by(tenant_id=tenant.id, account_id=account.id).first()
 
             if not ta:
                 # 如果账户还不是当前租户的成员，则创建成员关系
@@ -926,7 +768,7 @@ class RegisterService:
             language=account.interface_language,
             to=email,
             token=token,
-            inviter_name=inviter.name if inviter else 'Dify',
+            inviter_name=inviter.name if inviter else "Dify",
             workspace_name=tenant.name,
         )
 
@@ -950,17 +792,13 @@ class RegisterService:
         """
         token = str(uuid.uuid4())  # 生成一个随机的UUID作为邀请令牌。
         invitation_data = {
-            'account_id': account.id,
-            'email': account.email,
-            'workspace_id': tenant.id,
+            "account_id": account.id,
+            "email": account.email,
+            "workspace_id": tenant.id,
         }
         expiryHours = dify_config.INVITE_EXPIRY_HOURS
-        redis_client.setex(
-            cls._get_invitation_token_key(token),
-            expiryHours * 60 * 60,
-            json.dumps(invitation_data)
-        )
-        return token  # 返回生成的邀请令牌。
+        redis_client.setex(cls._get_invitation_token_key(token), expiryHours * 60 * 60, json.dumps(invitation_data))
+        return token
 
     @classmethod
     def revoke_token(cls, workspace_id: str, email: str, token: str):
@@ -979,8 +817,7 @@ class RegisterService:
         if workspace_id and email:
             # 根据电子邮件生成哈希值，并构造缓存键
             email_hash = sha256(email.encode()).hexdigest()
-            cache_key = 'member_invite_token:{}, {}:{}'.format(workspace_id, email_hash, token)
-            # 从Redis中删除对应的缓存条目
+            cache_key = "member_invite_token:{}, {}:{}".format(workspace_id, email_hash, token)
             redis_client.delete(cache_key)
         else:
             # 如果没有提供工作空间ID或电子邮件，则直接通过令牌 key 从Redis删除
@@ -1005,19 +842,21 @@ class RegisterService:
         if not invitation_data:
             return None
 
-        # 查询租户信息，确保租户存在且状态正常
-        tenant = db.session.query(Tenant).filter(
-            Tenant.id == invitation_data['workspace_id'],
-            Tenant.status == 'normal'
-        ).first()
+        tenant = (
+            db.session.query(Tenant)
+            .filter(Tenant.id == invitation_data["workspace_id"], Tenant.status == "normal")
+            .first()
+        )
 
         if not tenant:
             return None
 
-        # 查询账户及其在租户中的角色信息，确保账户存在且与邀请邮件地址匹配
-        tenant_account = db.session.query(Account, TenantAccountJoin.role).join(
-            TenantAccountJoin, Account.id == TenantAccountJoin.account_id
-        ).filter(Account.email == invitation_data['email'], TenantAccountJoin.tenant_id == tenant.id).first()
+        tenant_account = (
+            db.session.query(Account, TenantAccountJoin.role)
+            .join(TenantAccountJoin, Account.id == TenantAccountJoin.account_id)
+            .filter(Account.email == invitation_data["email"], TenantAccountJoin.tenant_id == tenant.id)
+            .first()
+        )
 
         if not tenant_account:
             return None
@@ -1026,15 +865,14 @@ class RegisterService:
         if not account:
             return None
 
-        # 验证邀请的账户ID是否与查询到的账户ID匹配
-        if invitation_data['account_id'] != str(account.id):
+        if invitation_data["account_id"] != str(account.id):
             return None
 
         # 返回验证通过的账户、邀请数据和租户信息
         return {
-            'account': account,
-            'data': invitation_data,
-            'tenant': tenant,
+            "account": account,
+            "data": invitation_data,
+            "tenant": tenant,
         }
 
     @classmethod
@@ -1054,7 +892,7 @@ class RegisterService:
         if workspace_id is not None and email is not None:
             # 通过邮箱生成哈希值，并构造缓存键
             email_hash = sha256(email.encode()).hexdigest()
-            cache_key = f'member_invite_token:{workspace_id}, {email_hash}:{token}'
+            cache_key = f"member_invite_token:{workspace_id}, {email_hash}:{token}"
             account_id = redis_client.get(cache_key)
 
             if not account_id:
@@ -1062,9 +900,9 @@ class RegisterService:
 
             # 返回邀请信息字典
             return {
-                'account_id': account_id.decode('utf-8'),
-                'email': email,
-                'workspace_id': workspace_id,
+                "account_id": account_id.decode("utf-8"),
+                "email": email,
+                "workspace_id": workspace_id,
             }
         else:
             # 通过邀请令牌直接从Redis获取邀请信息

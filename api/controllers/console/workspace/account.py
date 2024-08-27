@@ -26,10 +26,6 @@ from services.errors.account import CurrentPasswordIncorrectError as ServiceCurr
 
 
 class AccountInitApi(Resource):
-    """
-    账户初始化API接口类
-    """
-
     @setup_required
     @login_required
     def post(self):
@@ -47,50 +43,48 @@ class AccountInitApi(Resource):
         """
         account = current_user
 
-        # 检查账户是否已经是激活状态
-        if account.status == 'active':
+        if account.status == "active":
             raise AccountAlreadyInitedError()
 
         parser = reqparse.RequestParser()
 
-        if dify_config.EDITION == 'CLOUD':
-            parser.add_argument('invitation_code', type=str, location='json')
+        if dify_config.EDITION == "CLOUD":
+            parser.add_argument("invitation_code", type=str, location="json")
 
-        # 解析请求中的接口语言和时区参数
-        parser.add_argument(
-            'interface_language', type=supported_language, required=True, location='json')
-        parser.add_argument('timezone', type=timezone,
-                            required=True, location='json')
+        parser.add_argument("interface_language", type=supported_language, required=True, location="json")
+        parser.add_argument("timezone", type=timezone, required=True, location="json")
         args = parser.parse_args()
 
-        if dify_config.EDITION == 'CLOUD':
-            if not args['invitation_code']:
-                raise ValueError('invitation_code is required')
+        if dify_config.EDITION == "CLOUD":
+            if not args["invitation_code"]:
+                raise ValueError("invitation_code is required")
 
-            # 检查邀请码是否有效
-            invitation_code = db.session.query(InvitationCode).filter(
-                InvitationCode.code == args['invitation_code'],
-                InvitationCode.status == 'unused',
-            ).first()
+            # check invitation code
+            invitation_code = (
+                db.session.query(InvitationCode)
+                .filter(
+                    InvitationCode.code == args["invitation_code"],
+                    InvitationCode.status == "unused",
+                )
+                .first()
+            )
 
             if not invitation_code:
                 raise InvalidInvitationCodeError()
 
-            # 更新邀请码状态为已使用
-            invitation_code.status = 'used'
+            invitation_code.status = "used"
             invitation_code.used_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
             invitation_code.used_by_tenant_id = account.current_tenant_id
             invitation_code.used_by_account_id = account.id
 
-        # 更新账户信息
-        account.interface_language = args['interface_language']
-        account.timezone = args['timezone']
-        account.interface_theme = 'light'
-        account.status = 'active'
+        account.interface_language = args["interface_language"]
+        account.timezone = args["timezone"]
+        account.interface_theme = "light"
+        account.status = "active"
         account.initialized_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
         db.session.commit()
 
-        return {'result': 'success'}
+        return {"result": "success"}
 
 
 class AccountProfileApi(Resource):
@@ -143,16 +137,14 @@ class AccountNameApi(Resource):
             更新后的账户信息。
         """
         parser = reqparse.RequestParser()
-        parser.add_argument('name', type=str, required=True, location='json')
+        parser.add_argument("name", type=str, required=True, location="json")
         args = parser.parse_args()
 
-        # 验证账户名称长度是否符合要求
-        if len(args['name']) < 3 or len(args['name']) > 30:
-            raise ValueError(
-                "Account name must be between 3 and 30 characters.")
+        # Validate account name length
+        if len(args["name"]) < 3 or len(args["name"]) > 30:
+            raise ValueError("Account name must be between 3 and 30 characters.")
 
-        # 更新账户名称，并返回更新后的账户信息
-        updated_account = AccountService.update_account(current_user, name=args['name'])
+        updated_account = AccountService.update_account(current_user, name=args["name"])
 
         return updated_account
 
@@ -179,11 +171,10 @@ class AccountAvatarApi(Resource):
         
         # 解析请求中的头像参数
         parser = reqparse.RequestParser()
-        parser.add_argument('avatar', type=str, required=True, location='json')
+        parser.add_argument("avatar", type=str, required=True, location="json")
         args = parser.parse_args()
 
-        # 更新账户头像，并返回更新后的账户信息
-        updated_account = AccountService.update_account(current_user, avatar=args['avatar'])
+        updated_account = AccountService.update_account(current_user, avatar=args["avatar"])
 
         return updated_account
 
@@ -213,12 +204,10 @@ class AccountInterfaceLanguageApi(Resource):
         
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument(
-            'interface_language', type=supported_language, required=True, location='json')
+        parser.add_argument("interface_language", type=supported_language, required=True, location="json")
         args = parser.parse_args()
 
-        # 更新账户的接口语言设置并返回更新后的账户信息
-        updated_account = AccountService.update_account(current_user, interface_language=args['interface_language'])
+        updated_account = AccountService.update_account(current_user, interface_language=args["interface_language"])
 
         return updated_account
 
@@ -248,12 +237,10 @@ class AccountInterfaceThemeApi(Resource):
         
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('interface_theme', type=str, choices=[
-            'light', 'dark'], required=True, location='json')
+        parser.add_argument("interface_theme", type=str, choices=["light", "dark"], required=True, location="json")
         args = parser.parse_args()
 
-        # 更新账户的界面主题
-        updated_account = AccountService.update_account(current_user, interface_theme=args['interface_theme'])
+        updated_account = AccountService.update_account(current_user, interface_theme=args["interface_theme"])
 
         return updated_account
 
@@ -280,16 +267,14 @@ class AccountTimezoneApi(Resource):
         
         # 解析请求体中的时区参数
         parser = reqparse.RequestParser()
-        parser.add_argument('timezone', type=str,
-                            required=True, location='json')
+        parser.add_argument("timezone", type=str, required=True, location="json")
         args = parser.parse_args()
 
-        # 验证时区字符串的有效性
-        if args['timezone'] not in pytz.all_timezones:
+        # Validate timezone string, e.g. America/New_York, Asia/Shanghai
+        if args["timezone"] not in pytz.all_timezones:
             raise ValueError("Invalid timezone string.")
 
-        # 更新账户的时区信息
-        updated_account = AccountService.update_account(current_user, timezone=args['timezone'])
+        updated_account = AccountService.update_account(current_user, timezone=args["timezone"])
 
         return updated_account
 
@@ -315,22 +300,16 @@ class AccountPasswordApi(Resource):
         """
         # 解析客户端请求中的密码参数
         parser = reqparse.RequestParser()
-        parser.add_argument('password', type=str,
-                            required=False, location='json')
-        parser.add_argument('new_password', type=str,
-                            required=True, location='json')
-        parser.add_argument('repeat_new_password', type=str,
-                            required=True, location='json')
+        parser.add_argument("password", type=str, required=False, location="json")
+        parser.add_argument("new_password", type=str, required=True, location="json")
+        parser.add_argument("repeat_new_password", type=str, required=True, location="json")
         args = parser.parse_args()
 
-        # 验证新密码和重复新密码是否一致
-        if args['new_password'] != args['repeat_new_password']:
+        if args["new_password"] != args["repeat_new_password"]:
             raise RepeatPasswordNotMatchError()
 
         try:
-            # 尝试更新账户密码，如果当前密码不正确会抛出异常
-            AccountService.update_account_password(
-                current_user, args['password'], args['new_password'])
+            AccountService.update_account_password(current_user, args["password"], args["new_password"])
         except ServiceCurrentPasswordIncorrectError:
             raise CurrentPasswordIncorrectError()
 
@@ -344,15 +323,15 @@ class AccountIntegrateApi(Resource):
     
     # 定义返回集成信息时的字段
     integrate_fields = {
-        'provider': fields.String,
-        'created_at': TimestampField,
-        'is_bound': fields.Boolean,
-        'link': fields.String
+        "provider": fields.String,
+        "created_at": TimestampField,
+        "is_bound": fields.Boolean,
+        "link": fields.String,
     }
 
     # 定义返回集成列表时的字段结构
     integrate_list_fields = {
-        'data': fields.List(fields.Nested(integrate_fields)),
+        "data": fields.List(fields.Nested(integrate_fields)),
     }
 
     @setup_required
@@ -360,20 +339,11 @@ class AccountIntegrateApi(Resource):
     @account_initialization_required
     @marshal_with(integrate_list_fields)
     def get(self):
-        """
-        获取当前用户的账户集成信息列表。
-        
-        需要用户已设置、已登录、账户已初始化。
-        返回值: 包含集成信息的列表，每个集成信息包括提供者、创建时间、是否绑定以及链接。
-        """
-        account = current_user  # 获取当前登录的用户
+        account = current_user
 
-        # 从数据库查询当前账户的所有集成信息
-        account_integrates = db.session.query(AccountIntegrate).filter(
-            AccountIntegrate.account_id == account.id).all()
+        account_integrates = db.session.query(AccountIntegrate).filter(AccountIntegrate.account_id == account.id).all()
 
-        # 基础URL和OAuth登录路径
-        base_url = request.url_root.rstrip('/')
+        base_url = request.url_root.rstrip("/")
         oauth_base_path = "/console/api/oauth/login"
         providers = ["github", "google"]  # 支持的集成提供者列表
 
@@ -383,38 +353,38 @@ class AccountIntegrateApi(Resource):
             # 查找当前提供者是否已绑定
             existing_integrate = next((ai for ai in account_integrates if ai.provider == provider), None)
             if existing_integrate:
-                # 如果已绑定，添加相关信息
-                integrate_data.append({
-                    'id': existing_integrate.id,
-                    'provider': provider,
-                    'created_at': existing_integrate.created_at,
-                    'is_bound': True,
-                    'link': None
-                })
+                integrate_data.append(
+                    {
+                        "id": existing_integrate.id,
+                        "provider": provider,
+                        "created_at": existing_integrate.created_at,
+                        "is_bound": True,
+                        "link": None,
+                    }
+                )
             else:
-                # 如果未绑定，添加未绑定的信息及登录链接
-                integrate_data.append({
-                    'id': None,
-                    'provider': provider,
-                    'created_at': None,
-                    'is_bound': False,
-                    'link': f'{base_url}{oauth_base_path}/{provider}'
-                })
+                integrate_data.append(
+                    {
+                        "id": None,
+                        "provider": provider,
+                        "created_at": None,
+                        "is_bound": False,
+                        "link": f"{base_url}{oauth_base_path}/{provider}",
+                    }
+                )
 
-        return {'data': integrate_data}  # 返回集成信息列表
-
-
+        return {"data": integrate_data}
 
 
 # Register API resources
-api.add_resource(AccountInitApi, '/account/init')
-api.add_resource(AccountProfileApi, '/account/profile')
-api.add_resource(AccountNameApi, '/account/name')
-api.add_resource(AccountAvatarApi, '/account/avatar')
-api.add_resource(AccountInterfaceLanguageApi, '/account/interface-language')
-api.add_resource(AccountInterfaceThemeApi, '/account/interface-theme')
-api.add_resource(AccountTimezoneApi, '/account/timezone')
-api.add_resource(AccountPasswordApi, '/account/password')
-api.add_resource(AccountIntegrateApi, '/account/integrates')
+api.add_resource(AccountInitApi, "/account/init")
+api.add_resource(AccountProfileApi, "/account/profile")
+api.add_resource(AccountNameApi, "/account/name")
+api.add_resource(AccountAvatarApi, "/account/avatar")
+api.add_resource(AccountInterfaceLanguageApi, "/account/interface-language")
+api.add_resource(AccountInterfaceThemeApi, "/account/interface-theme")
+api.add_resource(AccountTimezoneApi, "/account/timezone")
+api.add_resource(AccountPasswordApi, "/account/password")
+api.add_resource(AccountIntegrateApi, "/account/integrates")
 # api.add_resource(AccountEmailApi, '/account/email')
 # api.add_resource(AccountEmailVerifyApi, '/account/email-verify')

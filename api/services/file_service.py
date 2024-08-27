@@ -17,28 +17,44 @@ from models.account import Account
 from models.model import EndUser, UploadFile
 from services.errors.file import FileTooLargeError, UnsupportedFileTypeError
 
-# 定义支持的图片文件扩展名列表，并将其转换为小写和大写两种形式，以便于文件扩展名的大小写不敏感匹配。
-IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg']
+IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif", "svg"]
 IMAGE_EXTENSIONS.extend([ext.upper() for ext in IMAGE_EXTENSIONS])
 
-ALLOWED_EXTENSIONS = ['txt', 'markdown', 'md', 'pdf', 'html', 'htm', 'xlsx', 'xls', 'docx', 'csv']
-UNSTRUCTURED_ALLOWED_EXTENSIONS = ['txt', 'markdown', 'md', 'pdf', 'html', 'htm', 'xlsx', 'xls',
-                                   'docx', 'csv', 'eml', 'msg', 'pptx', 'ppt', 'xml', 'epub']
+ALLOWED_EXTENSIONS = ["txt", "markdown", "md", "pdf", "html", "htm", "xlsx", "xls", "docx", "csv"]
+UNSTRUCTURED_ALLOWED_EXTENSIONS = [
+    "txt",
+    "markdown",
+    "md",
+    "pdf",
+    "html",
+    "htm",
+    "xlsx",
+    "xls",
+    "docx",
+    "csv",
+    "eml",
+    "msg",
+    "pptx",
+    "ppt",
+    "xml",
+    "epub",
+]
 
 PREVIEW_WORDS_LIMIT = 3000
 
 class FileService:
-
     @staticmethod
     def upload_file(file: FileStorage, user: Union[Account, EndUser], only_image: bool = False) -> UploadFile:
         filename = file.filename
-        extension = file.filename.split('.')[-1]
+        extension = file.filename.split(".")[-1]
         if len(filename) > 200:
-            filename = filename.split('.')[0][:200] + '.' + extension
+            filename = filename.split(".")[0][:200] + "." + extension
         etl_type = dify_config.ETL_TYPE
-        allowed_extensions = UNSTRUCTURED_ALLOWED_EXTENSIONS + IMAGE_EXTENSIONS if etl_type == 'Unstructured' \
+        allowed_extensions = (
+            UNSTRUCTURED_ALLOWED_EXTENSIONS + IMAGE_EXTENSIONS
+            if etl_type == "Unstructured"
             else ALLOWED_EXTENSIONS + IMAGE_EXTENSIONS
-        # 检查文件扩展名是否受支持
+        )
         if extension.lower() not in allowed_extensions:
             raise UnsupportedFileTypeError()
         elif only_image and extension.lower() not in IMAGE_EXTENSIONS:
@@ -58,7 +74,7 @@ class FileService:
 
         # 检查文件大小是否超过限制
         if file_size > file_size_limit:
-            message = f'File size exceeded. {file_size} > {file_size_limit}'
+            message = f"File size exceeded. {file_size} > {file_size_limit}"
             raise FileTooLargeError(message)
 
         # 使用UUID作为文件名
@@ -71,8 +87,7 @@ class FileService:
             # end_user
             current_tenant_id = user.tenant_id
 
-        # 构造文件存储路径
-        file_key = 'upload_files/' + current_tenant_id + '/' + file_uuid + '.' + extension
+        file_key = "upload_files/" + current_tenant_id + "/" + file_uuid + "." + extension
 
         # 将文件内容保存到存储系统
         storage.save(file_key, file_content)
@@ -86,11 +101,11 @@ class FileService:
             size=file_size,
             extension=extension,
             mime_type=file.mimetype,
-            created_by_role=('account' if isinstance(user, Account) else 'end_user'),
+            created_by_role=("account" if isinstance(user, Account) else "end_user"),
             created_by=user.id,
             created_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
             used=False,
-            hash=hashlib.sha3_256(file_content).hexdigest()
+            hash=hashlib.sha3_256(file_content).hexdigest(),
         )
 
         db.session.add(upload_file)
@@ -104,11 +119,10 @@ class FileService:
             text_name = text_name[:200]
         # user uuid as file name
         file_uuid = str(uuid.uuid4())
-        # 构建文件在存储系统中的键值
-        file_key = 'upload_files/' + current_user.current_tenant_id + '/' + file_uuid + '.txt'
+        file_key = "upload_files/" + current_user.current_tenant_id + "/" + file_uuid + ".txt"
 
-        # 将文本内容编码后保存到存储系统
-        storage.save(file_key, text.encode('utf-8'))
+        # save file to storage
+        storage.save(file_key, text.encode("utf-8"))
 
         # save file to db
         upload_file = UploadFile(
@@ -117,13 +131,13 @@ class FileService:
             key=file_key,
             name=text_name,
             size=len(text),
-            extension='txt',
-            mime_type='text/plain',
+            extension="txt",
+            mime_type="text/plain",
             created_by=current_user.id,
             created_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
             used=True,
             used_by=current_user.id,
-            used_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+            used_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
         )
 
         # 将新文件记录添加到数据库会话并提交
@@ -134,19 +148,7 @@ class FileService:
 
     @staticmethod
     def get_file_preview(file_id: str) -> str:
-        """
-        获取文件的预览文本。
-        
-        参数:
-        file_id (str): 文件的唯一标识符。
-        
-        返回:
-        str: 文件的预览文本。如果文件不存在或文件类型不受支持，则抛出相应的异常。
-        """
-        # 从数据库中查询对应的文件信息
-        upload_file = db.session.query(UploadFile) \
-            .filter(UploadFile.id == file_id) \
-            .first()
+        upload_file = db.session.query(UploadFile).filter(UploadFile.id == file_id).first()
 
         if not upload_file:
             # 如果文件不存在，则抛出异常
@@ -155,14 +157,14 @@ class FileService:
         # 根据应用配置确定文件类型是否受支持
         extension = upload_file.extension
         etl_type = dify_config.ETL_TYPE
-        allowed_extensions = UNSTRUCTURED_ALLOWED_EXTENSIONS if etl_type == 'Unstructured' else ALLOWED_EXTENSIONS
+        allowed_extensions = UNSTRUCTURED_ALLOWED_EXTENSIONS if etl_type == "Unstructured" else ALLOWED_EXTENSIONS
         if extension.lower() not in allowed_extensions:
             # 如果文件类型不受支持，则抛出异常
             raise UnsupportedFileTypeError()
 
         # 从文件中提取文本，并限制预览的字数
         text = ExtractProcessor.load_from_upload_file(upload_file, return_text=True)
-        text = text[0:PREVIEW_WORDS_LIMIT] if text else ''
+        text = text[0:PREVIEW_WORDS_LIMIT] if text else ""
 
         return text
 
@@ -185,10 +187,7 @@ class FileService:
         if not result:
             raise NotFound("File not found or signature is invalid")
 
-        # 从数据库中查询文件信息
-        upload_file = db.session.query(UploadFile) \
-            .filter(UploadFile.id == file_id) \
-            .first()
+        upload_file = db.session.query(UploadFile).filter(UploadFile.id == file_id).first()
 
         if not upload_file:
             raise NotFound("File not found or signature is invalid")
@@ -205,23 +204,7 @@ class FileService:
 
     @staticmethod
     def get_public_image_preview(file_id: str) -> tuple[Generator, str]:
-        """
-        获取公开图片预览
-        
-        参数:
-        file_id (str): 文件ID，用于查询数据库中的上传文件记录。
-        
-        返回值:
-        tuple[Generator, str]: 返回一个元组，包含图片数据的生成器和图片的MIME类型。
-        
-        抛出:
-        NotFound: 如果文件不存在或签名无效。
-        UnsupportedFileTypeError: 如果文件扩展名不是图片类型。
-        """
-        # 从数据库中查询文件记录
-        upload_file = db.session.query(UploadFile) \
-            .filter(UploadFile.id == file_id) \
-            .first()
+        upload_file = db.session.query(UploadFile).filter(UploadFile.id == file_id).first()
 
         if not upload_file:
             raise NotFound("File not found or signature is invalid")

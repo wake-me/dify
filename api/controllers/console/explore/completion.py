@@ -30,13 +30,6 @@ from services.app_generate_service import AppGenerateService
 
 # define completion api for user
 class CompletionApi(InstalledAppResource):
-    """
-    提供完成API的类，用于处理与安装应用相关的完成请求。
-
-    方法:
-    - post: 处理完成请求，并返回相应的完成响应。
-    """
-
     def post(self, installed_app):
         """
         处理完成请求。
@@ -60,33 +53,27 @@ class CompletionApi(InstalledAppResource):
         - InternalServerError: 如果发生内部服务器错误，则抛出此异常。
         """
         app_model = installed_app.app
-        # 检查应用模式是否为完成模式
-        if app_model.mode != 'completion':
+        if app_model.mode != "completion":
             raise NotCompletionAppError()
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('inputs', type=dict, required=True, location='json')
-        parser.add_argument('query', type=str, location='json', default='')
-        parser.add_argument('files', type=list, required=False, location='json')
-        parser.add_argument('response_mode', type=str, choices=['blocking', 'streaming'], location='json')
-        parser.add_argument('retriever_from', type=str, required=False, default='explore_app', location='json')
+        parser.add_argument("inputs", type=dict, required=True, location="json")
+        parser.add_argument("query", type=str, location="json", default="")
+        parser.add_argument("files", type=list, required=False, location="json")
+        parser.add_argument("response_mode", type=str, choices=["blocking", "streaming"], location="json")
+        parser.add_argument("retriever_from", type=str, required=False, default="explore_app", location="json")
         args = parser.parse_args()
 
-        # 处理响应模式，并设置自动生成名称为False
-        streaming = args['response_mode'] == 'streaming'
-        args['auto_generate_name'] = False
+        streaming = args["response_mode"] == "streaming"
+        args["auto_generate_name"] = False
 
         installed_app.last_used_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.session.commit()
 
         try:
             response = AppGenerateService.generate(
-                app_model=app_model,
-                user=current_user,
-                args=args,
-                invoke_from=InvokeFrom.EXPLORE,
-                streaming=streaming
+                app_model=app_model, user=current_user, args=args, invoke_from=InvokeFrom.EXPLORE, streaming=streaming
             )
 
             return helper.compact_generate_response(response)
@@ -126,14 +113,12 @@ class CompletionStopApi(InstalledAppResource):
     def post(self, installed_app, task_id):
         # 获取应用模型
         app_model = installed_app.app
-        # 检查应用模式是否为'completion'，如果不是，则抛出异常
-        if app_model.mode != 'completion':
+        if app_model.mode != "completion":
             raise NotCompletionAppError()
 
         AppQueueManager.set_stop_flag(task_id, InvokeFrom.EXPLORE, current_user.id)
 
-        # 返回成功结果
-        return {'result': 'success'}, 200
+        return {"result": "success"}, 200
 
 
 class ChatApi(InstalledAppResource):
@@ -174,25 +159,21 @@ class ChatApi(InstalledAppResource):
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('inputs', type=dict, required=True, location='json')
-        parser.add_argument('query', type=str, required=True, location='json')
-        parser.add_argument('files', type=list, required=False, location='json')
-        parser.add_argument('conversation_id', type=uuid_value, location='json')
-        parser.add_argument('retriever_from', type=str, required=False, default='explore_app', location='json')
+        parser.add_argument("inputs", type=dict, required=True, location="json")
+        parser.add_argument("query", type=str, required=True, location="json")
+        parser.add_argument("files", type=list, required=False, location="json")
+        parser.add_argument("conversation_id", type=uuid_value, location="json")
+        parser.add_argument("retriever_from", type=str, required=False, default="explore_app", location="json")
         args = parser.parse_args()
 
-        args['auto_generate_name'] = False
+        args["auto_generate_name"] = False
 
         installed_app.last_used_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.session.commit()
 
         try:
             response = AppGenerateService.generate(
-                app_model=app_model,
-                user=current_user,
-                args=args,
-                invoke_from=InvokeFrom.EXPLORE,
-                streaming=True
+                app_model=app_model, user=current_user, args=args, invoke_from=InvokeFrom.EXPLORE, streaming=True
             )
 
             return helper.compact_generate_response(response)
@@ -242,11 +223,22 @@ class ChatStopApi(InstalledAppResource):
 
         AppQueueManager.set_stop_flag(task_id, InvokeFrom.EXPLORE, current_user.id)
 
-        # 返回成功结果
-        return {'result': 'success'}, 200
+        return {"result": "success"}, 200
 
 
-api.add_resource(CompletionApi, '/installed-apps/<uuid:installed_app_id>/completion-messages', endpoint='installed_app_completion')
-api.add_resource(CompletionStopApi, '/installed-apps/<uuid:installed_app_id>/completion-messages/<string:task_id>/stop', endpoint='installed_app_stop_completion')
-api.add_resource(ChatApi, '/installed-apps/<uuid:installed_app_id>/chat-messages', endpoint='installed_app_chat_completion')
-api.add_resource(ChatStopApi, '/installed-apps/<uuid:installed_app_id>/chat-messages/<string:task_id>/stop', endpoint='installed_app_stop_chat_completion')
+api.add_resource(
+    CompletionApi, "/installed-apps/<uuid:installed_app_id>/completion-messages", endpoint="installed_app_completion"
+)
+api.add_resource(
+    CompletionStopApi,
+    "/installed-apps/<uuid:installed_app_id>/completion-messages/<string:task_id>/stop",
+    endpoint="installed_app_stop_completion",
+)
+api.add_resource(
+    ChatApi, "/installed-apps/<uuid:installed_app_id>/chat-messages", endpoint="installed_app_chat_completion"
+)
+api.add_resource(
+    ChatStopApi,
+    "/installed-apps/<uuid:installed_app_id>/chat-messages/<string:task_id>/stop",
+    endpoint="installed_app_stop_chat_completion",
+)

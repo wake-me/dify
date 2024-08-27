@@ -9,7 +9,7 @@ from extensions.ext_database import db
 from models.dataset import Dataset, Document, DocumentSegment
 
 
-@shared_task(queue='dataset')
+@shared_task(queue="dataset")
 def clean_notion_document_task(document_ids: list[str], dataset_id: str):
     """
     当从Notion文档导入的数据被删除时，清理相应的文档。
@@ -18,7 +18,9 @@ def clean_notion_document_task(document_ids: list[str], dataset_id: str):
 
     使用方法: clean_notion_document_task.delay(document_ids, dataset_id)
     """
-    logging.info(click.style('Start clean document when import form notion document deleted: {}'.format(dataset_id), fg='green'))
+    logging.info(
+        click.style("Start clean document when import form notion document deleted: {}".format(dataset_id), fg="green")
+    )
     start_at = time.perf_counter()
 
     try:
@@ -26,14 +28,11 @@ def clean_notion_document_task(document_ids: list[str], dataset_id: str):
         dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
 
         if not dataset:
-            raise Exception('Document has no dataset')
-        index_type = dataset.doc_form # 获取文档表单类型
+            raise Exception("Document has no dataset")
+        index_type = dataset.doc_form
         index_processor = IndexProcessorFactory(index_type).init_index_processor()
         for document_id in document_ids:
-            # 根据文档ID查询文档信息，并从数据库会话中删除该文档
-            document = db.session.query(Document).filter(
-                Document.id == document_id
-            ).first()
+            document = db.session.query(Document).filter(Document.id == document_id).first()
             db.session.delete(document)
             
             # 查询与该文档关联的文档段，并获取所有索引节点ID
@@ -49,8 +48,12 @@ def clean_notion_document_task(document_ids: list[str], dataset_id: str):
         db.session.commit()
         end_at = time.perf_counter()
         logging.info(
-            click.style('Clean document when import form notion document deleted end :: {} latency: {}'.format(
-                dataset_id, end_at - start_at),
-                        fg='green'))
+            click.style(
+                "Clean document when import form notion document deleted end :: {} latency: {}".format(
+                    dataset_id, end_at - start_at
+                ),
+                fg="green",
+            )
+        )
     except Exception:
         logging.exception("Cleaned document when import form notion document deleted  failed")

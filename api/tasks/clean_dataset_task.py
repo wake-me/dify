@@ -19,9 +19,15 @@ from models.model import UploadFile
 
 
 # Add import statement for ValueError
-@shared_task(queue='dataset')
-def clean_dataset_task(dataset_id: str, tenant_id: str, indexing_technique: str,
-                       index_struct: str, collection_binding_id: str, doc_form: str):
+@shared_task(queue="dataset")
+def clean_dataset_task(
+    dataset_id: str,
+    tenant_id: str,
+    indexing_technique: str,
+    index_struct: str,
+    collection_binding_id: str,
+    doc_form: str,
+):
     """
     当数据集被删除时，清理相应数据集的任务。
     :param dataset_id: 数据集ID
@@ -33,8 +39,7 @@ def clean_dataset_task(dataset_id: str, tenant_id: str, indexing_technique: str,
 
     使用方法：clean_dataset_task.delay(dataset_id, tenant_id, indexing_technique, index_struct)
     """
-    # 记录开始清理数据集的日志
-    logging.info(click.style('Start clean dataset when dataset deleted: {}'.format(dataset_id), fg='green'))
+    logging.info(click.style("Start clean dataset when dataset deleted: {}".format(dataset_id), fg="green"))
     start_at = time.perf_counter()
 
     try:
@@ -53,9 +58,9 @@ def clean_dataset_task(dataset_id: str, tenant_id: str, indexing_technique: str,
 
         # 若未找到相关文档，则记录日志并返回
         if documents is None or len(documents) == 0:
-            logging.info(click.style('No documents found for dataset: {}'.format(dataset_id), fg='green'))
+            logging.info(click.style("No documents found for dataset: {}".format(dataset_id), fg="green"))
         else:
-            logging.info(click.style('Cleaning documents for dataset: {}'.format(dataset_id), fg='green'))
+            logging.info(click.style("Cleaning documents for dataset: {}".format(dataset_id), fg="green"))
             # Specify the index type before initializing the index processor
             if doc_form is None:
                 raise ValueError("Index type must be specified.")
@@ -77,15 +82,16 @@ def clean_dataset_task(dataset_id: str, tenant_id: str, indexing_technique: str,
         if documents:
             for document in documents:
                 try:
-                    if document.data_source_type == 'upload_file':
+                    if document.data_source_type == "upload_file":
                         if document.data_source_info:
                             data_source_info = document.data_source_info_dict
-                            if data_source_info and 'upload_file_id' in data_source_info:
-                                file_id = data_source_info['upload_file_id']
-                                file = db.session.query(UploadFile).filter(
-                                    UploadFile.tenant_id == document.tenant_id,
-                                    UploadFile.id == file_id
-                                ).first()
+                            if data_source_info and "upload_file_id" in data_source_info:
+                                file_id = data_source_info["upload_file_id"]
+                                file = (
+                                    db.session.query(UploadFile)
+                                    .filter(UploadFile.tenant_id == document.tenant_id, UploadFile.id == file_id)
+                                    .first()
+                                )
                                 if not file:
                                     continue
                                 storage.delete(file.key)
@@ -97,7 +103,10 @@ def clean_dataset_task(dataset_id: str, tenant_id: str, indexing_technique: str,
         end_at = time.perf_counter()
         # 记录清理完成的日志，包括执行时间
         logging.info(
-            click.style('Cleaned dataset when dataset deleted: {} latency: {}'.format(dataset_id, end_at - start_at), fg='green'))
+            click.style(
+                "Cleaned dataset when dataset deleted: {} latency: {}".format(dataset_id, end_at - start_at), fg="green"
+            )
+        )
     except Exception:
         # 记录清理失败的异常日志
         logging.exception("Cleaned dataset when dataset deleted failed")

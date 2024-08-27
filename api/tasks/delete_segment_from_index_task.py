@@ -10,7 +10,7 @@ from extensions.ext_redis import redis_client
 from models.dataset import Dataset, Document
 
 
-@shared_task(queue='dataset')
+@shared_task(queue="dataset")
 def delete_segment_from_index_task(segment_id: str, index_node_id: str, dataset_id: str, document_id: str):
     """
     异步从索引中删除段落
@@ -22,29 +22,24 @@ def delete_segment_from_index_task(segment_id: str, index_node_id: str, dataset_
 
     使用方法：delete_segment_from_index_task.delay(segment_id)
     """
-    # 记录开始删除段落的日志
-    logging.info(click.style('Start delete segment from index: {}'.format(segment_id), fg='green'))
+    logging.info(click.style("Start delete segment from index: {}".format(segment_id), fg="green"))
     start_at = time.perf_counter()
-    indexing_cache_key = 'segment_{}_delete_indexing'.format(segment_id)
+    indexing_cache_key = "segment_{}_delete_indexing".format(segment_id)
     try:
         # 查询数据集信息
         dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
         if not dataset:
-            # 如果数据集不存在，则记录日志并返回
-            logging.info(click.style('Segment {} has no dataset, pass.'.format(segment_id), fg='cyan'))
+            logging.info(click.style("Segment {} has no dataset, pass.".format(segment_id), fg="cyan"))
             return
 
         # 查询文档信息
         dataset_document = db.session.query(Document).filter(Document.id == document_id).first()
         if not dataset_document:
-            # 如果文档不存在，则记录日志并返回
-            logging.info(click.style('Segment {} has no document, pass.'.format(segment_id), fg='cyan'))
+            logging.info(click.style("Segment {} has no document, pass.".format(segment_id), fg="cyan"))
             return
 
-        # 检查文档状态是否允许删除
-        if not dataset_document.enabled or dataset_document.archived or dataset_document.indexing_status != 'completed':
-            # 如果文档状态无效，则记录日志并返回
-            logging.info(click.style('Segment {} document status is invalid, pass.'.format(segment_id), fg='cyan'))
+        if not dataset_document.enabled or dataset_document.archived or dataset_document.indexing_status != "completed":
+            logging.info(click.style("Segment {} document status is invalid, pass.".format(segment_id), fg="cyan"))
             return
 
         # 根据文档类型获取索引处理器，并使用它来清除索引
@@ -54,7 +49,9 @@ def delete_segment_from_index_task(segment_id: str, index_node_id: str, dataset_
 
         # 记录删除操作完成的日志
         end_at = time.perf_counter()
-        logging.info(click.style('Segment deleted from index: {} latency: {}'.format(segment_id, end_at - start_at), fg='green'))
+        logging.info(
+            click.style("Segment deleted from index: {} latency: {}".format(segment_id, end_at - start_at), fg="green")
+        )
     except Exception:
         # 捕获并记录任何异常
         logging.exception("delete segment from index failed")

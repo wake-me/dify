@@ -55,7 +55,7 @@ class DatasetDocumentSegmentListApi(Resource):
         # 根据ID获取数据集对象
         dataset = DatasetService.get_dataset(dataset_id)
         if not dataset:
-            raise NotFound('Dataset not found.')
+            raise NotFound("Dataset not found.")
 
         # 检查用户是否有权限访问该数据集
         try:
@@ -66,41 +66,36 @@ class DatasetDocumentSegmentListApi(Resource):
         # 根据ID获取文档对象
         document = DocumentService.get_document(dataset_id, document_id)
         if not document:
-            raise NotFound('Document not found.')
+            raise NotFound("Document not found.")
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('last_id', type=str, default=None, location='args')
-        parser.add_argument('limit', type=int, default=20, location='args')
-        parser.add_argument('status', type=str,
-                            action='append', default=[], location='args')
-        parser.add_argument('hit_count_gte', type=int,
-                            default=None, location='args')
-        parser.add_argument('enabled', type=str, default='all', location='args')
-        parser.add_argument('keyword', type=str, default=None, location='args')
+        parser.add_argument("last_id", type=str, default=None, location="args")
+        parser.add_argument("limit", type=int, default=20, location="args")
+        parser.add_argument("status", type=str, action="append", default=[], location="args")
+        parser.add_argument("hit_count_gte", type=int, default=None, location="args")
+        parser.add_argument("enabled", type=str, default="all", location="args")
+        parser.add_argument("keyword", type=str, default=None, location="args")
         args = parser.parse_args()
 
-        # 获取解析后的参数值
-        last_id = args['last_id']
-        limit = min(args['limit'], 100)
-        status_list = args['status']
-        hit_count_gte = args['hit_count_gte']
-        keyword = args['keyword']
+        last_id = args["last_id"]
+        limit = min(args["limit"], 100)
+        status_list = args["status"]
+        hit_count_gte = args["hit_count_gte"]
+        keyword = args["keyword"]
 
         # 构建初始查询
         query = DocumentSegment.query.filter(
-            DocumentSegment.document_id == str(document_id),
-            DocumentSegment.tenant_id == current_user.current_tenant_id
+            DocumentSegment.document_id == str(document_id), DocumentSegment.tenant_id == current_user.current_tenant_id
         )
 
         # 如果提供了last_id，筛选出位置大于该段落的位置的段落
         if last_id is not None:
             last_segment = db.session.get(DocumentSegment, str(last_id))
             if last_segment:
-                query = query.filter(
-                    DocumentSegment.position > last_segment.position)
+                query = query.filter(DocumentSegment.position > last_segment.position)
             else:
-                return {'data': [], 'has_more': False, 'limit': limit}, 200
+                return {"data": [], "has_more": False, "limit": limit}, 200
 
         # 根据状态筛选
         if status_list:
@@ -112,13 +107,12 @@ class DatasetDocumentSegmentListApi(Resource):
 
         # 根据关键字搜索
         if keyword:
-            query = query.where(DocumentSegment.content.ilike(f'%{keyword}%'))
+            query = query.where(DocumentSegment.content.ilike(f"%{keyword}%"))
 
-        # 根据启用状态筛选
-        if args['enabled'].lower() != 'all':
-            if args['enabled'].lower() == 'true':
+        if args["enabled"].lower() != "all":
+            if args["enabled"].lower() == "true":
                 query = query.filter(DocumentSegment.enabled == True)
-            elif args['enabled'].lower() == 'false':
+            elif args["enabled"].lower() == "false":
                 query = query.filter(DocumentSegment.enabled == False)
 
         # 计算总记录数并获取数据
@@ -133,11 +127,11 @@ class DatasetDocumentSegmentListApi(Resource):
 
         # 返回查询结果
         return {
-            'data': marshal(segments, segment_fields),
-            'doc_form': document.doc_form,
-            'has_more': has_more,
-            'limit': limit,
-            'total': total
+            "data": marshal(segments, segment_fields),
+            "doc_form": document.doc_form,
+            "has_more": has_more,
+            "limit": limit,
+            "total": total,
         }, 200
 
 
@@ -161,14 +155,13 @@ class DatasetDocumentSegmentApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('vector_space')
+    @cloud_edition_billing_resource_check("vector_space")
     def patch(self, dataset_id, segment_id, action):
         dataset_id = str(dataset_id)
         dataset = DatasetService.get_dataset(dataset_id)
         if not dataset:
-            raise NotFound('Dataset not found.')
-
-        # 检查用户的数据集模型设置
+            raise NotFound("Dataset not found.")
+        # check user's model setting
         DatasetService.check_dataset_model_setting(dataset)
         # The role of the current user in the ta table must be admin, owner, or editor
         if not current_user.is_editor:
@@ -178,46 +171,41 @@ class DatasetDocumentSegmentApi(Resource):
             DatasetService.check_dataset_permission(dataset, current_user)
         except services.errors.account.NoPermissionError as e:
             raise Forbidden(str(e))
-
-        # 高质量索引技术检查
-        if dataset.indexing_technique == 'high_quality':
-            # 检查嵌入模型设置
+        if dataset.indexing_technique == "high_quality":
+            # check embedding model setting
             try:
                 model_manager = ModelManager()
                 model_manager.get_model_instance(
                     tenant_id=current_user.current_tenant_id,
                     provider=dataset.embedding_model_provider,
                     model_type=ModelType.TEXT_EMBEDDING,
-                    model=dataset.embedding_model
+                    model=dataset.embedding_model,
                 )
             except LLMBadRequestError:
                 raise ProviderNotInitializeError(
                     "No Embedding Model available. Please configure a valid provider "
-                    "in the Settings -> Model Provider.")
+                    "in the Settings -> Model Provider."
+                )
             except ProviderTokenNotInitError as ex:
                 raise ProviderNotInitializeError(ex.description)
 
         # 查询指定的文档段
         segment = DocumentSegment.query.filter(
-            DocumentSegment.id == str(segment_id),
-            DocumentSegment.tenant_id == current_user.current_tenant_id
+            DocumentSegment.id == str(segment_id), DocumentSegment.tenant_id == current_user.current_tenant_id
         ).first()
 
         if not segment:
-            raise NotFound('Segment not found.')
+            raise NotFound("Segment not found.")
 
-        # 确保文档段的状态为"completed"
-        if segment.status != 'completed':
-            raise NotFound('Segment is not completed, enable or disable function is not allowed')
+        if segment.status != "completed":
+            raise NotFound("Segment is not completed, enable or disable function is not allowed")
 
-        # 检查文档是否正在被索引
-        document_indexing_cache_key = 'document_{}_indexing'.format(segment.document_id)
+        document_indexing_cache_key = "document_{}_indexing".format(segment.document_id)
         cache_result = redis_client.get(document_indexing_cache_key)
         if cache_result is not None:
             raise InvalidActionError("Document is being indexed, please try again later")
 
-        # 检查段是否正在被索引
-        indexing_cache_key = 'segment_{}_indexing'.format(segment.id)
+        indexing_cache_key = "segment_{}_indexing".format(segment.id)
         cache_result = redis_client.get(indexing_cache_key)
         if cache_result is not None:
             raise InvalidActionError("Segment is being indexed, please try again later")
@@ -238,7 +226,7 @@ class DatasetDocumentSegmentApi(Resource):
             # 异步任务：启用段以进行索引
             enable_segment_to_index_task.delay(segment.id)
 
-            return {'result': 'success'}, 200
+            return {"result": "success"}, 200
         elif action == "disable":
             if not segment.enabled:
                 raise InvalidActionError("Segment is already disabled.")
@@ -254,7 +242,7 @@ class DatasetDocumentSegmentApi(Resource):
             # 异步任务：从索引中禁用段
             disable_segment_from_index_task.delay(segment.id)
 
-            return {'result': 'success'}, 200
+            return {"result": "success"}, 200
         else:
             raise InvalidActionError()
 
@@ -280,37 +268,36 @@ class DatasetDocumentSegmentAddApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('vector_space')
-    @cloud_edition_billing_knowledge_limit_check('add_segment')
+    @cloud_edition_billing_resource_check("vector_space")
+    @cloud_edition_billing_knowledge_limit_check("add_segment")
     def post(self, dataset_id, document_id):
         # 检查数据集存在性
         dataset_id = str(dataset_id)
         dataset = DatasetService.get_dataset(dataset_id)
         if not dataset:
-            raise NotFound('Dataset not found.')
-        
-        # 检查文档存在性
+            raise NotFound("Dataset not found.")
+        # check document
         document_id = str(document_id)
         document = DocumentService.get_document(dataset_id, document_id)
         if not document:
-            raise NotFound('Document not found.')
+            raise NotFound("Document not found.")
         if not current_user.is_editor:
             raise Forbidden()
-        
-        # 检查高质索引技术对应的嵌入模型设置
-        if dataset.indexing_technique == 'high_quality':
+        # check embedding model setting
+        if dataset.indexing_technique == "high_quality":
             try:
                 model_manager = ModelManager()
                 model_manager.get_model_instance(
                     tenant_id=current_user.current_tenant_id,
                     provider=dataset.embedding_model_provider,
                     model_type=ModelType.TEXT_EMBEDDING,
-                    model=dataset.embedding_model
+                    model=dataset.embedding_model,
                 )
             except LLMBadRequestError:
                 raise ProviderNotInitializeError(
                     "No Embedding Model available. Please configure a valid provider "
-                    "in the Settings -> Model Provider.")
+                    "in the Settings -> Model Provider."
+                )
             except ProviderTokenNotInitError as ex:
                 raise ProviderNotInitializeError(ex.description)
                 
@@ -322,9 +309,9 @@ class DatasetDocumentSegmentAddApi(Resource):
         
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('content', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('answer', type=str, required=False, nullable=True, location='json')
-        parser.add_argument('keywords', type=list, required=False, nullable=True, location='json')
+        parser.add_argument("content", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("answer", type=str, required=False, nullable=True, location="json")
+        parser.add_argument("keywords", type=list, required=False, nullable=True, location="json")
         args = parser.parse_args()
         
         # 验证参数合法性
@@ -332,19 +319,14 @@ class DatasetDocumentSegmentAddApi(Resource):
         
         # 创建新的段落
         segment = SegmentService.create_segment(args, document, dataset)
-        
-        # 返回创建的段落信息
-        return {
-            'data': marshal(segment, segment_fields),
-            'doc_form': document.doc_form
-        }, 200
+        return {"data": marshal(segment, segment_fields), "doc_form": document.doc_form}, 200
 
 
 class DatasetDocumentSegmentUpdateApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('vector_space')
+    @cloud_edition_billing_resource_check("vector_space")
     def patch(self, dataset_id, document_id, segment_id):
         """
         更新文档段落的内容。
@@ -367,38 +349,38 @@ class DatasetDocumentSegmentUpdateApi(Resource):
         dataset_id = str(dataset_id)
         dataset = DatasetService.get_dataset(dataset_id)
         if not dataset:
-            raise NotFound('Dataset not found.')
-        # 检查用户的数据集模型设置
+            raise NotFound("Dataset not found.")
+        # check user's model setting
         DatasetService.check_dataset_model_setting(dataset)
         # 检查文档存在性
         document_id = str(document_id)
         document = DocumentService.get_document(dataset_id, document_id)
         if not document:
-            raise NotFound('Document not found.')
-        if dataset.indexing_technique == 'high_quality':
-            # 高质量索引技术下，额外检查嵌入模型设置
+            raise NotFound("Document not found.")
+        if dataset.indexing_technique == "high_quality":
+            # check embedding model setting
             try:
                 model_manager = ModelManager()
                 model_manager.get_model_instance(
                     tenant_id=current_user.current_tenant_id,
                     provider=dataset.embedding_model_provider,
                     model_type=ModelType.TEXT_EMBEDDING,
-                    model=dataset.embedding_model
+                    model=dataset.embedding_model,
                 )
             except LLMBadRequestError:
                 raise ProviderNotInitializeError(
                     "No Embedding Model available. Please configure a valid provider "
-                    "in the Settings -> Model Provider.")
+                    "in the Settings -> Model Provider."
+                )
             except ProviderTokenNotInitError as ex:
                 raise ProviderNotInitializeError(ex.description)
             # 检查段落存在性
         segment_id = str(segment_id)
         segment = DocumentSegment.query.filter(
-            DocumentSegment.id == str(segment_id),
-            DocumentSegment.tenant_id == current_user.current_tenant_id
+            DocumentSegment.id == str(segment_id), DocumentSegment.tenant_id == current_user.current_tenant_id
         ).first()
         if not segment:
-            raise NotFound('Segment not found.')
+            raise NotFound("Segment not found.")
         # The role of the current user in the ta table must be admin, owner, or editor
         if not current_user.is_editor:
             raise Forbidden()
@@ -408,18 +390,14 @@ class DatasetDocumentSegmentUpdateApi(Resource):
             raise Forbidden(str(e))
         # 验证请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('content', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('answer', type=str, required=False, nullable=True, location='json')
-        parser.add_argument('keywords', type=list, required=False, nullable=True, location='json')
+        parser.add_argument("content", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("answer", type=str, required=False, nullable=True, location="json")
+        parser.add_argument("keywords", type=list, required=False, nullable=True, location="json")
         args = parser.parse_args()
         SegmentService.segment_create_args_validate(args, document)
         # 更新段落信息
         segment = SegmentService.update_segment(args, segment, document, dataset)
-        # 返回更新后的段落信息
-        return {
-            'data': marshal(segment, segment_fields),
-            'doc_form': document.doc_form
-        }, 200
+        return {"data": marshal(segment, segment_fields), "doc_form": document.doc_form}, 200
 
     @setup_required
     @login_required
@@ -444,25 +422,22 @@ class DatasetDocumentSegmentUpdateApi(Resource):
         dataset_id = str(dataset_id)
         dataset = DatasetService.get_dataset(dataset_id)
         if not dataset:
-            raise NotFound('Dataset not found.')
-        
-        # 检查用户的数据集模型设置
+            raise NotFound("Dataset not found.")
+        # check user's model setting
         DatasetService.check_dataset_model_setting(dataset)
         
         # 检查文档存在性
         document_id = str(document_id)
         document = DocumentService.get_document(dataset_id, document_id)
         if not document:
-            raise NotFound('Document not found.')
-        
-        # 检查文档段存在性
+            raise NotFound("Document not found.")
+        # check segment
         segment_id = str(segment_id)
         segment = DocumentSegment.query.filter(
-            DocumentSegment.id == str(segment_id),
-            DocumentSegment.tenant_id == current_user.current_tenant_id
+            DocumentSegment.id == str(segment_id), DocumentSegment.tenant_id == current_user.current_tenant_id
         ).first()
         if not segment:
-            raise NotFound('Segment not found.')
+            raise NotFound("Segment not found.")
         # The role of the current user in the ta table must be admin or owner
         if not current_user.is_editor:
             raise Forbidden()
@@ -475,7 +450,7 @@ class DatasetDocumentSegmentUpdateApi(Resource):
         
         # 删除文档段
         SegmentService.delete_segment(segment, document, dataset)
-        return {'result': 'success'}, 200
+        return {"result": "success"}, 200
 
 
 class DatasetDocumentSegmentBatchImportApi(Resource):
@@ -488,8 +463,8 @@ class DatasetDocumentSegmentBatchImportApi(Resource):
     @setup_required
     @login_required
     @account_initialization_required
-    @cloud_edition_billing_resource_check('vector_space')
-    @cloud_edition_billing_knowledge_limit_check('add_segment')
+    @cloud_edition_billing_resource_check("vector_space")
+    @cloud_edition_billing_knowledge_limit_check("add_segment")
     def post(self, dataset_id, document_id):
         """
         提交文档分段的批量导入任务。
@@ -506,27 +481,23 @@ class DatasetDocumentSegmentBatchImportApi(Resource):
         dataset_id = str(dataset_id)
         dataset = DatasetService.get_dataset(dataset_id)
         if not dataset:
-            raise NotFound('Dataset not found.')
-        
-        # 校验文档存在性
+            raise NotFound("Dataset not found.")
+        # check document
         document_id = str(document_id)
         document = DocumentService.get_document(dataset_id, document_id)
         if not document:
-            raise NotFound('Document not found.')
-        
-        # 从请求中获取文件
-        file = request.files['file']
-        
-        # 校验文件是否上传
-        if 'file' not in request.files:
+            raise NotFound("Document not found.")
+        # get file from request
+        file = request.files["file"]
+        # check file
+        if "file" not in request.files:
             raise NoFileUploadedError()
 
         # 校验文件数量
         if len(request.files) > 1:
             raise TooManyFilesError()
-
-        # 校验文件类型
-        if not file.filename.endswith('.csv'):
+        # check file type
+        if not file.filename.endswith(".csv"):
             raise ValueError("Invalid file type. Only CSV files are allowed")
 
         try:
@@ -534,26 +505,25 @@ class DatasetDocumentSegmentBatchImportApi(Resource):
             df = pd.read_csv(file)
             result = []
             for index, row in df.iterrows():
-                if document.doc_form == 'qa_model':
-                    data = {'content': row[0], 'answer': row[1]}
+                if document.doc_form == "qa_model":
+                    data = {"content": row[0], "answer": row[1]}
                 else:
-                    data = {'content': row[0]}
+                    data = {"content": row[0]}
                 result.append(data)
             if len(result) == 0:
                 raise ValueError("The CSV file is empty.")
             
             # 创建异步任务
             job_id = str(uuid.uuid4())
-            indexing_cache_key = 'segment_batch_import_{}'.format(str(job_id))
-            redis_client.setnx(indexing_cache_key, 'waiting')
-            batch_create_segment_to_index_task.delay(str(job_id), result, dataset_id, document_id,
-                                                     current_user.current_tenant_id, current_user.id)
+            indexing_cache_key = "segment_batch_import_{}".format(str(job_id))
+            # send batch add segments task
+            redis_client.setnx(indexing_cache_key, "waiting")
+            batch_create_segment_to_index_task.delay(
+                str(job_id), result, dataset_id, document_id, current_user.current_tenant_id, current_user.id
+            )
         except Exception as e:
-            return {'error': str(e)}, 500
-        return {
-            'job_id': job_id,
-            'job_status': 'waiting'
-        }, 200
+            return {"error": str(e)}, 500
+        return {"job_id": job_id, "job_status": "waiting"}, 200
 
     @setup_required
     @login_required
@@ -570,24 +540,23 @@ class DatasetDocumentSegmentBatchImportApi(Resource):
         - 如果任务不存在，则返回错误信息和HTTP状态码400。
         """
         job_id = str(job_id)
-        indexing_cache_key = 'segment_batch_import_{}'.format(job_id)
+        indexing_cache_key = "segment_batch_import_{}".format(job_id)
         cache_result = redis_client.get(indexing_cache_key)
         if cache_result is None:
             raise ValueError("The job is not exist.")
 
-        return {
-            'job_id': job_id,
-            'job_status': cache_result.decode()
-        }, 200
+        return {"job_id": job_id, "job_status": cache_result.decode()}, 200
 
-api.add_resource(DatasetDocumentSegmentListApi,
-                 '/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/segments')
-api.add_resource(DatasetDocumentSegmentApi,
-                 '/datasets/<uuid:dataset_id>/segments/<uuid:segment_id>/<string:action>')
-api.add_resource(DatasetDocumentSegmentAddApi,
-                 '/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/segment')
-api.add_resource(DatasetDocumentSegmentUpdateApi,
-                 '/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/segments/<uuid:segment_id>')
-api.add_resource(DatasetDocumentSegmentBatchImportApi,
-                 '/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/segments/batch_import',
-                 '/datasets/batch_import_status/<uuid:job_id>')
+
+api.add_resource(DatasetDocumentSegmentListApi, "/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/segments")
+api.add_resource(DatasetDocumentSegmentApi, "/datasets/<uuid:dataset_id>/segments/<uuid:segment_id>/<string:action>")
+api.add_resource(DatasetDocumentSegmentAddApi, "/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/segment")
+api.add_resource(
+    DatasetDocumentSegmentUpdateApi,
+    "/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/segments/<uuid:segment_id>",
+)
+api.add_resource(
+    DatasetDocumentSegmentBatchImportApi,
+    "/datasets/<uuid:dataset_id>/documents/<uuid:document_id>/segments/batch_import",
+    "/datasets/batch_import_status/<uuid:job_id>",
+)

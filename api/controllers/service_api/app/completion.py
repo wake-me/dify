@@ -41,48 +41,22 @@ class CompletionApi(Resource):
     
     @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.JSON, required=True))
     def post(self, app_model: App, end_user: EndUser):
-        """
-        处理提交的代码完成请求。
-        
-        Args:
-            app_model (App): 代表一个应用的模型实例。
-            end_user (EndUser): 代表发起请求的终端用户。
-            
-        Returns:
-            返回一个压缩后的响应，具体取决于服务的响应模式。
-            
-        Raises:
-            AppUnavailableError: 如果应用未启用或配置错误。
-            NotFound: 如果对话不存在。
-            ConversationCompletedError: 如果对话已经完成。
-            AppUnavailableError: 如果应用模型配置损坏。
-            ProviderNotInitializeError: 如果服务提供者未初始化。
-            ProviderQuotaExceededError: 如果配额超出。
-            ProviderModelCurrentlyNotSupportError: 如果模型当前不被支持。
-            CompletionRequestError: 如果完成请求发生错误。
-            ValueError: 如果值无效。
-            InternalServerError: 如果发生内部服务器错误。
-        """
-        
-        # 验证应用是否为完成模式
-        if app_model.mode != 'completion':
+        if app_model.mode != "completion":
             raise AppUnavailableError()
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('inputs', type=dict, required=True, location='json')
-        parser.add_argument('query', type=str, location='json', default='')
-        parser.add_argument('files', type=list, required=False, location='json')
-        parser.add_argument('response_mode', type=str, choices=['blocking', 'streaming'], location='json')
-        parser.add_argument('retriever_from', type=str, required=False, default='dev', location='json')
+        parser.add_argument("inputs", type=dict, required=True, location="json")
+        parser.add_argument("query", type=str, location="json", default="")
+        parser.add_argument("files", type=list, required=False, location="json")
+        parser.add_argument("response_mode", type=str, choices=["blocking", "streaming"], location="json")
+        parser.add_argument("retriever_from", type=str, required=False, default="dev", location="json")
 
         args = parser.parse_args()
 
-        # 判断响应模式是否为流式
-        streaming = args['response_mode'] == 'streaming'
+        streaming = args["response_mode"] == "streaming"
 
-        # 设置自动生成名称为False
-        args['auto_generate_name'] = False
+        args["auto_generate_name"] = False
 
         try:
             response = AppGenerateService.generate(
@@ -133,13 +107,12 @@ class CompletionStopApi(Resource):
     
     @validate_app_token(fetch_user_arg=FetchUserArg(fetch_from=WhereisUserArg.JSON, required=True))
     def post(self, app_model: App, end_user: EndUser, task_id):
-        # 验证应用是否处于完成模式
-        if app_model.mode != 'completion':
+        if app_model.mode != "completion":
             raise AppUnavailableError()
 
         AppQueueManager.set_stop_flag(task_id, InvokeFrom.SERVICE_API, end_user.id)
 
-        return {'result': 'success'}, 200
+        return {"result": "success"}, 200
 
 
 class ChatApi(Resource):
@@ -158,26 +131,21 @@ class ChatApi(Resource):
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('inputs', type=dict, required=True, location='json')
-        parser.add_argument('query', type=str, required=True, location='json')
-        parser.add_argument('files', type=list, required=False, location='json')
-        parser.add_argument('response_mode', type=str, choices=['blocking', 'streaming'], location='json')
-        parser.add_argument('conversation_id', type=uuid_value, location='json')
-        parser.add_argument('retriever_from', type=str, required=False, default='dev', location='json')
-        parser.add_argument('auto_generate_name', type=bool, required=False, default=True, location='json')
+        parser.add_argument("inputs", type=dict, required=True, location="json")
+        parser.add_argument("query", type=str, required=True, location="json")
+        parser.add_argument("files", type=list, required=False, location="json")
+        parser.add_argument("response_mode", type=str, choices=["blocking", "streaming"], location="json")
+        parser.add_argument("conversation_id", type=uuid_value, location="json")
+        parser.add_argument("retriever_from", type=str, required=False, default="dev", location="json")
+        parser.add_argument("auto_generate_name", type=bool, required=False, default=True, location="json")
 
         args = parser.parse_args()
 
-        # 判断响应模式是否为流式
-        streaming = args['response_mode'] == 'streaming'
+        streaming = args["response_mode"] == "streaming"
 
         try:
             response = AppGenerateService.generate(
-                app_model=app_model,
-                user=end_user,
-                args=args,
-                invoke_from=InvokeFrom.SERVICE_API,
-                streaming=streaming
+                app_model=app_model, user=end_user, args=args, invoke_from=InvokeFrom.SERVICE_API, streaming=streaming
             )
 
             return helper.compact_generate_response(response)
@@ -226,10 +194,10 @@ class ChatStopApi(Resource):
 
         AppQueueManager.set_stop_flag(task_id, InvokeFrom.SERVICE_API, end_user.id)
 
-        return {'result': 'success'}, 200
+        return {"result": "success"}, 200
 
 
-api.add_resource(CompletionApi, '/completion-messages')
-api.add_resource(CompletionStopApi, '/completion-messages/<string:task_id>/stop')
-api.add_resource(ChatApi, '/chat-messages')
-api.add_resource(ChatStopApi, '/chat-messages/<string:task_id>/stop')
+api.add_resource(CompletionApi, "/completion-messages")
+api.add_resource(CompletionStopApi, "/completion-messages/<string:task_id>/stop")
+api.add_resource(ChatApi, "/chat-messages")
+api.add_resource(ChatStopApi, "/chat-messages/<string:task_id>/stop")

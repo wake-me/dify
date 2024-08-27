@@ -12,7 +12,7 @@ from extensions.ext_database import db
 from models.dataset import Dataset, Document, DocumentSegment
 
 
-@shared_task(queue='dataset')
+@shared_task(queue="dataset")
 def document_indexing_update_task(dataset_id: str, document_id: str):
     """
     异步更新文档索引任务。
@@ -22,22 +22,16 @@ def document_indexing_update_task(dataset_id: str, document_id: str):
     
     使用方法：document_indexing_update_task.delay(dataset_id, document_id)
     """
-    # 记录开始更新文档的日志
-    logging.info(click.style('Start update document: {}'.format(document_id), fg='green'))
+    logging.info(click.style("Start update document: {}".format(document_id), fg="green"))
     start_at = time.perf_counter()
 
-    # 从数据库获取文档对象
-    document = db.session.query(Document).filter(
-        Document.id == document_id,
-        Document.dataset_id == dataset_id
-    ).first()
+    document = db.session.query(Document).filter(Document.id == document_id, Document.dataset_id == dataset_id).first()
 
     # 如果文档不存在，则抛出未找到异常
     if not document:
-        raise NotFound('Document not found')
+        raise NotFound("Document not found")
 
-    # 更新文档的索引状态为正在解析，并记录处理开始时间
-    document.indexing_status = 'parsing'
+    document.indexing_status = "parsing"
     document.processing_started_at = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     db.session.commit()
 
@@ -46,7 +40,7 @@ def document_indexing_update_task(dataset_id: str, document_id: str):
         # 获取数据集对象
         dataset = db.session.query(Dataset).filter(Dataset.id == dataset_id).first()
         if not dataset:
-            raise Exception('Dataset not found')
+            raise Exception("Dataset not found")
 
         # 根据文档形式获取索引处理器
         index_type = document.doc_form
@@ -66,7 +60,13 @@ def document_indexing_update_task(dataset_id: str, document_id: str):
         end_at = time.perf_counter()
         # 记录删除文档段落和索引的日志
         logging.info(
-            click.style('Cleaned document when document update data source or process rule: {} latency: {}'.format(document_id, end_at - start_at), fg='green'))
+            click.style(
+                "Cleaned document when document update data source or process rule: {} latency: {}".format(
+                    document_id, end_at - start_at
+                ),
+                fg="green",
+            )
+        )
     except Exception:
         # 记录异常日志
         logging.exception("Cleaned document when document update data source or process rule failed")
@@ -76,11 +76,9 @@ def document_indexing_update_task(dataset_id: str, document_id: str):
         indexing_runner = IndexingRunner()
         indexing_runner.run([document])
         end_at = time.perf_counter()
-        # 记录更新文档索引的日志
-        logging.info(click.style('update document: {} latency: {}'.format(document.id, end_at - start_at), fg='green'))
+        logging.info(click.style("update document: {} latency: {}".format(document.id, end_at - start_at), fg="green"))
     except DocumentIsPausedException as ex:
-        # 如果文档更新过程中被暂停，则记录相应的日志
-        logging.info(click.style(str(ex), fg='yellow'))
+        logging.info(click.style(str(ex), fg="yellow"))
     except Exception:
         # 忽略其他异常
         pass

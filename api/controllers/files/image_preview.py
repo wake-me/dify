@@ -28,29 +28,23 @@ class ImagePreviewApi(Resource):
         # 将file_id转换为字符串格式
         file_id = str(file_id)
 
-        # 从请求参数中获取时间戳、随机数和签名
-        timestamp = request.args.get('timestamp')
-        nonce = request.args.get('nonce')
-        sign = request.args.get('sign')
+        timestamp = request.args.get("timestamp")
+        nonce = request.args.get("nonce")
+        sign = request.args.get("sign")
 
         # 若缺少时间戳、随机数或签名，则返回无效请求信息
         if not timestamp or not nonce or not sign:
-            return {'content': 'Invalid request.'}, 400
+            return {"content": "Invalid request."}, 400
 
         try:
-            # 尝试获取图片预览，包括生成器和MIME类型
-            generator, mimetype = FileService.get_image_preview(
-                file_id,
-                timestamp,
-                nonce,
-                sign
-            )
+            generator, mimetype = FileService.get_image_preview(file_id, timestamp, nonce, sign)
         except services.errors.file.UnsupportedFileTypeError:
             # 若文件类型不支持，则抛出异常
             raise UnsupportedFileTypeError()
 
         # 返回图片预览响应
         return Response(generator, mimetype=mimetype)
+
 
 class WorkspaceWebappLogoApi(Resource):
     """
@@ -69,11 +63,11 @@ class WorkspaceWebappLogoApi(Resource):
 
         # 根据workspace_id获取定制配置，尝试获取替换Web应用Logo的文件ID
         custom_config = TenantService.get_custom_config(workspace_id)
-        webapp_logo_file_id = custom_config.get('replace_webapp_logo') if custom_config is not None else None
+        webapp_logo_file_id = custom_config.get("replace_webapp_logo") if custom_config is not None else None
 
         # 如果未找到webapp_logo_file_id，则抛出未找到错误
         if not webapp_logo_file_id:
-            raise NotFound('webapp logo is not found')
+            raise NotFound("webapp logo is not found")
 
         try:
             # 尝试根据webapp_logo_file_id获取图像预览及其MIME类型
@@ -87,19 +81,12 @@ class WorkspaceWebappLogoApi(Resource):
         # 返回图像数据和MIME类型
         return Response(generator, mimetype=mimetype)
 
-api.add_resource(ImagePreviewApi, '/files/<uuid:file_id>/image-preview')
-api.add_resource(WorkspaceWebappLogoApi, '/files/workspaces/<uuid:workspace_id>/webapp-logo')
+
+api.add_resource(ImagePreviewApi, "/files/<uuid:file_id>/image-preview")
+api.add_resource(WorkspaceWebappLogoApi, "/files/workspaces/<uuid:workspace_id>/webapp-logo")
 
 
 class UnsupportedFileTypeError(BaseHTTPException):
-    """
-    自定义异常类，用于处理不支持的文件类型错误。
-
-    属性:
-    error_code (str): 错误代码，用于标识错误类型。
-    description (str): 错误描述，提供关于错误的简短说明。
-    code (int): HTTP状态码，表示异常的HTTP响应状态。
-    """
-    error_code = 'unsupported_file_type'
+    error_code = "unsupported_file_type"
     description = "File type not allowed."
     code = 415

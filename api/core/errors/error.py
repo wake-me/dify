@@ -58,3 +58,8 @@ class ModelCurrentlyNotSupportError(Exception):
     自定义异常，当模型当前不支持时抛出。
     """
     description = "Model Currently Not Support"
+
+
+class InvokeRateLimitError(Exception):
+    """Raised when the Invoke returns rate limit error."""
+    description = "Rate Limit Error"

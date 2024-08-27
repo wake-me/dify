@@ -50,22 +50,22 @@ class RuleGenerateApi(Resource):
         """
         
         parser = reqparse.RequestParser()
-        parser.add_argument('instruction', type=str, required=True, nullable=False, location='json')
-        parser.add_argument('model_config', type=dict, required=True, nullable=False, location='json')
-        parser.add_argument('no_variable', type=bool, required=True, default=False, location='json')
+        parser.add_argument("instruction", type=str, required=True, nullable=False, location="json")
+        parser.add_argument("model_config", type=dict, required=True, nullable=False, location="json")
+        parser.add_argument("no_variable", type=bool, required=True, default=False, location="json")
         args = parser.parse_args()
 
         account = current_user
-        PROMPT_GENERATION_MAX_TOKENS = int(os.getenv('PROMPT_GENERATION_MAX_TOKENS', '512'))
+        PROMPT_GENERATION_MAX_TOKENS = int(os.getenv("PROMPT_GENERATION_MAX_TOKENS", "512"))
 
         try:
             # 尝试根据提供的参数生成规则配置
             rules = LLMGenerator.generate_rule_config(
                 tenant_id=account.current_tenant_id,
-                instruction=args['instruction'],
-                model_config=args['model_config'],
-                no_variable=args['no_variable'],
-                rule_config_max_tokens=PROMPT_GENERATION_MAX_TOKENS
+                instruction=args["instruction"],
+                model_config=args["model_config"],
+                no_variable=args["no_variable"],
+                rule_config_max_tokens=PROMPT_GENERATION_MAX_TOKENS,
             )
         except ProviderTokenNotInitError as ex:
             # 处理提供者令牌未初始化异常
@@ -83,4 +83,4 @@ class RuleGenerateApi(Resource):
         return rules  # 返回生成的规则配置
 
 
-api.add_resource(RuleGenerateApi, '/rule-generate')
+api.add_resource(RuleGenerateApi, "/rule-generate")

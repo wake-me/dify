@@ -33,55 +33,42 @@ from services.message_service import MessageService
 
 
 class MessageListApi(WebApiResource):
-    """
-    消息列表API资源类，用于处理消息列表的获取。
-
-    属性:
-    - feedback_fields: 反馈信息的字段定义。
-    - retriever_resource_fields: 检索资源的字段定义。
-    - message_fields: 消息的字段定义。
-    - message_infinite_scroll_pagination_fields: 无限滚动分页消息的字段定义。
-    """
-
-    # 定义反馈信息的字段
-    feedback_fields = {
-        'rating': fields.String
-    }
+    feedback_fields = {"rating": fields.String}
 
     # 定义检索资源的字段
     retriever_resource_fields = {
-        'id': fields.String,  # 资源的唯一标识符
-        'message_id': fields.String,  # 消息的唯一标识符
-        'position': fields.Integer,  # 资源在消息中的位置
-        'dataset_id': fields.String,  # 数据集的唯一标识符
-        'dataset_name': fields.String,  # 数据集的名称
-        'document_id': fields.String,  # 文档的唯一标识符
-        'document_name': fields.String,  # 文档的名称
-        'data_source_type': fields.String,  # 数据源的类型
-        'segment_id': fields.String,  # 文本段的唯一标识符
-        'score': fields.Float,  # 查询结果的相关性分数
-        'hit_count': fields.Integer,  # 命中结果的数量
-        'word_count': fields.Integer,  # 文本段的单词数量
-        'segment_position': fields.Integer,  # 文本段在文档中的位置
-        'index_node_hash': fields.String,  # 索引节点的哈希值
-        'content': fields.String,  # 文本段的内容
-        'created_at': TimestampField  # 资源创建的时间戳
+        "id": fields.String,
+        "message_id": fields.String,
+        "position": fields.Integer,
+        "dataset_id": fields.String,
+        "dataset_name": fields.String,
+        "document_id": fields.String,
+        "document_name": fields.String,
+        "data_source_type": fields.String,
+        "segment_id": fields.String,
+        "score": fields.Float,
+        "hit_count": fields.Integer,
+        "word_count": fields.Integer,
+        "segment_position": fields.Integer,
+        "index_node_hash": fields.String,
+        "content": fields.String,
+        "created_at": TimestampField,
     }
 
     # 定义消息的字段
     message_fields = {
-        'id': fields.String,
-        'conversation_id': fields.String,
-        'inputs': fields.Raw,
-        'query': fields.String,
-        'answer': fields.String(attribute='re_sign_file_url_answer'),
-        'message_files': fields.List(fields.Nested(message_file_fields), attribute='files'),
-        'feedback': fields.Nested(feedback_fields, attribute='user_feedback', allow_null=True),
-        'retriever_resources': fields.List(fields.Nested(retriever_resource_fields)),
-        'created_at': TimestampField,
-        'agent_thoughts': fields.List(fields.Nested(agent_thought_fields)),
-        'status': fields.String,
-        'error': fields.String,
+        "id": fields.String,
+        "conversation_id": fields.String,
+        "inputs": fields.Raw,
+        "query": fields.String,
+        "answer": fields.String(attribute="re_sign_file_url_answer"),
+        "message_files": fields.List(fields.Nested(message_file_fields), attribute="files"),
+        "feedback": fields.Nested(feedback_fields, attribute="user_feedback", allow_null=True),
+        "retriever_resources": fields.List(fields.Nested(retriever_resource_fields)),
+        "created_at": TimestampField,
+        "agent_thoughts": fields.List(fields.Nested(agent_thought_fields)),
+        "status": fields.String,
+        "error": fields.String,
     }
 
     """
@@ -95,9 +82,9 @@ class MessageListApi(WebApiResource):
     这个定义适用于需要进行无限滚动加载数据的场景，比如在网页或应用中的消息列表。
     """
     message_infinite_scroll_pagination_fields = {
-        'limit': fields.Integer,
-        'has_more': fields.Boolean,
-        'data': fields.List(fields.Nested(message_fields))
+        "limit": fields.Integer,
+        "has_more": fields.Boolean,
+        "data": fields.List(fields.Nested(message_fields)),
     }
 
     @marshal_with(message_infinite_scroll_pagination_fields)
@@ -108,15 +95,15 @@ class MessageListApi(WebApiResource):
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('conversation_id', required=True, type=uuid_value, location='args')
-        parser.add_argument('first_id', type=uuid_value, location='args')
-        parser.add_argument('limit', type=int_range(1, 100), required=False, default=20, location='args')
+        parser.add_argument("conversation_id", required=True, type=uuid_value, location="args")
+        parser.add_argument("first_id", type=uuid_value, location="args")
+        parser.add_argument("limit", type=int_range(1, 100), required=False, default=20, location="args")
         args = parser.parse_args()
 
         try:
-            # 根据起始ID和对话ID进行分页查询
-            return MessageService.pagination_by_first_id(app_model, end_user,
-                                                     args['conversation_id'], args['first_id'], args['limit'])
+            return MessageService.pagination_by_first_id(
+                app_model, end_user, args["conversation_id"], args["first_id"], args["limit"]
+            )
         except services.errors.conversation.ConversationNotExistsError:
             raise NotFound("Conversation Not Exists.")
         except services.errors.message.FirstMessageNotExistsError:
@@ -142,20 +129,16 @@ class MessageFeedbackApi(WebApiResource):
 
         # 初始化请求解析器，用于解析请求体中的参数
         parser = reqparse.RequestParser()
-        # 添加评分参数到解析器，支持'like', 'dislike'和None三种选择
-        parser.add_argument('rating', type=str, choices=['like', 'dislike', None], location='json')
-        # 解析请求体中的参数
+        parser.add_argument("rating", type=str, choices=["like", "dislike", None], location="json")
         args = parser.parse_args()
 
         try:
-            # 尝试创建消息反馈
-            MessageService.create_feedback(app_model, message_id, end_user, args['rating'])
+            MessageService.create_feedback(app_model, message_id, end_user, args["rating"])
         except services.errors.message.MessageNotExistsError:
             # 如果消息不存在，则抛出404错误
             raise NotFound("Message Not Exists.")
 
-        # 返回操作成功的结果
-        return {'result': 'success'}
+        return {"result": "success"}
 
 
 class MessageMoreLikeThisApi(WebApiResource):
@@ -183,19 +166,19 @@ class MessageMoreLikeThisApi(WebApiResource):
     """
 
     def get(self, app_model, end_user, message_id):
-        # 检查应用模式是否为'completion'
-        if app_model.mode != 'completion':
+        if app_model.mode != "completion":
             raise NotCompletionAppError()
 
         message_id = str(message_id)  # 确保消息ID为字符串格式
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('response_mode', type=str, required=True, choices=['blocking', 'streaming'], location='args')
+        parser.add_argument(
+            "response_mode", type=str, required=True, choices=["blocking", "streaming"], location="args"
+        )
         args = parser.parse_args()
 
-        # 根据响应模式确定是否流式返回结果
-        streaming = args['response_mode'] == 'streaming'
+        streaming = args["response_mode"] == "streaming"
 
         try:
             response = AppGenerateService.generate_more_like_this(
@@ -203,7 +186,7 @@ class MessageMoreLikeThisApi(WebApiResource):
                 user=end_user,
                 message_id=message_id,
                 invoke_from=InvokeFrom.WEB_APP,
-                streaming=streaming
+                streaming=streaming,
             )
 
             return helper.compact_generate_response(response)
@@ -260,10 +243,7 @@ class MessageSuggestedQuestionApi(WebApiResource):
         try:
             # 尝试获取回答后的建议问题
             questions = MessageService.get_suggested_questions_after_answer(
-                app_model=app_model,
-                user=end_user,
-                message_id=message_id,
-                invoke_from=InvokeFrom.WEB_APP
+                app_model=app_model, user=end_user, message_id=message_id, invoke_from=InvokeFrom.WEB_APP
             )
         except MessageNotExistsError:
             raise NotFound("Message not found")  # 消息不存在异常处理
@@ -283,10 +263,10 @@ class MessageSuggestedQuestionApi(WebApiResource):
             logging.exception("internal server error.")  # 内部服务器错误异常处理
             raise InternalServerError()
 
-        return {'data': questions}  # 返回建议问题数据
+        return {"data": questions}
 
 
-api.add_resource(MessageListApi, '/messages')
-api.add_resource(MessageFeedbackApi, '/messages/<uuid:message_id>/feedbacks')
-api.add_resource(MessageMoreLikeThisApi, '/messages/<uuid:message_id>/more-like-this')
-api.add_resource(MessageSuggestedQuestionApi, '/messages/<uuid:message_id>/suggested-questions')
+api.add_resource(MessageListApi, "/messages")
+api.add_resource(MessageFeedbackApi, "/messages/<uuid:message_id>/feedbacks")
+api.add_resource(MessageMoreLikeThisApi, "/messages/<uuid:message_id>/more-like-this")
+api.add_resource(MessageSuggestedQuestionApi, "/messages/<uuid:message_id>/suggested-questions")

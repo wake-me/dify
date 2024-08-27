@@ -15,6 +15,7 @@ from controllers.web.error import (
     ProviderNotInitializeError,
     ProviderQuotaExceededError,
 )
+from controllers.web.error import InvokeRateLimitError as InvokeRateLimitHttpError
 from controllers.web.wraps import WebApiResource
 from core.app.apps.base_app_queue_manager import AppQueueManager
 from core.app.entities.app_invoke_entities import InvokeFrom
@@ -24,64 +25,30 @@ from libs import helper
 from libs.helper import uuid_value
 from models.model import AppMode
 from services.app_generate_service import AppGenerateService
+from services.errors.llm import InvokeRateLimitError
 
 
 class CompletionApi(WebApiResource):
-    """
-    定义了一个用于用户完成任务的API接口。
-
-    Attributes:
-        WebApiResource: 继承的API资源基类。
-    """
-
     def post(self, app_model, end_user):
-        """
-        处理POST请求，用于发起完成任务的请求。
-
-        Parameters:
-            app_model: 应用模型，用于确定任务的配置和模式。
-            end_user: 终端用户信息，用于识别请求的用户。
-
-        Returns:
-            返回一个紧凑的响应结果，具体取决于完成服务的处理。
-
-        Raises:
-            NotCompletionAppError: 如果应用模式不是'completion'，则抛出异常。
-            NotFound: 如果对话不存在，则抛出异常。
-            ConversationCompletedError: 如果对话已完成，则抛出异常。
-            AppUnavailableError: 如果应用模型配置错误，则抛出异常。
-            ProviderNotInitializeError: 如果服务提供者未初始化，则抛出异常。
-            ProviderQuotaExceededError: 如果达到服务提供者的配额限制，则抛出异常。
-            ProviderModelCurrentlyNotSupportError: 如果当前服务模型不被支持，则抛出异常。
-            CompletionRequestError: 如果完成请求发生错误，则抛出异常。
-            ValueError: 如果发生值错误，则抛出异常。
-            InternalServerError: 如果发生内部服务器错误，则抛出异常。
-        """
-        # 检查应用模式是否为'completion'
-        if app_model.mode != 'completion':
+        if app_model.mode != "completion":
             raise NotCompletionAppError()
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('inputs', type=dict, required=True, location='json')
-        parser.add_argument('query', type=str, location='json', default='')
-        parser.add_argument('files', type=list, required=False, location='json')
-        parser.add_argument('response_mode', type=str, choices=['blocking', 'streaming'], location='json')
-        parser.add_argument('retriever_from', type=str, required=False, default='web_app', location='json')
+        parser.add_argument("inputs", type=dict, required=True, location="json")
+        parser.add_argument("query", type=str, location="json", default="")
+        parser.add_argument("files", type=list, required=False, location="json")
+        parser.add_argument("response_mode", type=str, choices=["blocking", "streaming"], location="json")
+        parser.add_argument("retriever_from", type=str, required=False, default="web_app", location="json")
 
         args = parser.parse_args()
 
-        # 处理响应模式，决定是否采用流式响应
-        streaming = args['response_mode'] == 'streaming'
-        args['auto_generate_name'] = False
+        streaming = args["response_mode"] == "streaming"
+        args["auto_generate_name"] = False
 
         try:
             response = AppGenerateService.generate(
-                app_model=app_model,
-                user=end_user,
-                args=args,
-                invoke_from=InvokeFrom.WEB_APP,
-                streaming=streaming
+                app_model=app_model, user=end_user, args=args, invoke_from=InvokeFrom.WEB_APP, streaming=streaming
             )
 
             return helper.compact_generate_response(response)
@@ -124,14 +91,12 @@ class CompletionStopApi(WebApiResource):
     """
     
     def post(self, app_model, end_user, task_id):
-        # 检查应用模式是否为完成模式，如果不是则抛出异常
-        if app_model.mode != 'completion':
+        if app_model.mode != "completion":
             raise NotCompletionAppError()
 
         AppQueueManager.set_stop_flag(task_id, InvokeFrom.WEB_APP, end_user.id)
 
-        # 返回成功结果
-        return {'result': 'success'}, 200
+        return {"result": "success"}, 200
 
 
 class ChatApi(WebApiResource):
@@ -156,26 +121,21 @@ class ChatApi(WebApiResource):
 
         # 解析请求参数
         parser = reqparse.RequestParser()
-        parser.add_argument('inputs', type=dict, required=True, location='json')
-        parser.add_argument('query', type=str, required=True, location='json')
-        parser.add_argument('files', type=list, required=False, location='json')
-        parser.add_argument('response_mode', type=str, choices=['blocking', 'streaming'], location='json')
-        parser.add_argument('conversation_id', type=uuid_value, location='json')
-        parser.add_argument('retriever_from', type=str, required=False, default='web_app', location='json')
+        parser.add_argument("inputs", type=dict, required=True, location="json")
+        parser.add_argument("query", type=str, required=True, location="json")
+        parser.add_argument("files", type=list, required=False, location="json")
+        parser.add_argument("response_mode", type=str, choices=["blocking", "streaming"], location="json")
+        parser.add_argument("conversation_id", type=uuid_value, location="json")
+        parser.add_argument("retriever_from", type=str, required=False, default="web_app", location="json")
 
         args = parser.parse_args()
 
-        # 处理响应模式为流式传输的情况
-        streaming = args['response_mode'] == 'streaming'
-        args['auto_generate_name'] = False
+        streaming = args["response_mode"] == "streaming"
+        args["auto_generate_name"] = False
 
         try:
             response = AppGenerateService.generate(
-                app_model=app_model,
-                user=end_user,
-                args=args,
-                invoke_from=InvokeFrom.WEB_APP,
-                streaming=streaming
+                app_model=app_model, user=end_user, args=args, invoke_from=InvokeFrom.WEB_APP, streaming=streaming
             )
 
             return helper.compact_generate_response(response)
@@ -198,6 +158,8 @@ class ChatApi(WebApiResource):
         except ModelCurrentlyNotSupportError:
             # 处理模型当前不支持的异常
             raise ProviderModelCurrentlyNotSupportError()
+        except InvokeRateLimitError as ex:
+            raise InvokeRateLimitHttpError(ex.description)
         except InvokeError as e:
             # 处理调用错误的异常
             raise CompletionRequestError(e.description)
@@ -229,11 +191,10 @@ class ChatStopApi(WebApiResource):
 
         AppQueueManager.set_stop_flag(task_id, InvokeFrom.WEB_APP, end_user.id)
 
-        # 返回成功结果和HTTP状态码200
-        return {'result': 'success'}, 200
+        return {"result": "success"}, 200
 
 
-api.add_resource(CompletionApi, '/completion-messages')
-api.add_resource(CompletionStopApi, '/completion-messages/<string:task_id>/stop')
-api.add_resource(ChatApi, '/chat-messages')
-api.add_resource(ChatStopApi, '/chat-messages/<string:task_id>/stop')
+api.add_resource(CompletionApi, "/completion-messages")
+api.add_resource(CompletionStopApi, "/completion-messages/<string:task_id>/stop")
+api.add_resource(ChatApi, "/chat-messages")
+api.add_resource(ChatStopApi, "/chat-messages/<string:task_id>/stop")
