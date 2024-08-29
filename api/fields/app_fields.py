@@ -1,5 +1,6 @@
 from flask_restful import fields
 
+from fields.workflow_fields import workflow_partial_fields
 from libs.helper import AppIconUrlField, TimestampField
 
 # 定义应用详情的基本字段
@@ -42,7 +43,10 @@ model_config_fields = {
     "completion_prompt_config": fields.Raw(attribute="completion_prompt_config_dict"),
     "dataset_configs": fields.Raw(attribute="dataset_configs_dict"),
     "file_upload": fields.Raw(attribute="file_upload_dict"),
+    "created_by": fields.String,
     "created_at": TimestampField,
+    "updated_by": fields.String,
+    "updated_at": TimestampField,
 }
 
 # 定义应用详情页面展示的字段结构
@@ -56,8 +60,12 @@ app_detail_fields = {
     "enable_site": fields.Boolean,
     "enable_api": fields.Boolean,
     "model_config": fields.Nested(model_config_fields, attribute="app_model_config", allow_null=True),
+    "workflow": fields.Nested(workflow_partial_fields, allow_null=True),
     "tracing": fields.Raw,
+    "created_by": fields.String,
     "created_at": TimestampField,
+    "updated_by": fields.String,
+    "updated_at": TimestampField,
 }
 
 # 定义提示配置的字段结构
@@ -69,6 +77,10 @@ prompt_config_fields = {
 model_config_partial_fields = {
     "model": fields.Raw(attribute="model_dict"),
     "pre_prompt": fields.String,
+    "created_by": fields.String,
+    "created_at": TimestampField,
+    "updated_by": fields.String,
+    "updated_at": TimestampField,
 }
 
 tag_fields = {"id": fields.String, "name": fields.String, "type": fields.String}
@@ -85,7 +97,11 @@ app_partial_fields = {
     "icon_background": fields.String,
     "icon_url": AppIconUrlField,
     "model_config": fields.Nested(model_config_partial_fields, attribute="app_model_config", allow_null=True),
+    "workflow": fields.Nested(workflow_partial_fields, allow_null=True),
+    "created_by": fields.String,
     "created_at": TimestampField,
+    "updated_by": fields.String,
+    "updated_at": TimestampField,
     "tags": fields.List(fields.Nested(tag_fields)),
 }
 
@@ -134,6 +150,10 @@ site_fields = {
     "prompt_public": fields.Boolean,
     "app_base_url": fields.String,
     "show_workflow_steps": fields.Boolean,
+    "created_by": fields.String,
+    "created_at": TimestampField,
+    "updated_by": fields.String,
+    "updated_at": TimestampField,
 }
 
 # 定义包含站点信息的 app 详情字段
@@ -149,9 +169,13 @@ app_detail_fields_with_site = {
     "enable_site": fields.Boolean,
     "enable_api": fields.Boolean,
     "model_config": fields.Nested(model_config_fields, attribute="app_model_config", allow_null=True),
+    "workflow": fields.Nested(workflow_partial_fields, allow_null=True),
     "site": fields.Nested(site_fields),
     "api_base_url": fields.String,
+    "created_by": fields.String,
     "created_at": TimestampField,
+    "updated_by": fields.String,
+    "updated_at": TimestampField,
     "deleted_tools": fields.List(fields.String),
 }
 

@@ -878,6 +878,7 @@ class IndexingRunner:
                 # 更新状态为完成的文档段
                 db.session.query(DocumentSegment).filter(
                     DocumentSegment.document_id == document_id,
+                    DocumentSegment.dataset_id == dataset_id,
                     DocumentSegment.index_node_id.in_(document_ids),
                     DocumentSegment.status == "indexing"
                 ).update({
@@ -910,6 +911,7 @@ class IndexingRunner:
             # 更新数据库中对应文档段的状态为完成，并启用它们
             db.session.query(DocumentSegment).filter(
                 DocumentSegment.document_id == dataset_document.id,
+                DocumentSegment.dataset_id == dataset.id,
                 DocumentSegment.index_node_id.in_(document_ids),
                 DocumentSegment.status == "indexing"
             ).update({

@@ -123,7 +123,9 @@ class App(db.Model):
     is_universal = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
     tracing = db.Column(db.Text, nullable=True)
     max_active_requests = db.Column(db.Integer, nullable=True)
+    created_by = db.Column(StringUUID, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_by = db.Column(StringUUID, nullable=True)
     updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
 
     @property
@@ -352,7 +354,9 @@ class AppModelConfig(db.Model):
     provider = db.Column(db.String(255), nullable=True)
     model_id = db.Column(db.String(255), nullable=True)
     configs = db.Column(db.JSON, nullable=True)
+    created_by = db.Column(StringUUID, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_by = db.Column(StringUUID, nullable=True)
     updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
     opening_statement = db.Column(db.Text)
     suggested_questions = db.Column(db.Text)
@@ -798,7 +802,6 @@ class InstalledApp(db.Model):
         return tenant
 
 
-
 class Conversation(db.Model):
     """
     对话模型，用于表示一个对话实体。
@@ -1032,6 +1035,15 @@ class Conversation(db.Model):
             end_user = db.session.query(EndUser).filter(EndUser.id == self.from_end_user_id).first()
             if end_user:
                 return end_user.session_id
+
+        return None
+
+    @property
+    def from_account_name(self):
+        if self.from_account_id:
+            account = db.session.query(Account).filter(Account.id == self.from_account_id).first()
+            if account:
+                return account.name
 
         return None
 
@@ -1818,7 +1830,9 @@ class Site(db.Model):
     customize_token_strategy = db.Column(db.String(255), nullable=False)
     prompt_public = db.Column(db.Boolean, nullable=False, server_default=db.text('false'))
     status = db.Column(db.String(255), nullable=False, server_default=db.text("'normal'::character varying"))
+    created_by = db.Column(StringUUID, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
+    updated_by = db.Column(StringUUID, nullable=True)
     updated_at = db.Column(db.DateTime, nullable=False, server_default=db.text('CURRENT_TIMESTAMP(0)'))
     code = db.Column(db.String(255))
 

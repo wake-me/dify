@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from flask_login import current_user
 from flask_restful import Resource, marshal_with, reqparse
 from werkzeug.exceptions import Forbidden, NotFound
@@ -86,6 +88,8 @@ class AppSite(Resource):
             if value is not None:
                 setattr(site, attr_name, value)
 
+        site.updated_by = current_user.id
+        site.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
         db.session.commit()
 
         return site  # 返回更新后的站点信息
@@ -110,7 +114,9 @@ class AppSiteAccessTokenReset(Resource):
 
         # 生成新的16位代码，并更新数据库中的站点代码
         site.code = Site.generate_code(16)
-        db.session.commit()  # 提交数据库事务
+        site.updated_by = current_user.id
+        site.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.session.commit()
 
         return site  # 返回更新后的站点信息
 

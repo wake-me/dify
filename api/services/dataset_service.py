@@ -136,20 +136,10 @@ class DatasetService:
         return datasets.items, datasets.total
 
     @staticmethod
-    def create_empty_dataset(tenant_id: str, name: str, indexing_technique: Optional[str], account: Account):
-        """
-        创建一个空的数据集。
-
-        参数:
-        tenant_id (str): 租户ID，用于标识数据集所属的租户。
-        name (str): 数据集的名称。
-        indexing_technique (Optional[str]): 数据集的索引技术类型，可以为空。如果指定为'high_quality'，则会尝试使用高质量的嵌入模型。
-        account (Account): 创建数据集的账户信息。
-
-        返回值:
-        Dataset: 创建的空数据集对象。
-        """
-        # 检查数据集名称是否已经存在
+    def create_empty_dataset(
+        tenant_id: str, name: str, indexing_technique: Optional[str], account: Account, permission: Optional[str]
+    ):
+        # check if dataset name already exists
         if Dataset.query.filter_by(name=name, tenant_id=tenant_id).first():
             raise DatasetNameDuplicateError(f"Dataset with name {name} already exists.")
         embedding_model = None
@@ -167,8 +157,7 @@ class DatasetService:
         # 如果存在嵌入模型，则设置模型的提供者和模型本身
         dataset.embedding_model_provider = embedding_model.provider if embedding_model else None
         dataset.embedding_model = embedding_model.model if embedding_model else None
-        
-        # 将数据集实例添加到数据库会话，并提交事务
+        dataset.permission = permission if permission else DatasetPermissionEnum.ONLY_ME
         db.session.add(dataset)
         db.session.commit()
         

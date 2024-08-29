@@ -768,6 +768,7 @@ class DocumentDetailApi(DocumentResource):
                 "hit_count": document.hit_count,
                 "display_status": document.display_status,
                 "doc_form": document.doc_form,
+                "doc_language": document.doc_language,
             }
         else:
             # 返回所有信息
@@ -801,6 +802,7 @@ class DocumentDetailApi(DocumentResource):
                 "hit_count": document.hit_count,
                 "display_status": document.display_status,
                 "doc_form": document.doc_form,
+                "doc_language": document.doc_language,
             }
 
         return response, 200
