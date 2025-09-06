@@ -106,7 +106,7 @@ class RedisConfig(BaseSettings):
 
     REDIS_SERIALIZATION_PROTOCOL: int = Field(
         description="Redis serialization protocol (RESP) version",
-        default=3,
+        default=2,
     )
 
     REDIS_ENABLE_CLIENT_SIDE_CACHE: bool = Field(

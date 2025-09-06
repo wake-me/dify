@@ -222,3 +222,4 @@ api/.env.backup
 .bmad-core/
 .qwen/
 .claude/commands/
+.doc/
